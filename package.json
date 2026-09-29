@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "deploy": "vite build && wrangler deploy",
     "test": "vitest run",
+    "test:e2e": "vite build && playwright test",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.worker.json --noEmit"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.60.2",
     "@cloudflare/workers-types": "^5.20260926.1",
+    "@playwright/test": "^1.63.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",

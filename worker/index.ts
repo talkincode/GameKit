@@ -1,69 +1,107 @@
-type AiEnv = { AI: Ai };
+import { complete, image, readMessages } from "./ai";
+import type { GameKitEnv } from "./env";
+import { HttpError, errorResponse, json, redirect } from "./http";
+import { DEV_COOKIE, readCookie, requireIdentity, usesLocalAuth } from "./identity";
 
-const TEXT_MODEL = "@cf/qwen/qwen2.5-coder-32b-instruct";
-const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
-
+/**
+ * Routes. Static files (the studio page, PWA shell) never reach this Worker.
+ *
+ * Every `/api/*` route needs an allowed identity (see identity.ts). There are no
+ * anonymous API routes; unknown paths are refused by the gate before the 404.
+ * Sign-in and sign-out are top-level navigations, not fetches:
+ *
+ * - GET /api/login   Cloudflare Access signs the user in, then we send them back to `/?login=<result>`.
+ * - GET /api/logout  Ends the Access session.
+ */
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== "/api/ai") return new Response(null, { status: 404 });
-    if (request.method !== "POST") return json({ error: "Use POST." }, 405);
-    if (!env.AI) return json({ error: "Workers AI is not configured for this deployment." }, 503);
-
-    let body: unknown;
     try {
-      body = await request.json();
-    } catch {
-      return json({ error: "The request body must be JSON." }, 400);
-    }
-    if (!body || typeof body !== "object") return json({ error: "The request body must be an object." }, 400);
-    const record = body as { op?: unknown; messages?: unknown; prompt?: unknown };
+      if (url.pathname === "/api/login") return await login(request, env, url);
+      if (url.pathname === "/api/logout") return logout(env, url);
+      if (!url.pathname.startsWith("/api/")) return json({ error: "Not found.", code: "not_found" }, 404);
 
-    try {
-      if (record.op === "complete") return await complete(env, record.messages);
-      if (record.op === "image") return await image(env, record.prompt);
-      return json({ error: "Unknown AI operation." }, 400);
+      const identity = await requireIdentity(request, env);
+      if (url.pathname === "/api/me" && request.method === "GET") return json({ email: identity.email });
+      if (url.pathname === "/api/ai" && request.method === "POST") return await ai(request, env);
+      return json({ error: "Not found.", code: "not_found" }, 404);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "The AI request failed.";
-      return json({ error: message }, 502);
+      return errorResponse(error);
     }
   },
-} satisfies ExportedHandler<AiEnv>;
+} satisfies ExportedHandler<GameKitEnv>;
 
-async function complete(env: AiEnv, messages: unknown): Promise<Response> {
-  if (!Array.isArray(messages) || messages.length < 1 || messages.length > 8) {
-    return json({ error: "A completion needs 1 to 8 messages." }, 400);
+async function ai(request: Request, env: GameKitEnv): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    throw new HttpError(400, "bad_request", "The request body must be JSON.");
   }
-  const clean = messages.map((message) => {
-    if (!message || typeof message !== "object") throw new Error("Invalid message.");
-    const entry = message as { role?: unknown; content?: unknown };
-    if (entry.role !== "system" && entry.role !== "user") throw new Error("Unsupported message role.");
-    if (typeof entry.content !== "string" || entry.content.length > 24_000) {
-      throw new Error("A message is missing or too long.");
-    }
-    return { role: entry.role, content: entry.content };
-  });
-  const result = await env.AI.run(TEXT_MODEL, { messages: clean, max_tokens: 4096, temperature: 0.2 });
-  const text = textOf(result);
-  if (!text) return json({ error: "The model returned an empty response." }, 502);
-  return json({ text });
+  if (!body || typeof body !== "object") throw new HttpError(400, "bad_request", "The request body must be an object.");
+  const record = body as { op?: unknown; messages?: unknown; prompt?: unknown };
+  if (record.op === "complete") return json({ text: await complete(env, readMessages(record.messages)) });
+  if (record.op === "image") return json(await image(env, record.prompt));
+  throw new HttpError(400, "bad_request", "Unknown AI operation.");
 }
 
-async function image(env: AiEnv, prompt: unknown): Promise<Response> {
-  if (typeof prompt !== "string" || prompt.trim().length < 3 || prompt.length > 1200) {
-    return json({ error: "The image prompt must be between 3 and 1200 characters." }, 400);
+const LOGIN_RESULT: Record<number, string> = { 401: "failed", 403: "denied", 503: "unavailable" };
+
+async function login(request: Request, env: GameKitEnv, url: URL): Promise<Response> {
+  let local: boolean;
+  try {
+    local = usesLocalAuth(env, url);
+  } catch {
+    return redirect("/?login=unavailable");
   }
-  const result = (await env.AI.run(IMAGE_MODEL, { prompt: prompt.trim(), steps: 4 })) as { image?: string };
-  if (!result.image) return json({ error: "The image model returned no image." }, 502);
-  return json({ image: result.image, mediaType: "image/jpeg" });
+
+  if (local && request.method === "POST") {
+    const form = await request.formData();
+    const email = String(form.get("email") ?? "").trim().toLowerCase();
+    return redirect("/api/login", { "Set-Cookie": devCookie(email, 60 * 60 * 24) });
+  }
+  if (local && !readCookie(request, DEV_COOKIE)) return localSignInForm();
+
+  try {
+    await requireIdentity(request, env);
+    return redirect("/?login=ok");
+  } catch (error) {
+    if (!(error instanceof HttpError) || !LOGIN_RESULT[error.status]) throw error;
+    // Locally, forget a refused email so the form can be used again.
+    const headers: HeadersInit = local ? { "Set-Cookie": devCookie("", 0) } : {};
+    return redirect(`/?login=${LOGIN_RESULT[error.status]}`, headers);
+  }
 }
 
-function textOf(result: unknown): string {
-  if (!result || typeof result !== "object") return "";
-  const record = result as { response?: unknown };
-  return typeof record.response === "string" ? record.response : "";
+function logout(env: GameKitEnv, url: URL): Response {
+  let local: boolean;
+  try {
+    local = usesLocalAuth(env, url);
+  } catch {
+    return redirect("/?login=out");
+  }
+  if (local) return redirect("/?login=out", { "Set-Cookie": devCookie("", 0) });
+  return redirect("/cdn-cgi/access/logout");
 }
 
-function json(body: unknown, status = 200): Response {
-  return Response.json(body, { status });
+function devCookie(value: string, maxAge: number): string {
+  return `${DEV_COOKIE}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+function localSignInForm(): Response {
+  const html = `<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GameKit 本地登录</title>
+<body style="font-family: system-ui; max-width: 28rem; margin: 4rem auto; padding: 0 1rem">
+<h1>本地开发登录</h1>
+<p>这是本地开发用的替身。正式站点使用 Cloudflare Access 的 GitHub 登录。</p>
+<form method="post" action="/api/login">
+<label>GitHub 账号邮箱 <input name="email" type="email" required autofocus></label>
+<button type="submit">登录</button>
+</form>
+</body>
+</html>`;
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }

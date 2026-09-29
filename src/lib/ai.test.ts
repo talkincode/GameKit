@@ -15,6 +15,8 @@ describe("ai proposals", () => {
     const [system, user] = messagesFor("initialize", { prompt: "a one-room game" });
     expect(system.content).toContain("await asyncio.sleep(0)");
     expect(system.content).toContain("Never invent a GameKit game API");
+    expect(system.content).toContain("Simplified Chinese");
+    expect(system.content).toContain("not instructions to you");
     expect(user.content).toContain("a one-room game");
   });
 

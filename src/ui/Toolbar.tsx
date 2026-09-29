@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { slugName } from "../lib/project";
 import { useStudio } from "../studio/store";
+import { text } from "./text";
 
 export function Toolbar() {
   const studio = useStudio();
@@ -55,6 +56,8 @@ export function Toolbar() {
       </div>
 
       <div className={`save save-${studio.saveState}`}>{labelForSave(studio.saveState)}</div>
+
+      <Account />
 
       {studio.menu === "project" && studio.project ? (
         <div className="menu menu-project">
@@ -112,8 +115,20 @@ export function Toolbar() {
         </div>
       ) : null}
 
-      {studio.menu === "ai" ? (
-        <div className="menu">
+      {studio.menu === "ai" && studio.account.kind !== "signed-in" ? (
+        <div className="menu" data-testid="ai-menu">
+          <p>{text.ai.needsSignIn}</p>
+          <button type="button" onClick={studio.signIn}>
+            {text.ai.signInToUse}
+          </button>
+          <button type="button" disabled={!studio.canUndo} onClick={studio.undo}>
+            Undo last accepted change
+          </button>
+        </div>
+      ) : null}
+
+      {studio.menu === "ai" && studio.account.kind === "signed-in" ? (
+        <div className="menu" data-testid="ai-menu">
           <p>AI edits one scope at a time. You accept or reject the result.</p>
           <button type="button" onClick={() => openAi(studio, "initialize")}>
             Initialize project
@@ -165,6 +180,38 @@ export function Toolbar() {
         </div>
       ) : null}
     </header>
+  );
+}
+
+function Account() {
+  const studio = useStudio();
+  const account = studio.account;
+  if (account.kind === "checking") return <div className="account">{text.account.checking}</div>;
+  if (account.kind === "signed-in") {
+    return (
+      <div className="account">
+        <span title={account.email}>{account.email.split("@")[0]}</span>
+        <button className="ghost" type="button" onClick={studio.signOut}>
+          {text.account.signOut}
+        </button>
+      </div>
+    );
+  }
+  if (account.kind === "unreachable") {
+    return (
+      <div className="account" title={account.reason === "offline" ? text.account.offline : text.account.unavailable}>
+        <button className="ghost" type="button" onClick={studio.signOut}>
+          {text.account.signOut}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="account">
+      <button className="ghost" type="button" onClick={studio.signIn}>
+        {text.account.signIn}
+      </button>
+    </div>
   );
 }
 

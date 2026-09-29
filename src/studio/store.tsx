@@ -9,6 +9,17 @@ import {
   type ReactNode,
 } from "react";
 import template from "../../runtime/player.tmpl?raw";
+import {
+  LOGIN_PATH,
+  LOGOUT_PATH,
+  callApi,
+  fetchAccount,
+  hasSignInHint,
+  setSignInHint,
+  takeLoginResult,
+  type Account,
+  type ApiOutcome,
+} from "../lib/account";
 import { assetPrompt, messagesFor, readModelResult, type FileProposal } from "../lib/ai";
 import { buildWebBundle } from "../lib/build";
 import { diagnoseProject, problemsFromConsole, type Problem } from "../lib/diagnostics";
@@ -35,6 +46,7 @@ import {
 import { downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
 import { createBlankProject, createStarterProject } from "../lib/starter";
 import { deleteStoredProject, loadProjects, saveProject } from "../lib/storage";
+import { text } from "../ui/text";
 
 export type RunState = "idle" | "starting" | "running" | "stopped" | "error";
 export type SaveState = "saved" | "saving" | "error";
@@ -57,6 +69,9 @@ export type AssetDraft = {
 
 type StudioValue = {
   ready: boolean;
+  account: Account;
+  signIn: () => void;
+  signOut: () => void;
   project: Project | null;
   projects: Project[];
   path: string;
@@ -156,6 +171,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [bottomTab, setBottomTab] = useState<"console" | "problems" | "debug">("console");
   const [undoStack, setUndoStack] = useState<ProjectFile[][]>([]);
   const [runtimeProblems, setRuntimeProblems] = useState<Problem[]>([]);
+  const [account, setAccount] = useState<Account>({ kind: "checking" });
   const variation = useRef(1);
   const project = projects.find((item) => item.id === activeId) ?? null;
   const projectRef = useRef(project);
@@ -185,6 +201,56 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return () => {
       cancel = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const result = takeLoginResult();
+    if (result) setSignInHint(result === "ok");
+    if (result && result !== "ok") setNotice(text.account.notes[result]);
+    // Anonymous visitors never trigger an identity request.
+    if (!hasSignInHint()) {
+      setAccount({ kind: "anonymous" });
+      return;
+    }
+    let cancel = false;
+    void fetchAccount().then((next) => {
+      if (cancel) return;
+      if (next.kind === "anonymous") {
+        setSignInHint(false);
+        if (next.note) setNotice(text.account.notes[next.note]);
+      }
+      setAccount(next);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  /**
+   * Calls an AI route. Returns null (after telling the child why) when the call
+   * could not be made or did not succeed.
+   */
+  const callAi = useCallback(async <T,>(body: unknown): Promise<T | null> => {
+    const outcome: ApiOutcome<T> = await callApi<T>("/api/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (outcome.ok) return outcome.value;
+    if (outcome.problem === "sign-in" || outcome.problem === "denied") {
+      const note = outcome.problem === "denied" ? "denied" : "expired";
+      setSignInHint(false);
+      setAccount({ kind: "anonymous", note });
+      setNotice(text.account.notes[note]);
+    } else if (outcome.problem === "offline") {
+      setNotice(text.account.offline);
+    } else if (outcome.problem === "unavailable") {
+      setNotice(text.account.unavailable);
+    } else {
+      console.warn("AI request failed:", outcome.message);
+      setNotice(text.ai.failed);
+    }
+    return null;
   }, []);
 
   useEffect(() => {
@@ -278,6 +344,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
     return {
       ready,
+      account,
+      signIn: () => location.assign(LOGIN_PATH),
+      signOut: () => {
+        setSignInHint(false);
+        location.assign(LOGOUT_PATH);
+      },
       project,
       projects,
       path,
@@ -464,6 +536,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       ask: async (action, promptText) => {
         const current = requireProject();
         const file = current.files.find((item) => item.path === path);
+        if (account.kind !== "signed-in") {
+          setComposer(null);
+          setNotice(text.ai.needsSignIn);
+          return;
+        }
         if ((action === "complete" || action === "refactor") && !selection.trim()) {
           setNotice("Select the code you want to change.");
           return;
@@ -479,13 +556,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             selection,
             error: problems.find((item) => item.severity === "error")?.message,
           });
-          const response = await fetch("/api/ai", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ op: "complete", messages }),
-          });
-          const payload = (await response.json()) as { text?: string; error?: string };
-          if (!response.ok || !payload.text) throw new Error(payload.error || "AI request failed.");
+          const payload = await callAi<{ text?: string }>({ op: "complete", messages });
+          if (!payload) return;
+          if (!payload.text) throw new Error("AI request failed.");
           const result = readModelResult(payload.text, current, path);
           if (result.kind === "explain") {
             setProposal({ title: "Explain", explanation: result.explanation, files: [] });
@@ -516,17 +589,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       },
       canUndo: undoStack.length > 0,
       generateAsset: async (promptText) => {
+        if (account.kind !== "signed-in") {
+          setComposer(null);
+          setNotice(text.ai.needsSignIn);
+          return;
+        }
         variation.current += 1;
         setAiBusy(true);
         setNotice("");
         try {
-          const response = await fetch("/api/ai", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ op: "image", prompt: assetPrompt(assetKind, promptText, variation.current) }),
+          const payload = await callAi<{ image?: string; mediaType?: string }>({
+            op: "image",
+            prompt: assetPrompt(assetKind, promptText, variation.current),
           });
-          const payload = (await response.json()) as { image?: string; mediaType?: string; error?: string };
-          if (!response.ok || !payload.image) throw new Error(payload.error || "Image generation failed.");
+          if (!payload) return;
+          if (!payload.image) throw new Error("Image generation failed.");
           const stamp = new Date().toISOString().slice(11, 19).replaceAll(":", "");
           setAssetDraft({
             bytes: base64ToBytes(payload.image),
@@ -554,6 +631,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
   }, [
     ready,
+    account,
+    callAi,
     project,
     projects,
     path,

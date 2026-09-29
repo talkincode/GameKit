@@ -12,7 +12,7 @@ GameKit 没有自己实现 Pygame。预览和导出使用同一套 [pygbag 0.9.3
 | 桌面项目直接拷进来 | pygbag 不能在一个同步死循环里刷新页面 | 模板诊断 `await asyncio.sleep(0)`、`time.sleep` 和 `pygame.time.wait` | 这不是私有 API。同一份 async 循环也能在安装了 pygame 的桌面 Python 上运行。GameKit 不会在构建时偷偷改写用户源码 |
 | 音频 | 浏览器需要用户手势，且 pygame-web 支持的是 OGG Vorbis | 示例把 `mixer.init()` 放在第一次跳跃；WAV/MP3 只给出警告 | 打开预览后要点一下画面，声音才会响。桌面 WAV 文件不会被自动转码 |
 | 停止游戏 | WASM 进程活在 iframe 里 | Stop 把 iframe 设为 `about:blank`，重新 Run 使用新的会话 | 没有进程级调试器，也不能在任意行暂停 |
-| AI | 不能让模型自己改项目、构建或发布 | Worker 只提供补全和生图两个接口。产品逻辑在编辑器里，生成结果要先看 diff 再接受 | 公开站点会消耗账号的 Workers AI 额度。接口限制了消息长度和文件数量，但没有用户登录 |
+| AI | 不能让模型自己改项目、构建或发布 | Worker 只提供补全和生图两个接口，只对授权用户开放（见 [ai-rules.md](ai-rules.md)）。产品逻辑在编辑器里，生成结果要先看 diff 再接受 | 系统提示词仍在浏览器里拼装，授权用户可以改写它；还没有按人配额 |
 | 按键 | 编辑器焦点在 Monaco 上 | 要点预览画布，画布才会吃键盘 | Run 按钮的点击发生在父页面，不会替 iframe 完成自动播放授权 |
 
 ## 帧循环
