@@ -1,3 +1,5 @@
+import { designFromRecord, type DesignCard } from "./design";
+
 export type ProjectFile = {
   path: string;
   text?: string;
@@ -10,6 +12,8 @@ export type Project = {
   createdAt: number;
   updatedAt: number;
   files: ProjectFile[];
+  /** The design card the child adopted (see src/lib/design.ts). */
+  design?: DesignCard;
 };
 
 export type StoredFile = {
@@ -24,6 +28,7 @@ export type StoredProject = {
   createdAt: number;
   updatedAt: number;
   files: StoredFile[];
+  design?: DesignCard;
 };
 
 const TEXT_EXTENSIONS = new Set([
@@ -126,6 +131,7 @@ export function toStored(project: Project): StoredProject {
     files: project.files.map((file) =>
       file.bytes ? { path: file.path, base64: bytesToBase64(file.bytes) } : { path: file.path, text: file.text ?? "" },
     ),
+    design: project.design,
   };
 }
 
@@ -140,6 +146,7 @@ export function fromStored(stored: StoredProject): Project {
         file.base64 ? { path: file.path, bytes: base64ToBytes(file.base64) } : { path: file.path, text: file.text ?? "" },
       ),
     ),
+    design: designFromRecord(stored.design) ?? undefined,
   };
 }
 

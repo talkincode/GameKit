@@ -79,6 +79,15 @@ export function diagnoseProject(project: Project): Problem[] {
   return problems;
 }
 
+/** Last traceback in the console, for a repair prompt. */
+export function tracebackTail(text: string, max = 2_000): string {
+  const marker = "Traceback (most recent call last):";
+  const start = text.lastIndexOf(marker);
+  const body = start < 0 ? text : text.slice(start);
+  const trimmed = body.trim();
+  return trimmed.length <= max ? trimmed : trimmed.slice(-max);
+}
+
 export function problemsFromConsole(text: string): Problem[] {
   const marker = "Traceback (most recent call last):";
   const start = text.lastIndexOf(marker);

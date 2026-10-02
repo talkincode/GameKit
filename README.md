@@ -1,9 +1,12 @@
 # GameKit
 
-给孩子用的 AI 辅助 pygame 游戏工作室：像 MakeCode Arcade 一样在浏览器里做游戏，
-但写的是真正的 Python + pygame-ce 代码，导出后在桌面 Python 里也能运行。
+给孩子用的 AI 驱动 pygame 游戏设计器：说出想做的游戏，小助手做成能试玩的版本，孩子试完决定收下哪一版。
+写出来的是真正的 Python + pygame-ce 代码，导出后在桌面 Python 里也能运行。
 
-`想点子 → 写代码 → 试玩 → 改错 → 做素材 → 导出`
+`说想法 → 小助手做出候选版本 → 试玩 → 采用 → （随时）看代码 / 再改一句 → 导出`
+
+主界面分两个视图：**做游戏**（默认，舞台 + 小助手对话）和 **看代码**（文件树 + Monaco + 控制台）。
+小助手的自动迭代只发生在候选版本里；采用才写进作品，而且可以撤销。
 
 正式站点：https://gamekit.talkincode.net
 
@@ -88,7 +91,8 @@ pnpm preview
 
 - 编辑器不包含 pygame。预览和导出都使用 pygame-web 的 pygbag 0.9.3（pygame-ce / Python 3.12 WASM）。
 - 构建只生成文件。没有 itch.io、GitHub Pages 或 Cloudflare Pages 的账号对接，也不托管成品游戏。
-- AI 每次只处理一个明确操作，结果需要接受后才会写入项目。
-- 不做积木编辑器、不做公开作品广场，完整的非目标见 [docs/roadmap.md](docs/roadmap.md#非目标铁律)。
+- 小助手一轮最多修两次；只有代码证据（静态问题、traceback）才触发修复，改不动就停下来交给孩子。
+  候选改动只在内存里，采用才写入项目，而且可撤销。
+- 不做积木编辑器、不做公开作品广场，完整非目标见 [docs/roadmap.md](docs/roadmap.md#非目标铁律)。
 
 运行时选择和限制见 [docs/runtime.md](docs/runtime.md)。

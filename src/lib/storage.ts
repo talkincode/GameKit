@@ -3,9 +3,17 @@ import { fromStored, toStored, type Project, type StoredProject } from "./projec
 const DB_NAME = "gamekit";
 const STORE = "projects";
 
+/**
+ * Schema rule: object stores and indexes need a version bump (plus a migration in
+ * `onupgradeneeded`). Adding an optional field to a stored project record does
+ * not: old records simply lack it, and `fromStored` tolerates that. `design`
+ * (src/lib/design.ts) was added that way.
+ */
+const DB_VERSION = 1;
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" });

@@ -7,6 +7,7 @@ import "monaco-editor/languages/definitions/css/register.js";
 import { useEffect, useState } from "react";
 import { assetFilter, editorLanguage, mediaType } from "../lib/project";
 import { useStudio } from "../studio/store";
+import { text } from "./text";
 
 self.MonacoEnvironment = {
   getWorker() {
@@ -20,28 +21,26 @@ export function CodePane() {
   const file = studio.project?.files.find((item) => item.path === studio.path);
   const kind = file ? assetFilter(file.path) : null;
   const url = useObjectUrl(file?.bytes, file ? mediaType(file.path) : "");
+  const canExplain = !!file?.text;
 
   return (
     <section className="editor">
       <div className="tabs">
-        <span>{studio.path || "No file"}</span>
+        <span>{studio.path || text.code.files}</span>
         <div className="inline-ai">
-          <button type="button" onClick={() => void studio.ask("complete")} disabled={!studio.selection}>
-            Complete
-          </button>
-          <button type="button" onClick={() => void studio.ask("refactor")} disabled={!studio.selection}>
-            Refactor
-          </button>
-          <button type="button" onClick={() => void studio.ask("explain")}>
-            Explain
-          </button>
-          <button type="button" onClick={() => void studio.ask("fix")}>
-            Fix error
+          <button
+            type="button"
+            data-testid="explain"
+            disabled={!canExplain}
+            title={text.code.explain}
+            onClick={() => void studio.explainSelection()}
+          >
+            {studio.aiBusy ? text.pane.explainBusy : text.code.explain}
           </button>
         </div>
       </div>
       {!file ? (
-        <p className="empty pad">Open a file from the project.</p>
+        <p className="empty pad">{text.code.empty}</p>
       ) : file.text !== undefined && !file.bytes ? (
         <Editor
           key={file.path}
@@ -79,7 +78,7 @@ export function CodePane() {
           <p>{file.path}</p>
         </div>
       ) : (
-        <p className="empty pad">Binary file. Rename or delete it from Files.</p>
+        <p className="empty pad">{text.code.binary}</p>
       )}
     </section>
   );

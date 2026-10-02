@@ -129,6 +129,13 @@ export async function createStarterProject(name = "my-cool-game"): Promise<Proje
     name,
     createdAt: now,
     updatedAt: now,
+    design: {
+      title: "信号漂流",
+      hero: "一个小方块",
+      goal: "在平台上左右奔跑、跳来跳去，点一下画面就留下一个记号",
+      controls: ["←→ 或 A D 移动", "空格或 ↑ 跳跃", "点击画面留下记号"],
+      look: "深色的夜晚，绿色地面，橙色记号",
+    },
     files: [
       { path: "main.py", text: MAIN },
       { path: "game/__init__.py", text: "" },

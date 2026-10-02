@@ -2,8 +2,14 @@ import { useEffect, useRef } from "react";
 import { RUNTIME } from "../lib/build";
 import { parseGamekitEvent } from "../lib/messages";
 import { useStudio } from "../studio/store";
+import { text } from "./text";
 
-export function PreviewPane() {
+/**
+ * The stage: the one place a game runs, whether it is the child's own build or a
+ * candidate version. It stays mounted across views, so switching to 看代码 never
+ * restarts the game.
+ */
+export function Stage() {
   const studio = useStudio();
   const frame = useRef<HTMLIFrameElement>(null);
   const studioRef = useRef(studio);
@@ -27,7 +33,7 @@ export function PreviewPane() {
   }, []);
 
   useEffect(() => {
-    if (!frame.current || studio.frameSrc === "about:blank") return;
+    if (studio.frameSrc === "about:blank") return;
     const timer = window.setInterval(() => {
       const doc = frame.current?.contentDocument;
       if (!doc) return;
@@ -50,29 +56,44 @@ export function PreviewPane() {
     frame.current?.contentWindow?.focus();
   };
 
+  const idle = studio.runState === "idle" || studio.runState === "stopped";
+
   return (
-    <section className="preview">
-      <div className="preview-bar">
-        <strong>Preview</strong>
-        <span>{studio.statusNote}</span>
+    <section className="stage-pane">
+      <div className="stage-bar">
+        <span className={`stage-badge owner-${studio.stageOwner}`}>
+          {studio.stageOwner === "candidate" ? text.stage.candidate : text.stage.mine}
+        </span>
+        <span className="stage-note">{studio.statusNote}</span>
         <b>{studio.fps === null ? "FPS —" : `FPS ${Math.round(studio.fps)}`}</b>
+        {!idle ? (
+          <button className="stop" type="button" onClick={studio.stop}>
+            <i />
+            {text.stage.stop}
+          </button>
+        ) : null}
       </div>
-      <div className="stage" onPointerDown={focusGame}>
+      <div className="stage-screen" data-testid="stage" onPointerDown={focusGame}>
         <iframe
           ref={frame}
-          title="Game preview"
+          title={text.brand.name}
           src={studio.frameSrc}
           allow="autoplay; fullscreen; gamepad"
           onLoad={focusGame}
         />
-        {studio.runState === "idle" || studio.runState === "stopped" ? (
+        {idle ? (
           <div className="stage-idle">
-            <p>Press Run. The game uses the same pygame-ce runtime as an export.</p>
-            <small>Runtime {RUNTIME.version} · Python {RUNTIME.pybuild}</small>
+            <button className="play" type="button" onClick={() => void studio.run()}>
+              <i />
+              {text.stage.play}
+            </button>
+            <small>
+              {text.stage.empty} {text.stage.runtime(RUNTIME.version, RUNTIME.pybuild)}
+            </small>
           </div>
         ) : null}
       </div>
-      <p className="hint">Click the preview so the keyboard reaches the game. The first click also unlocks audio.</p>
+      <p className="stage-hint">{text.stage.clickToPlay}</p>
     </section>
   );
 }

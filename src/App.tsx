@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BottomPanel } from "./ui/BottomPanel";
 import { CodePane } from "./ui/CodePane";
+import { DesignerPane } from "./ui/DesignerPane";
 import { Overlays } from "./ui/Overlays";
-import { PreviewPane } from "./ui/PreviewPane";
 import { Sidebar } from "./ui/Sidebar";
+import { Stage } from "./ui/Stage";
 import { Toolbar } from "./ui/Toolbar";
 import { StudioProvider, useStudio } from "./studio/store";
 
@@ -17,6 +18,13 @@ export function App() {
 
 function Shell() {
   const studio = useStudio();
+  // Monaco is heavy; build it the first time the child opens 看代码, then keep it
+  // mounted so switching views never loses the file or the editor state.
+  const [codeSeen, setCodeSeen] = useState(false);
+
+  useEffect(() => {
+    if (studio.view === "code") setCodeSeen(true);
+  }, [studio.view]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -35,8 +43,7 @@ function Shell() {
 
   return (
     <div
-      className="shell"
-      style={{ ["--side" as string]: `${studio.side}px`, ["--bottom" as string]: `${studio.bottom}px` }}
+      className={`shell view-${studio.view}`}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
@@ -54,21 +61,17 @@ function Shell() {
       }}
     >
       <Toolbar />
-      <div className="workspace">
-        <Sidebar />
-        <Splitter
-          label="Resize file list"
-          onDelta={(delta) => studio.setSide(clamp(studio.side + delta, 188, 420))}
-        />
-        <CodePane />
-        <PreviewPane />
-      </div>
-      <Splitter
-        label="Resize console"
-        row
-        onDelta={(delta) => studio.setBottom(clamp(studio.bottom - delta, 108, 420))}
-      />
-      <BottomPanel />
+      <main className="studio">
+        <Stage />
+        <DesignerPane />
+        {codeSeen ? (
+          <>
+            <Sidebar />
+            <CodePane />
+            <BottomPanel />
+          </>
+        ) : null}
+      </main>
       <Overlays />
       {studio.notice ? (
         <button className="notice" type="button" onClick={studio.dismissNotice}>
@@ -77,30 +80,4 @@ function Shell() {
       ) : null}
     </div>
   );
-}
-
-function Splitter({ label, row, onDelta }: { label: string; row?: boolean; onDelta: (delta: number) => void }) {
-  return (
-    <div
-      className={row ? "gutter gutter-row" : "gutter"}
-      role="separator"
-      aria-orientation={row ? "horizontal" : "vertical"}
-      aria-label={label}
-      onPointerDown={(event) => {
-        event.preventDefault();
-        let origin = row ? event.clientY : event.clientX;
-        const move = (next: PointerEvent) => {
-          const point = row ? next.clientY : next.clientX;
-          onDelta(point - origin);
-          origin = point;
-        };
-        window.addEventListener("pointermove", move);
-        window.addEventListener("pointerup", () => window.removeEventListener("pointermove", move), { once: true });
-      }}
-    />
-  );
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }

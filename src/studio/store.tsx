@@ -20,10 +20,21 @@ import {
   type Account,
   type ApiOutcome,
 } from "../lib/account";
-import { assetPrompt, messagesFor, readModelResult, type FileProposal } from "../lib/ai";
+import {
+  RUN_EVIDENCE_MS,
+  foldStep,
+  runAgentTurn,
+  type AgentEvent,
+  type AgentStep,
+  type AgentTurnInput,
+  type AgentTurnOutcome,
+  type CandidateResult,
+  type RunOutcome,
+} from "../lib/agent";
+import { assetPrompt, explainMessages, readSay, type ChatMessage } from "../lib/ai";
 import { buildWebBundle } from "../lib/build";
-import { diagnoseProject, problemsFromConsole, type Problem } from "../lib/diagnostics";
-import { diffLines, type DiffRow } from "../lib/diff";
+import type { DesignCard } from "../lib/design";
+import { diagnoseProject, problemsFromConsole, tracebackTail, type Problem } from "../lib/diagnostics";
 import {
   embedZip,
   itchZip,
@@ -32,8 +43,8 @@ import {
   staticFolderZip,
   webZip,
 } from "../lib/export";
-import { base64ToBytes } from "../lib/project";
 import {
+  base64ToBytes,
   normalizePath,
   removeFile,
   renameFile,
@@ -50,14 +61,11 @@ import { text } from "../ui/text";
 
 export type RunState = "idle" | "starting" | "running" | "stopped" | "error";
 export type SaveState = "saved" | "saving" | "error";
-export type MenuId = "project" | "ai" | "export" | null;
-export type AiAction = "initialize" | "generate" | "complete" | "refactor" | "explain" | "fix";
-
-export type Proposal = {
-  title: string;
-  explanation: string;
-  files: { path: string; before: string; after: string; rows: DiffRow[] }[];
-};
+export type MenuId = "project" | "export" | null;
+/** 做游戏 is the product; 看代码 is where the implementation lives. */
+export type ViewId = "design" | "code";
+/** Whose build the stage is showing. */
+export type StageOwner = "current" | "candidate";
 
 export type AssetKind = "sprite" | "background" | "tile" | "icon";
 
@@ -66,6 +74,33 @@ export type AssetDraft = {
   mediaType: string;
   suggested: string;
 };
+
+/**
+ * One round in the conversation pane. It is a record of what happened, not a
+ * source of truth: only 采用 writes into the project.
+ */
+export type Turn = {
+  id: string;
+  kind: "design" | "explain";
+  /** What the child asked, in their own words. */
+  request: string;
+  steps: AgentStep[];
+  design?: DesignCard;
+  say: string;
+  /** The newest candidate version of this round. */
+  candidate?: CandidateResult;
+  outcome?: AgentTurnOutcome;
+  adopted: boolean;
+  discarded: boolean;
+  /** Explain turns only. */
+  answer?: string;
+};
+
+/** What 撤销 restores: the files and the design card together. */
+type Snapshot = { files: ProjectFile[]; design?: DesignCard };
+
+/** A candidate preview waiting for evidence (see `RunOutcome`). */
+type PendingRun = { turnId: string; resolve: (outcome: RunOutcome) => void; timer: number };
 
 type StudioValue = {
   ready: boolean;
@@ -79,6 +114,7 @@ type StudioValue = {
   saveState: SaveState;
   runState: RunState;
   frameSrc: string;
+  stageOwner: StageOwner;
   consoleText: string;
   statusNote: string;
   fps: number | null;
@@ -89,19 +125,25 @@ type StudioValue = {
   setSelection: (value: string) => void;
   menu: MenuId;
   setMenu: (menu: MenuId) => void;
-  proposal: Proposal | null;
+  view: ViewId;
+  setView: (view: ViewId) => void;
+  turns: Turn[];
+  candidate: CandidateResult | null;
+  turnBusy: boolean;
+  canTurn: boolean;
+  startTurn: (request: string) => Promise<void>;
+  cancelTurn: () => void;
+  adoptCandidate: () => void;
+  discardCandidate: () => void;
+  explainSelection: () => Promise<void>;
   assetDraft: AssetDraft | null;
   assetKind: AssetKind;
   setAssetKind: (kind: AssetKind) => void;
-  composer: "initialize" | "generate" | "asset" | null;
-  setComposer: (composer: "initialize" | "generate" | "asset" | null) => void;
+  assetOpen: boolean;
+  setAssetOpen: (open: boolean) => void;
   aiBusy: boolean;
   notice: string;
   dismissNotice: () => void;
-  side: number;
-  bottom: number;
-  setSide: (value: number) => void;
-  setBottom: (value: number) => void;
   bottomTab: "console" | "problems" | "debug";
   setBottomTab: (tab: "console" | "problems" | "debug") => void;
   updateText: (path: string, text: string) => void;
@@ -125,9 +167,6 @@ type StudioValue = {
   noteReady: () => void;
   noteTick: (fps: number, frameMs: number) => void;
   noteInput: (detail: string) => void;
-  ask: (action: AiAction, prompt?: string) => Promise<void>;
-  acceptProposal: () => void;
-  rejectProposal: () => void;
   undo: () => void;
   canUndo: boolean;
   generateAsset: (prompt: string) => Promise<void>;
@@ -145,6 +184,13 @@ export function useStudio(): StudioValue {
 
 const ACTIVE_KEY = "gamekit.active";
 
+/** Folds one agent event into the round it belongs to. */
+function applyEvent(turn: Turn, event: AgentEvent): Turn {
+  if (event.kind === "step") return { ...turn, steps: foldStep(turn.steps, event.step) };
+  if (event.kind === "design") return { ...turn, design: event.design, say: event.say };
+  return { ...turn, candidate: event.candidate };
+}
+
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeId, setActiveId] = useState("");
@@ -153,29 +199,37 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [runState, setRunState] = useState<RunState>("idle");
   const [frameSrc, setFrameSrc] = useState("about:blank");
+  const [stageOwner, setStageOwner] = useState<StageOwner>("current");
   const [consoleText, setConsoleText] = useState("");
-  const [statusNote, setStatusNote] = useState("Idle");
+  const [statusNote, setStatusNote] = useState(text.stage.idle);
   const [fps, setFps] = useState<number | null>(null);
   const [frameMs, setFrameMs] = useState<number | null>(null);
   const [inputs, setInputs] = useState<string[]>([]);
   const [selection, setSelection] = useState("");
   const [menu, setMenu] = useState<MenuId>(null);
-  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [view, setView] = useState<ViewId>("design");
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turnBusy, setTurnBusy] = useState(false);
   const [assetDraft, setAssetDraft] = useState<AssetDraft | null>(null);
   const [assetKind, setAssetKind] = useState<AssetKind>("sprite");
-  const [composer, setComposer] = useState<"initialize" | "generate" | "asset" | null>(null);
+  const [assetOpen, setAssetOpen] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [side, setSide] = useState(248);
-  const [bottom, setBottom] = useState(176);
   const [bottomTab, setBottomTab] = useState<"console" | "problems" | "debug">("console");
-  const [undoStack, setUndoStack] = useState<ProjectFile[][]>([]);
+  const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
   const [runtimeProblems, setRuntimeProblems] = useState<Problem[]>([]);
   const [account, setAccount] = useState<Account>({ kind: "checking" });
   const variation = useRef(1);
   const project = projects.find((item) => item.id === activeId) ?? null;
   const projectRef = useRef(project);
   projectRef.current = project;
+  /** Which view is on screen, for messages that belong to the other one. */
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  /** The round in flight, if any. Guards writes after a cancel or project switch. */
+  const turnRef = useRef<{ id: string; projectId: string; cancelled: boolean } | null>(null);
+  const pendingRun = useRef<PendingRun | null>(null);
+  const consoleRef = useRef("");
 
   useEffect(() => {
     let cancel = false;
@@ -195,7 +249,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
       setReady(true);
     })().catch((error: unknown) => {
-      setNotice(error instanceof Error ? error.message : "Could not open local projects.");
+      setNotice(error instanceof Error ? error.message : text.account.notes.failed);
       setReady(true);
     });
     return () => {
@@ -228,9 +282,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   /**
    * Calls an AI route. Returns null (after telling the child why) when the call
-   * could not be made or did not succeed.
+   * could not be made or did not succeed. `quiet` skips the generic failure
+   * notice, for callers that report the failure themselves.
    */
-  const callAi = useCallback(async <T,>(body: unknown): Promise<T | null> => {
+  const callAi = useCallback(async <T,>(body: unknown, quiet = false): Promise<T | null> => {
     const outcome: ApiOutcome<T> = await callApi<T>("/api/ai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -246,7 +301,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setNotice(text.account.offline);
     } else if (outcome.problem === "unavailable") {
       setNotice(text.account.unavailable);
-    } else {
+    } else if (!quiet) {
       console.warn("AI request failed:", outcome.message);
       setNotice(text.ai.failed);
     }
@@ -283,59 +338,238 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const remember = useCallback(() => {
     if (!project) return;
-    setUndoStack((stack) => [...stack, project.files].slice(-20));
+    setUndoStack((stack) => [...stack, { files: project.files, design: project.design }].slice(-20));
   }, [project]);
+
+  /** Resolves the candidate preview that is waiting for evidence, if any. */
+  const settleRun = useCallback((outcome: RunOutcome) => {
+    const pending = pendingRun.current;
+    if (!pending) return false;
+    window.clearTimeout(pending.timer);
+    pendingRun.current = null;
+    pending.resolve(outcome);
+    return true;
+  }, []);
 
   const stop = useCallback(() => {
     setFrameSrc("about:blank");
     setRunState((state) => (state === "idle" ? state : "stopped"));
-    setStatusNote("Stopped");
-  }, []);
+    setStatusNote(text.stage.stopped);
+    // Stopping mid-check means we have no evidence; never a code problem.
+    settleRun({ kind: "quiet" });
+  }, [settleRun]);
 
-  const run = useCallback(async () => {
-    const current = projectRef.current;
-    if (!current) return;
-    if (!current.files.some((file) => file.path === "main.py" && file.text?.trim())) {
-      setBottomTab("problems");
-      setNotice("Add main.py before running.");
-      return;
+  /** Publishes a build to the stage. Throws when the preview cannot start. */
+  const runProject = useCallback(async (target: Project, owner: StageOwner) => {
+    if (!target.files.some((file) => file.path === "main.py" && file.text?.trim())) {
+      throw new Error(text.stage.needMain);
     }
     setMenu(null);
     setRunState("starting");
+    consoleRef.current = "";
     setConsoleText("");
     setRuntimeProblems([]);
     setFps(null);
     setFrameMs(null);
     setInputs([]);
-    setStatusNote("Preparing the pygame runtime…");
+    setStatusNote(text.stage.preparing);
     setFrameSrc("about:blank");
-    try {
-      await ensurePlayerServiceWorker();
-      const bundle = buildWebBundle(current, { template, preview: true });
-      const session = crypto.randomUUID();
-      const href = await publishPlay(session, bundle);
-      setFrameSrc(`${href}?run=${session}`);
-      setStatusNote("Loading pygame-ce…");
-    } catch (error) {
-      setRunState("error");
-      setStatusNote("Could not start");
-      setNotice(error instanceof Error ? error.message : "Run failed.");
-      setBottomTab("console");
-    }
+    setStageOwner(owner);
+    await ensurePlayerServiceWorker();
+    const bundle = buildWebBundle(target, { template, preview: true });
+    const session = crypto.randomUUID();
+    const href = await publishPlay(session, bundle);
+    setFrameSrc(`${href}?run=${session}`);
+    setStatusNote(text.stage.loading);
   }, []);
 
-  const noteConsole = useCallback((text: string) => {
-    setConsoleText((current) => {
-      const next = (current + text).slice(-20_000);
+  const run = useCallback(async () => {
+    const current = projectRef.current;
+    if (!current) return;
+    try {
+      await runProject(current, "current");
+    } catch (error) {
+      setRunState("error");
+      setStatusNote(text.stage.failed);
+      setNotice(error instanceof Error ? error.message : text.stage.failed);
+      setBottomTab("console");
+    }
+  }, [runProject]);
+
+  /** The agent loop's run step: start a candidate and wait for evidence. */
+  const runCandidate = useCallback(
+    (candidate: Project, turn: AgentTurnInput): Promise<RunOutcome> => {
+      return new Promise<RunOutcome>((resolve) => {
+        const timer = window.setTimeout(() => settleRun({ kind: "quiet" }), RUN_EVIDENCE_MS);
+        pendingRun.current = { turnId: turn.id, resolve, timer };
+        void runProject(candidate, "candidate").catch((error: unknown) => {
+          settleRun({
+            kind: "unavailable",
+            detail: error instanceof Error ? error.message : "The preview could not start.",
+          });
+        });
+      });
+    },
+    [runProject, settleRun],
+  );
+
+  const noteConsole = useCallback(
+    (chunk: string) => {
+      const next = (consoleRef.current + chunk).slice(-20_000);
+      consoleRef.current = next;
+      setConsoleText(next);
       const found = problemsFromConsole(next);
       if (found.length) {
         setRuntimeProblems(found);
         setRunState("error");
         setBottomTab("problems");
+        settleRun({ kind: "error", detail: tracebackTail(next) });
       }
-      return next;
+    },
+    [settleRun],
+  );
+
+  const callModel = useCallback(
+    async (messages: ChatMessage[]): Promise<string> => {
+      const payload = await callAi<{ text?: string }>({ op: "complete", messages }, true);
+      if (!payload || typeof payload.text !== "string" || !payload.text.trim()) {
+        throw new Error("The model did not answer.");
+      }
+      return payload.text;
+    },
+    [callAi],
+  );
+
+  const startTurn = useCallback(
+    async (request: string) => {
+      const base = projectRef.current;
+      if (!base) return;
+      if (account.kind !== "signed-in") {
+        setNotice(text.ai.needsSignIn);
+        return;
+      }
+      const turnId = crypto.randomUUID();
+      const fresh: Turn = {
+        id: turnId,
+        kind: "design",
+        request: request.trim(),
+        steps: [],
+        say: "",
+        adopted: false,
+        discarded: false,
+      };
+      setTurns((list) => [...list, fresh]);
+      turnRef.current = { id: turnId, projectId: base.id, cancelled: false };
+      setTurnBusy(true);
+      setNotice("");
+      const patch = (change: (turn: Turn) => Turn) =>
+        setTurns((list) => list.map((item) => (item.id === turnId ? change(item) : item)));
+      let outcome: AgentTurnOutcome;
+      try {
+        outcome = await runAgentTurn({ id: turnId, request: fresh.request }, base, {
+          model: callModel,
+          diagnose: diagnoseProject,
+          run: runCandidate,
+          cancelled: () =>
+            turnRef.current?.id !== turnId || turnRef.current.cancelled || projectRef.current?.id !== base.id,
+          emit: (event) => patch((item) => applyEvent(item, event)),
+        });
+      } catch (error) {
+        outcome = { kind: "failed", message: error instanceof Error ? error.message : "The model call failed." };
+      }
+      patch((item) => ({ ...item, outcome }));
+      if (outcome.kind === "failed") console.warn("Agent round failed:", outcome.message);
+      if (outcome.kind === "ready" && viewRef.current === "code") setNotice(text.pane.doneNotice);
+      if (turnRef.current?.id === turnId) turnRef.current = null;
+      setTurnBusy(false);
+    },
+    [account.kind, callModel, runCandidate],
+  );
+
+  const cancelTurn = useCallback(() => {
+    if (!turnRef.current && !pendingRun.current) return;
+    if (turnRef.current) turnRef.current.cancelled = true;
+    settleRun({ kind: "cancelled" });
+    setStageOwner((owner) => {
+      if (owner === "candidate") stop();
+      return "current";
     });
-  }, []);
+  }, [settleRun, stop]);
+
+  /** Cancels a round because the child or a project switch moved on. */
+  const abortTurn = useCallback(() => {
+    if (turnRef.current) turnRef.current.cancelled = true;
+    settleRun({ kind: "cancelled" });
+    setTurnBusy(false);
+  }, [settleRun]);
+
+  const activeTurn = turns.at(-1) ?? null;
+  const candidate = activeTurn && !activeTurn.adopted && !activeTurn.discarded ? activeTurn.candidate ?? null : null;
+  const canTurn = account.kind === "signed-in" && !!project && !turnBusy;
+
+  const adoptCandidate = useCallback(() => {
+    const turn = turns.at(-1);
+    const target = projectRef.current;
+    if (!turn?.candidate || !target || turn.candidate.project.id !== target.id) return;
+    if (turn.adopted || turn.discarded) return;
+    if (turn.outcome?.kind !== "ready") return;
+    remember();
+    replaceProject({
+      ...target,
+      files: turn.candidate.project.files,
+      design: turn.candidate.design,
+      updatedAt: Date.now(),
+    });
+    setTurns((list) => list.map((item) => (item.id === turn.id ? { ...item, adopted: true } : item)));
+    setStageOwner("current");
+  }, [remember, replaceProject, turns]);
+
+  const discardCandidate = useCallback(() => {
+    const turn = turns.at(-1);
+    if (!turn?.candidate) return;
+    setTurns((list) => list.map((item) => (item.id === turn.id ? { ...item, discarded: true } : item)));
+    setStageOwner((owner) => {
+      if (owner === "candidate") stop();
+      return "current";
+    });
+  }, [stop, turns]);
+
+  const explainSelection = useCallback(async () => {
+    const current = projectRef.current;
+    if (!current) return;
+    if (account.kind !== "signed-in") {
+      setNotice(text.ai.needsSignIn);
+      return;
+    }
+    const file = current.files.find((item) => item.path === path);
+    if (!file || file.bytes) return;
+    const turnId = crypto.randomUUID();
+    setTurns((list) => [
+      ...list,
+      {
+        id: turnId,
+        kind: "explain",
+        request: selection.trim() ? `${path} 里选中的代码` : path,
+        steps: [],
+        say: "",
+        adopted: false,
+        discarded: false,
+      },
+    ]);
+    setView("design");
+    setAiBusy(true);
+    try {
+      const answer = readSay(
+        await callModel(explainMessages({ path, source: file.text ?? "", selection })),
+      );
+      setTurns((list) => list.map((item) => (item.id === turnId ? { ...item, answer } : item)));
+    } catch (error) {
+      console.warn("Explain failed:", error);
+      setTurns((list) => list.map((item) => (item.id === turnId ? { ...item, answer: text.ai.failed } : item)));
+    } finally {
+      setAiBusy(false);
+    }
+  }, [account.kind, callModel, path, selection]);
 
   const value = useMemo<StudioValue>(() => {
     const requireProject = () => {
@@ -360,6 +594,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       saveState,
       runState,
       frameSrc,
+      stageOwner,
       consoleText,
       statusNote,
       fps,
@@ -370,33 +605,39 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSelection,
       menu,
       setMenu,
-      proposal,
+      view,
+      setView,
+      turns,
+      candidate,
+      turnBusy,
+      canTurn,
+      startTurn,
+      cancelTurn,
+      adoptCandidate,
+      discardCandidate,
+      explainSelection,
       assetDraft,
       assetKind,
       setAssetKind,
-      composer,
-      setComposer,
+      assetOpen,
+      setAssetOpen,
       aiBusy,
       notice,
       dismissNotice: () => setNotice(""),
-      side,
-      bottom,
-      setSide,
-      setBottom,
       bottomTab,
       setBottomTab,
       updateText,
       createFile: (raw) => {
         const next = normalizePath(raw);
         if (!project || !next) {
-          setNotice("Use a relative path such as game/enemy.py.");
+          setNotice(text.code.badPath);
           return;
         }
         if (project.files.some((file) => file.path === next)) {
           setPath(next);
           return;
         }
-        replaceProject(upsertFile(project, { path: next, text: next.endsWith(".py") ? "" : "" }));
+        replaceProject(upsertFile(project, { path: next, text: "" }));
         setPath(next);
       },
       removeCurrent: () => {
@@ -410,7 +651,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         if (!project) return;
         const next = renameFile(project, path, raw);
         if (!next) {
-          setNotice("That path is empty, unsafe, or already used.");
+          setNotice(text.code.badPath);
           return;
         }
         replaceProject(next);
@@ -420,7 +661,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         if (!project) return;
         const next = normalizePath(raw);
         if (!next) {
-          setNotice("That asset path is not valid.");
+          setNotice(text.code.badPath);
           return;
         }
         const chosen = uniquePath(
@@ -434,8 +675,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         const archive = new Uint8Array(await file.arrayBuffer());
         const imported = projectFromArchive(file.name, archive);
         await saveProject(imported);
+        abortTurn();
         setProjects((current) => [imported, ...current]);
         setActiveId(imported.id);
+        setTurns([]);
         localStorage.setItem(ACTIVE_KEY, imported.id);
         setPath(imported.files.some((item) => item.path === "main.py") ? "main.py" : imported.files[0].path);
         setNotice("");
@@ -444,8 +687,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       newSample: async () => {
         const created = await createStarterProject(`sample-${projects.length + 1}`);
         await saveProject(created);
+        abortTurn();
         setProjects((current) => [created, ...current]);
         setActiveId(created.id);
+        setTurns([]);
         localStorage.setItem(ACTIVE_KEY, created.id);
         setPath("main.py");
         stop();
@@ -453,14 +698,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       newBlank: (name) => {
         const created = createBlankProject(name.trim() || "untitled");
         void saveProject(created);
+        abortTurn();
         setProjects((current) => [created, ...current]);
         setActiveId(created.id);
+        setTurns([]);
         localStorage.setItem(ACTIVE_KEY, created.id);
         setPath("main.py");
         stop();
       },
       openProject: (id) => {
+        abortTurn();
         setActiveId(id);
+        setTurns([]);
         localStorage.setItem(ACTIVE_KEY, id);
         setPath("main.py");
         setMenu(null);
@@ -476,6 +725,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         if (!project) return;
         await deleteStoredProject(project.id);
         const rest = projects.filter((item) => item.id !== project.id);
+        abortTurn();
         if (!rest.length) {
           const created = createBlankProject("untitled");
           await saveProject(created);
@@ -487,11 +737,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           setActiveId(rest[0].id);
           localStorage.setItem(ACTIVE_KEY, rest[0].id);
         }
+        setTurns([]);
         setPath("main.py");
         stop();
       },
       duplicateProject: async () => {
         if (!project) return;
+        abortTurn();
         const copy: Project = {
           ...project,
           id: crypto.randomUUID(),
@@ -502,6 +754,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         };
         await saveProject(copy);
         setProjects((current) => [copy, ...current]);
+        setTurns([]);
         setActiveId(copy.id);
         localStorage.setItem(ACTIVE_KEY, copy.id);
       },
@@ -525,72 +778,27 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       noteConsole,
       noteReady: () => {
         setRunState("running");
-        setStatusNote("Running");
+        setStatusNote(text.stage.running);
+        settleRun({ kind: "running" });
       },
       noteTick: (nextFps, nextFrame) => {
         setFps(nextFps);
         setFrameMs(nextFrame);
         setRunState((state) => (state === "error" ? state : "running"));
+        // A frame is proof the game is up, even if the first frame message was late.
+        settleRun({ kind: "running" });
       },
       noteInput: (detail) => setInputs((current) => [detail, ...current].slice(0, 12)),
-      ask: async (action, promptText) => {
-        const current = requireProject();
-        const file = current.files.find((item) => item.path === path);
-        if (account.kind !== "signed-in") {
-          setComposer(null);
-          setNotice(text.ai.needsSignIn);
-          return;
-        }
-        if ((action === "complete" || action === "refactor") && !selection.trim()) {
-          setNotice("Select the code you want to change.");
-          return;
-        }
-        setAiBusy(true);
-        setNotice("");
-        setComposer(null);
-        try {
-          const messages = messagesFor(action, {
-            prompt: promptText ?? "",
-            path,
-            source: file?.text ?? "",
-            selection,
-            error: problems.find((item) => item.severity === "error")?.message,
-          });
-          const payload = await callAi<{ text?: string }>({ op: "complete", messages });
-          if (!payload) return;
-          if (!payload.text) throw new Error("AI request failed.");
-          const result = readModelResult(payload.text, current, path);
-          if (result.kind === "explain") {
-            setProposal({ title: "Explain", explanation: result.explanation, files: [] });
-            return;
-          }
-          setProposal(toProposal(titleFor(action), result, current));
-        } catch (error) {
-          setNotice(error instanceof Error ? error.message : "AI request failed.");
-        } finally {
-          setAiBusy(false);
-        }
-      },
-      acceptProposal: () => {
-        if (!project || !proposal) return;
-        remember();
-        let next = project;
-        for (const file of proposal.files) next = upsertFile(next, { path: file.path, text: file.after });
-        replaceProject(next);
-        if (proposal.files[0]) setPath(proposal.files[0].path);
-        setProposal(null);
-      },
-      rejectProposal: () => setProposal(null),
       undo: () => {
         const previous = undoStack.at(-1);
         if (!project || !previous) return;
-        replaceProject({ ...project, files: previous, updatedAt: Date.now() });
+        replaceProject({ ...project, files: previous.files, design: previous.design, updatedAt: Date.now() });
         setUndoStack((stack) => stack.slice(0, -1));
       },
       canUndo: undoStack.length > 0,
       generateAsset: async (promptText) => {
         if (account.kind !== "signed-in") {
-          setComposer(null);
+          setAssetOpen(false);
           setNotice(text.ai.needsSignIn);
           return;
         }
@@ -611,7 +819,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             suggested: `assets/${assetKind}-${stamp}.jpg`,
           });
         } catch (error) {
-          setNotice(error instanceof Error ? error.message : "Image generation failed.");
+          setNotice(error instanceof Error ? error.message : text.ai.failed);
         } finally {
           setAiBusy(false);
         }
@@ -625,7 +833,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         replaceProject(upsertFile(project, { path: chosen, bytes: assetDraft.bytes }));
         setPath(chosen);
         setAssetDraft(null);
-        setComposer(null);
+        setAssetOpen(false);
       },
       clearAsset: () => setAssetDraft(null),
     };
@@ -639,6 +847,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     saveState,
     runState,
     frameSrc,
+    stageOwner,
     consoleText,
     statusNote,
     fps,
@@ -647,43 +856,32 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     problems,
     selection,
     menu,
-    proposal,
+    view,
+    turns,
+    candidate,
+    turnBusy,
+    canTurn,
+    startTurn,
+    cancelTurn,
+    adoptCandidate,
+    discardCandidate,
+    explainSelection,
     assetDraft,
     assetKind,
-    composer,
+    assetOpen,
     aiBusy,
     notice,
-    side,
-    bottom,
     bottomTab,
     updateText,
     remember,
     replaceProject,
     run,
     stop,
+    abortTurn,
     noteConsole,
+    settleRun,
     undoStack,
   ]);
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
-}
-
-function titleFor(action: AiAction): string {
-  if (action === "initialize") return "Initialize project";
-  if (action === "generate") return "Generate code";
-  if (action === "complete") return "Complete selection";
-  if (action === "refactor") return "Refactor selection";
-  if (action === "explain") return "Explain";
-  return "Fix error";
-}
-
-function toProposal(title: string, result: FileProposal, project: Project): Proposal {
-  return {
-    title,
-    explanation: result.explanation,
-    files: result.files.map((file) => {
-      const before = project.files.find((item) => item.path === file.path)?.text ?? "";
-      return { path: file.path, before, after: file.content, rows: diffLines(before, file.content) };
-    }),
-  };
 }

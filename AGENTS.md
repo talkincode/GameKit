@@ -30,9 +30,11 @@ GameKit 是给孩子用的 AI 辅助 pygame 游戏工作室：像 MakeCode Arcad
    - 新增接口默认需要身份；匿名可访问的接口必须显式列出并写明理由。
    - 配置缺失时返回拒绝，不放行。生产代码里不存在绕过身份门的开关。
 6. **未登录路径完整可用。** 新建、编辑、运行、导入、导出不依赖登录，也不发起需要身份的请求。
-7. **项目只有一个写入入口。** 界面、内置 AI、WebMCP 都通过工作室的同一套动作（现在是 `src/studio/store.tsx`）改项目；
-   AI 和 WebMCP 的写入必须先成为提议，由人确认，可撤销。
-8. **AI 规则只有一个文字来源：[docs/ai-rules.md](docs/ai-rules.md)。** 改系统提示词、模型输出校验或工具权限时，先改它。
+7. **项目只有一个写入入口。** 界面、内置小助手、WebMCP 都通过工作室的同一套动作（现在是 `src/studio/store.tsx`）改项目。
+   小助手可以自己在**候选版本**里迭代（生成、试运行、修复），但候选不是作品：只有人点「采用这一版」才写入，且可撤销；
+   换项目、新建、导入时正在跑的一轮立即作废。
+8. **AI 规则只有一个文字来源：[docs/ai-rules.md](docs/ai-rules.md)。** 改系统提示词、一轮怎么跑（`src/lib/agent.ts`）、
+   模型输出校验或工具权限时，先改它。
 9. **工具定义只写一次。** 内置小助手和 WebMCP 共用同一份工具清单和权限等级。
 10. **界面文案面向孩子。** 简体中文优先、短句、不责备；技术细节折叠；新增文案集中管理，不散落在组件里。
 
@@ -85,14 +87,17 @@ E2E 在 `tests/e2e/`（Playwright，配置 `playwright.config.ts`），CI 中失
 
 | 路径 | 内容 |
 | --- | --- |
-| `src/App.tsx`、`src/ui/` | 页面布局：工具栏、文件侧栏、编辑器、舞台、底部面板、弹层 |
-| `src/studio/store.tsx` | 工作室状态与所有动作（项目读写、运行、登录状态、AI、导出） |
+| `src/App.tsx`、`src/ui/` | 页面布局：两个视图（做游戏 / 看代码）、舞台、对话面板、头部菜单、弹层 |
+| `src/studio/store.tsx` | 工作室状态与所有动作（项目读写、运行、登录状态、小助手一轮、导出） |
+| `src/lib/agent.ts` | Agent 循环（可注入依赖的纯逻辑：设计 → 制作候选 → 检查修复） |
+| `src/ui/DesignerPane.tsx`、`src/ui/Stage.tsx` | 对话面板与游戏舞台（作品和候选都在这里跑） |
 | `src/lib/account.ts` | 页面侧登录状态与 `/api` 调用（处理 Access 重定向） |
 | `src/ui/text.ts` | 面向孩子的文案 |
 | `src/lib/project.ts`、`src/lib/storage.ts` | 项目模型与 IndexedDB |
+| `src/lib/design.ts` | 设计卡（随项目保存，随候选一起采用） |
 | `src/lib/build.ts`、`src/lib/session.ts`、`public/sw.js` | 打包 pygbag 构建、预览会话 |
 | `src/lib/diagnostics.ts`、`src/lib/messages.ts` | 静态诊断、预览桥消息 |
-| `src/lib/ai.ts` | AI 提示词与模型输出校验 |
+| `src/lib/ai.ts` | 提示词与模型输出校验 |
 | `src/lib/export.ts` | 各种导出包与源码导入 |
 | `src/lib/starter.ts`、`src/lib/samples/` | 起始示例 |
 | `runtime/` | pygbag player 模板（MIT，改动记录在 `docs/runtime.md`） |
@@ -100,5 +105,5 @@ E2E 在 `tests/e2e/`（Playwright，配置 `playwright.config.ts`），CI 中失
 | `worker/identity.ts` | 唯一的身份门（Access JWT + 授权名单，本地替身登录） |
 | `worker/ai.ts` | AI 网关（OpenAI 兼容文本、Workers AI 生图） |
 | `scripts/` | `setup-access.sh`（创建 Access 应用）、`put-secrets.sh`（写入 Worker secret） |
-| `tests/e2e/` | Playwright E2E 与替身模型 |
+| `tests/e2e/` | Playwright E2E、替身身份与替身模型 |
 | `docs/` | 路线图、AI 规则、运行时记录、编码规范 |

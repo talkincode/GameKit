@@ -1,31 +1,27 @@
 import { useEffect, useState } from "react";
 import { assetFilter, fileTree, mediaType, type TreeNode } from "../lib/project";
 import { useStudio } from "../studio/store";
+import { text } from "./text";
 
 export function Sidebar() {
   const studio = useStudio();
   const [pane, setPane] = useState<"files" | "assets">("files");
-  const [filter, setFilter] = useState<ReturnType<typeof assetFilter> | "all">("all");
   const [draft, setDraft] = useState<string | null>(null);
   const [rename, setRename] = useState("");
   const project = studio.project;
   if (!project) return <aside className="sidebar" />;
 
   const tree = fileTree(project.files.map((file) => file.path));
-  const assets = project.files.filter((file) => {
-    const kind = assetFilter(file.path);
-    if (!kind) return false;
-    return filter === "all" || filter === kind;
-  });
+  const assets = project.files.filter((file) => assetFilter(file.path));
 
   return (
     <aside className="sidebar">
       <div className="seg">
         <button type="button" className={pane === "files" ? "on" : ""} onClick={() => setPane("files")}>
-          Files
+          {text.code.files}
         </button>
         <button type="button" className={pane === "assets" ? "on" : ""} onClick={() => setPane("assets")}>
-          Assets
+          {text.code.assets}
         </button>
       </div>
 
@@ -33,13 +29,13 @@ export function Sidebar() {
         <>
           <div className="side-actions">
             <button type="button" onClick={() => setDraft("game/new.py")}>
-              New file
+              {text.code.newFile}
             </button>
             <button type="button" onClick={() => setRename(studio.path)}>
-              Rename
+              {text.code.rename}
             </button>
             <button type="button" onClick={studio.removeCurrent}>
-              Delete
+              {text.code.delete}
             </button>
           </div>
           {draft !== null ? (
@@ -52,7 +48,7 @@ export function Sidebar() {
               }}
             >
               <input value={draft} onChange={(event) => setDraft(event.target.value)} autoFocus />
-              <button type="submit">Add</button>
+              <button type="submit">{text.code.open}</button>
             </form>
           ) : null}
           {rename ? (
@@ -76,16 +72,9 @@ export function Sidebar() {
         </>
       ) : (
         <>
-          <div className="side-actions wrap">
-            {(["all", "images", "audio", "fonts", "other"] as const).map((item) => (
-              <button key={item} type="button" className={filter === item ? "on" : ""} onClick={() => setFilter(item)}>
-                {item}
-              </button>
-            ))}
-          </div>
           <div className="side-actions">
             <label className="file-btn">
-              Upload
+              {text.code.upload}
               <input
                 type="file"
                 multiple
@@ -98,18 +87,23 @@ export function Sidebar() {
                 }}
               />
             </label>
-            <button type="button" onClick={() => studio.setComposer("asset")}>
-              Generate asset
+            <button type="button" onClick={() => studio.setAssetOpen(true)}>
+              {text.code.generate}
             </button>
           </div>
           <div className="asset-grid">
             {assets.map((file) => (
-              <button key={file.path} type="button" className={file.path === studio.path ? "card on" : "card"} onClick={() => studio.setPath(file.path)}>
+              <button
+                key={file.path}
+                type="button"
+                className={file.path === studio.path ? "card on" : "card"}
+                onClick={() => studio.setPath(file.path)}
+              >
                 <AssetThumb path={file.path} bytes={file.bytes} />
                 <span>{file.path.split("/").pop()}</span>
               </button>
             ))}
-            {!assets.length ? <p className="empty">Drop images, audio, or fonts here.</p> : null}
+            {!assets.length ? <p className="empty">{text.code.upload}</p> : null}
           </div>
         </>
       )}
@@ -141,7 +135,12 @@ function Node({
     );
   }
   return (
-    <button type="button" className={active === node.path ? "file on" : "file"} style={{ paddingLeft: 8 + depth * 12 }} onClick={() => onOpen(node.path)}>
+    <button
+      type="button"
+      className={active === node.path ? "file on" : "file"}
+      style={{ paddingLeft: 8 + depth * 12 }}
+      onClick={() => onOpen(node.path)}
+    >
       {node.name}
     </button>
   );
@@ -150,7 +149,7 @@ function Node({
 function AssetThumb({ path, bytes }: { path: string; bytes?: Uint8Array }) {
   const kind = assetFilter(path);
   const url = useObjectUrl(kind === "images" ? bytes : undefined, mediaType(path));
-  if (kind !== "images" || !url) return <em>{kind === "audio" ? "Audio" : kind === "fonts" ? "Font" : "File"}</em>;
+  if (kind !== "images" || !url) return <em>{kind === "audio" ? "音频" : kind === "fonts" ? "字体" : "文件"}</em>;
   return <img src={url} alt="" />;
 }
 

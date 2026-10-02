@@ -3,6 +3,10 @@ import { slugName } from "../lib/project";
 import { useStudio } from "../studio/store";
 import { text } from "./text";
 
+/**
+ * The header. Two views: 做游戏 (the designer) and 看代码 (the implementation).
+ * Project and export actions live here so the designer stays about the game.
+ */
 export function Toolbar() {
   const studio = useStudio();
   const root = useRef<HTMLElement>(null);
@@ -25,44 +29,60 @@ export function Toolbar() {
           <path d="M12 9.5v13l10-6.5-10-6.5z" />
         </svg>
         <div>
-          <strong>GameKit</strong>
-          <span>Build Pygame games in your browser</span>
+          <strong>{text.brand.name}</strong>
+          <span>{text.brand.tagline}</span>
         </div>
       </div>
 
-      <div className="cluster">
-        <button className="ghost" type="button" onClick={() => studio.setMenu(studio.menu === "project" ? null : "project")}>
-          Project
+      <div className="view-switch" role="tablist" aria-label={text.brand.name}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={studio.view === "design"}
+          className={studio.view === "design" ? "on" : ""}
+          onClick={() => studio.setView("design")}
+        >
+          {text.header.design}
         </button>
-        <button className="run" type="button" onClick={() => void studio.run()} disabled={!studio.project || studio.runState === "starting"}>
-          <i />
-          {studio.runState === "starting" ? "Starting" : "Run"}
-          <kbd>F5</kbd>
-        </button>
-        <button className="stop" type="button" onClick={studio.stop}>
-          <i />
-          Stop
-          <kbd>F6</kbd>
-        </button>
-        <button className="ghost" type="button" onClick={() => studio.setBottomTab("debug")}>
-          Debug
-        </button>
-        <button className="ghost" type="button" onClick={() => studio.setMenu(studio.menu === "ai" ? null : "ai")}>
-          AI Tools
-        </button>
-        <button className="ghost" type="button" onClick={() => studio.setMenu(studio.menu === "export" ? null : "export")}>
-          Export
+        <button
+          type="button"
+          role="tab"
+          aria-selected={studio.view === "code"}
+          className={studio.view === "code" ? "on" : ""}
+          onClick={() => studio.setView("code")}
+        >
+          {text.header.code}
         </button>
       </div>
 
-      <div className={`save save-${studio.saveState}`}>{labelForSave(studio.saveState)}</div>
+      <div className="cluster">
+        <button
+          className="ghost"
+          type="button"
+          onClick={() => studio.setMenu(studio.menu === "project" ? null : "project")}
+        >
+          {text.header.project}
+        </button>
+        <button
+          className="ghost"
+          type="button"
+          onClick={() => studio.setMenu(studio.menu === "export" ? null : "export")}
+        >
+          {text.header.export}
+        </button>
+        <button className="ghost" type="button" disabled={!studio.canUndo} onClick={studio.undo}>
+          {text.header.undo}
+        </button>
+      </div>
+
+      <div className={`save save-${studio.saveState}`}>{text.header.save[studio.saveState]}</div>
 
       <Account />
 
       {studio.menu === "project" && studio.project ? (
-        <div className="menu menu-project">
+        <div className="menu menu-project" data-testid="project-menu">
           <label>
-            Name
+            {text.project.name}
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -72,26 +92,27 @@ export function Toolbar() {
               }}
             />
           </label>
+          <p>{text.project.switchHint}</p>
           <button type="button" onClick={() => void studio.newSample()}>
-            New sample project
+            {text.project.newSample}
           </button>
           <button
             type="button"
             onClick={() => {
-              const next = window.prompt("Project name", "untitled");
+              const next = window.prompt(text.project.namePrompt, "untitled");
               if (next) studio.newBlank(next);
             }}
           >
-            New empty project
+            {text.project.newBlank}
           </button>
           <button type="button" onClick={() => void studio.duplicateProject()}>
-            Duplicate
+            {text.project.duplicate}
           </button>
           <button type="button" onClick={studio.exportSource}>
-            Export source zip
+            {text.project.exportSource}
           </button>
           <label className="file-btn">
-            Import zip
+            {text.project.importZip}
             <input
               type="file"
               accept=".zip,application/zip"
@@ -102,79 +123,49 @@ export function Toolbar() {
               }}
             />
           </label>
+          <small className="menu-foot">{text.project.open}</small>
           <div className="menu-list">
             {studio.projects.map((item) => (
-              <button key={item.id} type="button" className={item.id === studio.project?.id ? "current" : ""} onClick={() => studio.openProject(item.id)}>
+              <button
+                key={item.id}
+                type="button"
+                className={item.id === studio.project?.id ? "current" : ""}
+                onClick={() => studio.openProject(item.id)}
+              >
                 {item.name}
               </button>
             ))}
           </div>
-          <button className="danger" type="button" onClick={() => void studio.deleteProject()}>
-            Delete project
-          </button>
-        </div>
-      ) : null}
-
-      {studio.menu === "ai" && studio.account.kind !== "signed-in" ? (
-        <div className="menu" data-testid="ai-menu">
-          <p>{text.ai.needsSignIn}</p>
-          <button type="button" onClick={studio.signIn}>
-            {text.ai.signInToUse}
-          </button>
-          <button type="button" disabled={!studio.canUndo} onClick={studio.undo}>
-            Undo last accepted change
-          </button>
-        </div>
-      ) : null}
-
-      {studio.menu === "ai" && studio.account.kind === "signed-in" ? (
-        <div className="menu" data-testid="ai-menu">
-          <p>AI edits one scope at a time. You accept or reject the result.</p>
-          <button type="button" onClick={() => openAi(studio, "initialize")}>
-            Initialize project
-          </button>
-          <button type="button" onClick={() => openAi(studio, "generate")}>
-            Generate code
-          </button>
-          <button type="button" onClick={() => void studio.ask("complete")}>
-            Complete selection
-          </button>
-          <button type="button" onClick={() => void studio.ask("refactor")}>
-            Refactor selection
-          </button>
-          <button type="button" onClick={() => void studio.ask("explain")}>
-            Explain code
-          </button>
-          <button type="button" onClick={() => void studio.ask("fix")}>
-            Fix error
-          </button>
-          <button type="button" onClick={() => studio.setComposer("asset")}>
-            Generate asset
-          </button>
-          <button type="button" disabled={!studio.canUndo} onClick={studio.undo}>
-            Undo last accepted change
+          <button
+            className="danger"
+            type="button"
+            onClick={() => {
+              if (window.confirm(text.project.confirmDelete)) void studio.deleteProject();
+            }}
+          >
+            {text.project.delete}
           </button>
         </div>
       ) : null}
 
       {studio.menu === "export" ? (
-        <div className="menu">
-          <p>These are files. GameKit does not host the game.</p>
+        <div className="menu menu-export">
+          <p>{text.export.copy}</p>
           <button type="button" onClick={() => studio.exportKind("web")}>
-            Web ZIP
-            <small>index.html and the runtime archive</small>
+            {text.export.web}
+            <small>{text.export.webHint}</small>
           </button>
           <button type="button" onClick={() => studio.exportKind("static")}>
-            Static folder
-            <small>Unzip and host the folder anywhere</small>
+            {text.export.static}
+            <small>{text.export.staticHint}</small>
           </button>
           <button type="button" onClick={() => studio.exportKind("itch")}>
-            itch.io package
-            <small>HTML project zip, uploaded by you</small>
+            {text.export.itch}
+            <small>{text.export.itchHint}</small>
           </button>
           <button type="button" onClick={() => studio.exportKind("embed")}>
-            Embed package
-            <small>Same game plus an iframe page</small>
+            {text.export.embed}
+            <small>{text.export.embedHint}</small>
           </button>
           {studio.project ? <small className="menu-foot">{slugName(studio.project.name)}</small> : null}
         </div>
@@ -215,13 +206,3 @@ function Account() {
   );
 }
 
-function openAi(studio: ReturnType<typeof useStudio>, action: "initialize" | "generate") {
-  studio.setMenu(null);
-  studio.setComposer(action);
-}
-
-function labelForSave(state: "saved" | "saving" | "error") {
-  if (state === "saving") return "Saving";
-  if (state === "error") return "Not saved";
-  return "Saved";
-}
