@@ -59,7 +59,10 @@ function read(request) {
 
 function replyFor(messages) {
   if (mode === "broken") return "this is not json";
-  const user = messages.find((message) => message.role === "user")?.content ?? "";
+  // The agent keeps a whole conversation now, so the newest user message is the
+  // step being asked for; older ones are history.
+  const userMessages = messages.filter((message) => message.role === "user");
+  const user = userMessages.at(-1)?.content ?? "";
   // The design request is the one that asks for a design card.
   if (user.includes('"hero"')) return JSON.stringify(DESIGN);
   // Explain requests must never return files.

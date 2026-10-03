@@ -93,7 +93,7 @@ async function subjectInEnglish(env: GameKitEnv, subject: string): Promise<strin
       },
       { role: "user", content: subject },
     ]);
-    const parsed = JSON.parse(answer.slice(answer.indexOf("{"), answer.lastIndexOf("}") + 1)) as { prompt?: unknown };
+    const parsed = JSON.parse(answer.text.slice(answer.text.indexOf("{"), answer.text.lastIndexOf("}") + 1)) as { prompt?: unknown };
     const prompt = typeof parsed.prompt === "string" ? parsed.prompt.trim() : "";
     if (prompt.length >= 3) return prompt.slice(0, 300);
   } catch {
@@ -110,22 +110,26 @@ export function imagePromptFor(kind: AssetKind, subject: string): string {
 export type ChatPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
-export type ChatMessage = { role: "system" | "user"; content: string | ChatPart[] };
+export type ChatMessage = { role: "system" | "user" | "assistant"; content: string | ChatPart[] };
+export type ChatAnswer = { text: string; usage?: { promptTokens: number; completionTokens: number } };
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_IMAGES_PER_REQUEST = 4;
+// A whole agent conversation may travel in one request now, so the message
+// budget is generous while each message keeps its own size cap.
+const MAX_MESSAGES = 60;
 // The browser downscales before sending; this is the upper bound we accept.
 const MAX_IMAGE_CHARS = 900_000;
 
 export function readMessages(value: unknown): ChatMessage[] {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 8) {
-    throw new HttpError(400, "bad_request", "A completion needs 1 to 8 messages.");
+  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_MESSAGES) {
+    throw new HttpError(400, "bad_request", `A completion needs 1 to ${MAX_MESSAGES} messages.`);
   }
   let images = 0;
   return value.map((message) => {
     if (!message || typeof message !== "object") throw new HttpError(400, "bad_request", "Invalid message.");
     const entry = message as { role?: unknown; content?: unknown };
-    if (entry.role !== "system" && entry.role !== "user") {
+    if (entry.role !== "system" && entry.role !== "user" && entry.role !== "assistant") {
       throw new HttpError(400, "bad_request", "Unsupported message role.");
     }
     if (typeof entry.content === "string") {
@@ -161,7 +165,20 @@ export function readMessages(value: unknown): ChatMessage[] {
   });
 }
 
-export async function complete(env: GameKitEnv, messages: ChatMessage[]): Promise<string> {
+/**
+ * What this deployment's text model can take. The window is a deployment fact, so
+ * it comes from configuration; the client sizes the agent's memory with it
+ * instead of guessing (see src/lib/settings.ts).
+ */
+export function modelInfo(env: GameKitEnv): { model: string; contextTokens: number } {
+  const declared = Number(env.OPENAI_CONTEXT_TOKENS ?? "");
+  return {
+    model: env.OPENAI_MODEL?.trim() ?? "",
+    contextTokens: Number.isFinite(declared) && declared > 0 ? Math.floor(declared) : 128_000,
+  };
+}
+
+export async function complete(env: GameKitEnv, messages: ChatMessage[]): Promise<ChatAnswer> {
   const base = env.OPENAI_API_URL?.trim().replace(/\/+$/, "") ?? "";
   const key = env.OPENAI_API_KEY?.trim() ?? "";
   const model = env.OPENAI_MODEL?.trim() ?? "";
@@ -182,12 +199,24 @@ export async function complete(env: GameKitEnv, messages: ChatMessage[]): Promis
     // The provider's body may echo request details; keep only the status.
     throw new HttpError(502, "upstream_failed", `The text model returned HTTP ${response.status}.`);
   }
-  const body = (await response.json()) as { choices?: { message?: { content?: unknown } }[] };
+  const body = (await response.json()) as {
+    choices?: { message?: { content?: unknown } }[];
+    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
+  };
   const text = body.choices?.[0]?.message?.content;
   if (typeof text !== "string" || !text.trim()) {
     throw new HttpError(502, "upstream_failed", "The text model returned an empty response.");
   }
-  return text;
+  // Usage travels back: ADK measures a project session against its token budget with it.
+  const promptTokens = Number(body.usage?.prompt_tokens ?? 0);
+  const completionTokens = Number(body.usage?.completion_tokens ?? 0);
+  return {
+    text,
+    usage:
+      Number.isFinite(promptTokens) && Number.isFinite(completionTokens)
+        ? { promptTokens, completionTokens }
+        : undefined,
+  };
 }
 
 export async function image(env: GameKitEnv, request: ImageRequest): Promise<{ image: string; mediaType: string }> {

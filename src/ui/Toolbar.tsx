@@ -111,6 +111,17 @@ export function Toolbar() {
         {text.header.save[studio.saveState]}
       </div>
 
+      <button
+        className="ghost icon-only"
+        type="button"
+        title={text.settings.title}
+        aria-label={text.settings.title}
+        data-testid="settings-open"
+        onClick={() => studio.setSettingsOpen(true)}
+      >
+        <IconGear />
+      </button>
+
       <Account />
 
       {studio.menu === "export" ? (
@@ -136,6 +147,15 @@ export function Toolbar() {
         </div>
       ) : null}
     </header>
+  );
+}
+
+function IconGear() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="gear-icon">
+      <path d="M8 5.9a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2Z" />
+      <path d="M8 1.8l.9 1.5 1.7-.4.4 1.7 1.5.9-1 1.4 1 1.4-1.5.9-.4 1.7-1.7-.4L8 14.2l-.9-1.5-1.7.4-.4-1.7-1.5-.9 1-1.4-1-1.4 1.5-.9.4-1.7 1.7.4Z" />
+    </svg>
   );
 }
 

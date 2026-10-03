@@ -56,6 +56,7 @@ export function DesignerPane() {
 }
 
 function Welcome({ design }: { design?: DesignCard }) {
+  const studio = useStudio();
   const lines = design ? designLines(design) : [];
   return (
     <div className="welcome">
@@ -75,6 +76,7 @@ function Welcome({ design }: { design?: DesignCard }) {
         </article>
       ) : null}
       <p className="quiet">{text.pane.hintPlay}</p>
+      {studio.remembers ? <p className="quiet">{text.pane.remembers}</p> : null}
     </div>
   );
 }

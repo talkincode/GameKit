@@ -24,6 +24,11 @@ async function captureModelCalls(page: Page): Promise<Capture[]> {
   const captured: Capture[] = [];
   await page.route("**/api/ai", async (route) => {
     const body = route.request().postData() ?? "";
+    // GET /api/ai reports the model; only the completion calls carry a body.
+    if (!body) {
+      await route.fallback();
+      return;
+    }
     const parsed = JSON.parse(body) as { op?: string; messages?: { role: string; content: unknown }[] };
     if (parsed.op !== "complete") {
       await route.fallback();

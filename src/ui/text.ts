@@ -64,6 +64,7 @@ export const text = {
     welcome: "先说说你想做一个什么样的游戏吧",
     examples: "比如：「一个在太空里躲陨石的小方块」「一只跑得飞快的狐狸，去追星星」",
     hintPlay: "也可以直接点舞台上的「试玩我的作品」，看看现在的游戏。",
+    remembers: "小助手记得你们之前聊过的内容，接着说一句就行。",
     placeholder: "说说你想做的游戏…",
     placeholderNext: "再说一句：想改哪里？",
     send: "开始做",
@@ -118,6 +119,19 @@ export const text = {
     repair: "正在修刚发现的问题",
     finish: "马上就好",
     stop: "停下了",
+  },
+  settings: {
+    title: "设置",
+    close: "关闭",
+    memory: "小助手记得多少",
+    memoryHint:
+      "小助手会记住你们聊过的内容，下次打开这个项目能接着聊。聊得太长时，它会先把早先的对话缩成一小段摘要，再继续。",
+    auto: "自动",
+    autoDetail: (modelLimit: number, tokens: number) =>
+      `跟随现在的模型（最多约 ${Math.round(modelLimit / 1000)}K，小助手用到 ${Math.round(tokens / 1000)}K）`,
+    tokens: (value: number) => `${Math.round(value / 1000)}K`,
+    tooBig: (allowed: string) => `模型装不下这么多，会自动用 ${allowed}`,
+    current: (tokens: number) => `现在：每个项目最多记 ${Math.round(tokens / 1000)}K`,
   },
   code: {
     files: "文件",

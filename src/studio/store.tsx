@@ -31,6 +31,8 @@ import {
   type CandidateResult,
   type RunOutcome,
 } from "../lib/agent";
+import { GatewayError } from "../lib/adk/model";
+import { forgetAllRunners, forgetProjectRunner, projectHasSession, projectRunner } from "../lib/adk/runner";
 import { explainMessages, readSay, type ChatImage, type ChatMessage } from "../lib/ai";
 import { buildWebBundle } from "../lib/build";
 import type { DesignCard } from "../lib/design";
@@ -59,6 +61,7 @@ import {
   type TrashedFile,
 } from "../lib/project";
 import { downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
+import { budgetFor, loadSettings, saveSettings, type Settings } from "../lib/settings";
 import { prepareAsset } from "../lib/sprite";
 import { createBlankProject, createStarterProject } from "../lib/starter";
 import { deleteStoredProject, loadProjects, saveProject } from "../lib/storage";
@@ -150,6 +153,13 @@ type StudioValue = {
   setSelection: (value: string) => void;
   menu: MenuId;
   setMenu: (menu: MenuId) => void;
+  remembers: boolean;
+  settings: Settings;
+  updateSettings: (next: Settings) => void;
+  /** The model's context window, or null while unknown. */
+  modelLimit: number | null;
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
   /** 我的项目：a panel of its own, not a dropdown of names. */
   projectsOpen: boolean;
   setProjectsOpen: (open: boolean) => void;
@@ -242,6 +252,21 @@ function writePanels(panels: PanelState): void {
   localStorage.setItem(PANELS_KEY, JSON.stringify(panels));
 }
 
+/** Our chat content -> ADK parts: text, and pictures as inline data. */
+function toAdkParts(content: unknown): { text?: string; inlineData?: { mimeType: string; data: string } }[] {
+  if (typeof content === "string") return [{ text: content }];
+  if (!Array.isArray(content)) return [{ text: "" }];
+  const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] = [];
+  for (const item of content as { type?: string; text?: string; image_url?: { url?: string } }[]) {
+    if (item?.type === "text" && typeof item.text === "string") parts.push({ text: item.text });
+    if (item?.type === "image_url" && typeof item.image_url?.url === "string") {
+      const match = /^data:([^;]+);base64,(.*)$/.exec(item.image_url.url);
+      if (match) parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+    }
+  }
+  return parts.length ? parts : [{ text: "" }];
+}
+
 /** Folds one agent event into the round it belongs to. */
 function applyEvent(turn: Turn, event: AgentEvent): Turn {
   if (event.kind === "step") return { ...turn, steps: foldStep(turn.steps, event.step) };
@@ -266,6 +291,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [selection, setSelection] = useState("");
   const [menu, setMenu] = useState<MenuId>(null);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Does the assistant already have a conversation about this project? */
+  const [remembers, setRemembers] = useState(false);
   const [view, setView] = useState<ViewId>("design");
   const [panels, setPanels] = useState<PanelState>(() => readPanels());
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -281,6 +309,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
   const [runtimeProblems, setRuntimeProblems] = useState<Problem[]>([]);
   const [account, setAccount] = useState<Account>({ kind: "checking" });
+  const [settings, setSettings] = useState<Settings>(() => loadSettings());
+  /** The text model's context window, reported by the Worker. */
+  const [modelLimit, setModelLimit] = useState<number | null>(null);
+  const budgetRef = useRef(budgetFor(loadSettings().agentBudget, null).tokens);
   const variation = useRef(1);
   const project = projects.find((item) => item.id === activeId) ?? null;
   const projectRef = useRef(project);
@@ -351,6 +383,27 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    * could not be made or did not succeed. `quiet` skips the generic failure
    * notice, for callers that report the failure themselves.
    */
+  /** Tells the child what went wrong with an AI call, and updates who-is-signed-in. */
+  const noteApiProblem = useCallback((problem: ApiOutcome<unknown>["ok"] extends never ? never : "sign-in" | "denied" | "unavailable" | "offline" | "error", message: string) => {
+    if (problem === "sign-in" || problem === "denied") {
+      const note = problem === "denied" ? "denied" : "expired";
+      setSignInHint(false);
+      setAccount({ kind: "anonymous", note });
+      setNotice(text.account.notes[note]);
+      return;
+    }
+    if (problem === "offline") {
+      setNotice(text.account.offline);
+      return;
+    }
+    if (problem === "unavailable") {
+      setNotice(text.account.unavailable);
+      return;
+    }
+    console.warn("AI request failed:", message);
+    setNotice(text.ai.failed);
+  }, []);
+
   const callAi = useCallback(async <T,>(body: unknown, quiet = false): Promise<T | null> => {
     const outcome: ApiOutcome<T> = await callApi<T>("/api/ai", {
       method: "POST",
@@ -358,21 +411,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify(body),
     });
     if (outcome.ok) return outcome.value;
-    if (outcome.problem === "sign-in" || outcome.problem === "denied") {
-      const note = outcome.problem === "denied" ? "denied" : "expired";
-      setSignInHint(false);
-      setAccount({ kind: "anonymous", note });
-      setNotice(text.account.notes[note]);
-    } else if (outcome.problem === "offline") {
-      setNotice(text.account.offline);
-    } else if (outcome.problem === "unavailable") {
-      setNotice(text.account.unavailable);
-    } else if (!quiet) {
+    if (quiet && outcome.problem === "error") {
       console.warn("AI request failed:", outcome.message);
-      setNotice(text.ai.failed);
+      return null;
     }
+    noteApiProblem(outcome.problem === "error" ? "error" : outcome.problem, outcome.message);
     return null;
-  }, []);
+  }, [noteApiProblem]);
 
   const replaceProject = useCallback((next: Project) => {
     setProjects((current) => current.map((item) => (item.id === next.id ? next : item)));
@@ -410,6 +455,47 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     },
     [flushSave, queueSave, replaceProject],
   );
+
+  /** Ask the Worker how much the model can take, so 自动 mode is not a guess. */
+  useEffect(() => {
+    if (account.kind !== "signed-in") return;
+    let cancel = false;
+    void fetch("/api/ai", { credentials: "same-origin", redirect: "manual" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((info: { contextTokens?: number } | null) => {
+        if (cancel || !info || typeof info.contextTokens !== "number") return;
+        setModelLimit(info.contextTokens);
+      })
+      .catch(() => {
+        // Offline or refused: 自动 falls back to the built-in assumption.
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [account.kind]);
+
+  useEffect(() => {
+    if (!project) {
+      setRemembers(false);
+      return;
+    }
+    let cancel = false;
+    void projectHasSession(project.id)
+      .then((has) => {
+        if (!cancel) setRemembers(has);
+      })
+      .catch(() => {
+        if (!cancel) setRemembers(false);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [project?.id]);
+
+  useEffect(() => {
+    budgetRef.current = budgetFor(settings.agentBudget, modelLimit).tokens;
+    forgetAllRunners();
+  }, [settings.agentBudget, modelLimit]);
 
   useEffect(() => {
     if (!ready || !project) return;
@@ -545,13 +631,29 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const callModel = useCallback(
     async (messages: ChatMessage[]): Promise<string> => {
-      const payload = await callAi<{ text?: string }>({ op: "complete", messages }, true);
-      if (!payload || typeof payload.text !== "string" || !payload.text.trim()) {
+      // One ADK run per step: ADK owns the project's conversation and its token
+      // budget, the gateway owns the key and the model call.
+      const base = projectRef.current;
+      const runner = projectRunner({
+        system: messages[0]?.content as string,
+        sessionId: base?.id ?? "scratch",
+        budgetTokens: budgetRef.current,
+      });
+      // Our loop writes text, or text plus pictures. ADK wants its own parts, so
+      // pictures become inline data instead of being dropped.
+      const stepParts = toAdkParts(messages[1]?.content);
+      try {
+        return await runner.run(stepParts);
+      } catch (error) {
+        if (error instanceof GatewayError) {
+          noteApiProblem(error.problem === "failed" ? "error" : error.problem, error.problem);
+          throw error;
+        }
+        console.warn("Model call failed:", error);
         throw new Error("The model did not answer.");
       }
-      return payload.text;
     },
-    [callAi],
+    [noteApiProblem],
   );
 
   const startTurn = useCallback(
@@ -722,6 +824,15 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSelection,
       menu,
       setMenu,
+      remembers,
+      settings,
+      updateSettings: (next) => {
+        saveSettings(next);
+        setSettings(next);
+      },
+      modelLimit,
+      settingsOpen,
+      setSettingsOpen,
       projectsOpen,
       setProjectsOpen,
       view,
@@ -891,6 +1002,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       },
       deleteProject: async () => {
         if (!project) return;
+        forgetProjectRunner(project.id);
         await deleteStoredProject(project.id);
         const rest = projects.filter((item) => item.id !== project.id);
         abortTurn();
@@ -1045,6 +1157,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     problems,
     selection,
     menu,
+    remembers,
+    settings,
+    modelLimit,
+    settingsOpen,
     projectsOpen,
     view,
     panels,

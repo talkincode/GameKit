@@ -1,4 +1,4 @@
-import { complete, image, readImageRequest, readMessages } from "./ai";
+import { complete, image, modelInfo, readImageRequest, readMessages } from "./ai";
 import type { GameKitEnv } from "./env";
 import { HttpError, errorResponse, json, redirect } from "./http";
 import { DEV_COOKIE, readCookie, requireIdentity, usesLocalAuth } from "./identity";
@@ -23,6 +23,8 @@ export default {
 
       const identity = await requireIdentity(request, env);
       if (url.pathname === "/api/me" && request.method === "GET") return json({ email: identity.email });
+      // What the model can take; the app sizes the assistant's memory with it.
+      if (url.pathname === "/api/ai" && request.method === "GET") return json(modelInfo(env));
       if (url.pathname === "/api/ai" && request.method === "POST") return await ai(request, env);
       return json({ error: "Not found.", code: "not_found" }, 404);
     } catch (error) {
@@ -40,7 +42,10 @@ async function ai(request: Request, env: GameKitEnv): Promise<Response> {
   }
   if (!body || typeof body !== "object") throw new HttpError(400, "bad_request", "The request body must be an object.");
   const record = body as { op?: unknown; messages?: unknown; prompt?: unknown };
-  if (record.op === "complete") return json({ text: await complete(env, readMessages(record.messages)) });
+  if (record.op === "complete") {
+    const answer = await complete(env, readMessages(record.messages));
+    return json({ text: answer.text, usage: answer.usage });
+  }
   if (record.op === "image") return json(await image(env, readImageRequest(record)));
   throw new HttpError(400, "bad_request", "Unknown AI operation.");
 }

@@ -26,7 +26,7 @@ type StoredRow = { files: string[]; trash: string[] };
 async function storedProjects(page: Page): Promise<StoredRow[]> {
   return page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("gamekit", 1);
+      const request = indexedDB.open("gamekit");
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

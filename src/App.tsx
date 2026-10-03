@@ -4,6 +4,7 @@ import { CodePane } from "./ui/CodePane";
 import { DesignerPane } from "./ui/DesignerPane";
 import { Overlays } from "./ui/Overlays";
 import { ProjectsPanel } from "./ui/ProjectsPanel";
+import { SettingsPanel } from "./ui/SettingsPanel";
 import { Sidebar } from "./ui/Sidebar";
 import { Stage } from "./ui/Stage";
 import { Toolbar } from "./ui/Toolbar";
@@ -83,6 +84,7 @@ function Shell() {
       </main>
       <Overlays />
       <ProjectsPanel />
+      <SettingsPanel />
       {studio.notice ? (
         <button className="notice" type="button" onClick={studio.dismissNotice}>
           {studio.notice}

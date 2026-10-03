@@ -123,7 +123,10 @@ Cloudflare Worker（gamekit.talkincode.net）
 一轮最多 4 次模型调用；只有代码证据（静态问题、traceback）触发修复，预览没起来就算「没能自动验证」。
 候选在内存里，刷新就没了，从不碰作品；采用才写入并记快照。
 孩子可以中途停下；换项目、新建、导入时正在跑的一轮立即作废。
-入口 `src/lib/agent.ts`（纯逻辑，可注入依赖）、`src/studio/store.tsx`（接运行与状态）。
+会话（对话历史、token 用量、压缩）由 Google ADK 承担：每个项目一份 session 存在本机，打开项目接着聊，
+超过记忆上限就把最早的对话压成摘要；上限在「设置」里可选，默认跟随模型能装多少。
+入口 `src/lib/agent.ts`（步骤逻辑，可注入依赖）、`src/lib/adk/`（模型适配、会话、runner）、
+`src/studio/store.tsx`（接运行与状态）、`src/ui/SettingsPanel.tsx`。
 
 - 多文件项目与本地保存
 

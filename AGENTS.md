@@ -52,6 +52,7 @@ GameKit 是给孩子用的 AI 辅助 pygame 游戏工作室：像 MakeCode Arcad
 | `OPENAI_API_URL` | secret / `.env` | OpenAI 兼容文本模型接口地址（不含 `/chat/completions`） |
 | `OPENAI_API_KEY` | secret / `.env` | 上述接口的密钥 |
 | `OPENAI_MODEL` | `wrangler.jsonc` vars | 文本模型名 |
+| `OPENAI_CONTEXT_TOKENS` | secret / `.env`（可缺省） | 文本模型的上下文窗口（token）；小助手记忆上限的「自动」以此为准，缺省按 128K 估 |
 | `GEMINI_APIKEY` | secret / `.env` | Gemini 密钥，只用于生图（游戏图片） |
 | `GEMINI_IMAGE_MODEL` | secret / `.env` | 生图模型名，如 `models/gemini-3.1-flash-lite-image`；缺省时用 Worker 内置默认值 |
 | `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD` | `wrangler.jsonc` vars | Zero Trust 团队域名与 GameKit Access 应用的 AUD，由 `scripts/setup-access.sh` 写入；为空时 `/api/*` 全部拒绝 |
@@ -96,6 +97,7 @@ E2E 在 `tests/e2e/`（Playwright，配置 `playwright.config.ts`），CI 中失
 | `src/App.tsx`、`src/ui/` | 页面布局：两个视图（做游戏 / 看代码）、舞台、对话面板、头部菜单、弹层 |
 | `src/studio/store.tsx` | 工作室状态与所有动作（项目读写、运行、登录状态、小助手一轮、导出） |
 | `src/lib/agent.ts` | Agent 循环（可注入依赖的纯逻辑：设计 → 制作候选 → 检查修复） |
+| `src/lib/adk/` | Google ADK：模型适配走 Worker 网关、每个项目一份会话（IndexedDB）、320K 可配置预算与压缩 |
 | `src/ui/DesignerPane.tsx`、`src/ui/Stage.tsx` | 对话面板与游戏舞台（作品和候选都在这里跑） |
 | `src/lib/account.ts` | 页面侧登录状态与 `/api` 调用（处理 Access 重定向） |
 | `src/ui/text.ts` | 面向孩子的文案 |

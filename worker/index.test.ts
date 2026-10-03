@@ -206,7 +206,8 @@ describe("ai gateway", () => {
     const response = await call("/api/ai", { token: await jwt(), init: completion });
     expect(response.status).toBe(200);
     const body = await response.text();
-    expect(JSON.parse(body)).toEqual({ text: '{"explanation":"好"}' });
+    // The gateway answers with the text and what it cost; ADK measures its budget with the usage.
+    expect(JSON.parse(body)).toMatchObject({ text: '{"explanation":"好"}' });
     expect(body).not.toContain("server-secret");
     expect(modelCalls).toHaveLength(1);
     expect(modelCalls[0].url).toBe(`${MODEL_URL}/chat/completions`);

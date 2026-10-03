@@ -16,6 +16,8 @@ export type GameKitEnv = {
   OPENAI_API_URL?: string;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
+  /** Context window of the text model, in tokens. Defaults to 128000. */
+  OPENAI_CONTEXT_TOKENS?: string;
   /** Gemini API key, used for game images. Server-side only, never sent to a browser. */
   GEMINI_APIKEY?: string;
   /** Which Gemini image model to draw with. Defaults to gemini-3.1-flash-lite-image. */
