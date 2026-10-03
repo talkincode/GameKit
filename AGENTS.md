@@ -52,9 +52,12 @@ GameKit 是给孩子用的 AI 辅助 pygame 游戏工作室：像 MakeCode Arcad
 | `OPENAI_API_URL` | secret / `.env` | OpenAI 兼容文本模型接口地址（不含 `/chat/completions`） |
 | `OPENAI_API_KEY` | secret / `.env` | 上述接口的密钥 |
 | `OPENAI_MODEL` | `wrangler.jsonc` vars | 文本模型名 |
+| `GEMINI_APIKEY` | secret / `.env` | Gemini 密钥，只用于生图（游戏图片） |
+| `GEMINI_IMAGE_MODEL` | secret / `.env` | 生图模型名，如 `models/gemini-3.1-flash-lite-image`；缺省时用 Worker 内置默认值 |
 | `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD` | `wrangler.jsonc` vars | Zero Trust 团队域名与 GameKit Access 应用的 AUD，由 `scripts/setup-access.sh` 写入；为空时 `/api/*` 全部拒绝 |
 | `LOCAL_DEV_AUTH` | 只在本地 `.env` | `1` 表示用本地替身登录表单代替 Access；只在 localhost 生效，其他主机上出现会让身份路由拒绝 |
-| `GAMEKIT_NO_REMOTE` | 命令行环境 | `1` 表示本地运行不连 Cloudflare 远程绑定（E2E、没有 Cloudflare 登录时），生图会报未配置 |
+
+Worker 没有需要 Cloudflare 登录的远程绑定：文本和图片都走服务端持有的密钥，本地、预览和线上跑的是同一套代码。
 
 上线步骤：`scripts/setup-access.sh`（创建 Access 应用并写入 `ACCESS_AUD`）→ `scripts/put-secrets.sh`（把 `.env` 里的 secret 写入 Worker）→ 推送 `main`。
 
@@ -101,12 +104,13 @@ E2E 在 `tests/e2e/`（Playwright，配置 `playwright.config.ts`），CI 中失
 | `src/lib/build.ts`、`src/lib/session.ts`、`public/sw.js` | 打包 pygbag 构建、预览会话 |
 | `src/lib/diagnostics.ts`、`src/lib/messages.ts` | 静态诊断、预览桥消息 |
 | `src/lib/ai.ts` | 提示词与模型输出校验 |
+| `src/lib/sprite.ts` | 把生成的图片变成素材（去背景、裁边、缩放到像素尺寸） |
 | `src/lib/export.ts` | 各种导出包与源码导入 |
 | `src/lib/starter.ts`、`src/lib/samples/` | 起始示例 |
 | `runtime/` | pygbag player 模板（MIT，改动记录在 `docs/runtime.md`） |
 | `worker/index.ts` | Cloudflare Worker 路由：`/api/login`、`/api/logout`、`/api/me`、`/api/ai` |
 | `worker/identity.ts` | 唯一的身份门（Access JWT + 授权名单，本地替身登录） |
-| `worker/ai.ts` | AI 网关（OpenAI 兼容文本、Workers AI 生图） |
+| `worker/ai.ts` | AI 网关（OpenAI 兼容文本、Gemini 生图） |
 | `scripts/` | `setup-access.sh`（创建 Access 应用）、`put-secrets.sh`（写入 Worker secret） |
 | `tests/e2e/` | Playwright E2E、替身身份与替身模型 |
 | `docs/` | 路线图、AI 规则、运行时记录、编码规范 |

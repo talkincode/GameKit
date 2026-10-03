@@ -16,13 +16,11 @@
   },
   // Not secret. ACCESS_AUD is filled in by scripts/setup-access.sh; while it is
   // empty every /api route refuses (fail closed). Secrets (ALLOW_GITHUB_USERS,
-  // OPENAI_API_URL, OPENAI_API_KEY) are set with `wrangler secret put`.
+  // OPENAI_API_URL, OPENAI_API_KEY, GEMINI_APIKEY, GEMINI_IMAGE_MODEL) are set
+  // with `wrangler secret put`.
   "vars": {
     "ACCESS_TEAM_DOMAIN": "toughstruct.cloudflareaccess.com",
     "ACCESS_AUD": "fd42066577db27a3be622d97a732bf2113bef9cf2ba2204734d695bf5cba4b56",
     "OPENAI_MODEL": "deepseek-flash"
-  },
-  "ai": {
-    "binding": "AI"
   }
 }

@@ -30,7 +30,6 @@ export default defineConfig({
       url: "http://localhost:4173",
       reuseExistingServer: false,
       env: {
-        GAMEKIT_NO_REMOTE: "1",
         CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",
         LOCAL_DEV_AUTH: "1",
         ACCESS_AUD: "",
@@ -38,6 +37,10 @@ export default defineConfig({
         OPENAI_API_URL: `http://127.0.0.1:${MODEL_PORT}`,
         OPENAI_API_KEY: "e2e-key",
         OPENAI_MODEL: "e2e-model",
+        // Image generation is stubbed at the network boundary in assets.spec.ts:
+        // the page's own pipeline runs, the provider does not.
+        GEMINI_APIKEY: "e2e-gemini-key",
+        GEMINI_IMAGE_MODEL: "models/e2e-image",
       },
     },
   ],

@@ -11,12 +11,15 @@ const AUD = "gamekit-aud";
 const KID = "test-key";
 const ALLOWED = "kid@example.com";
 const MODEL_URL = "https://model.example.com";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
 
 let keys: CryptoKeyPair;
 let otherKeys: CryptoKeyPair;
 let publicJwk: JsonWebKey;
 let modelCalls: { url: string; init: RequestInit }[];
 let modelReply: () => Response;
+let imageCalls: { url: string; init: RequestInit }[];
+let imageReply: () => Response;
 
 beforeAll(async () => {
   const params = { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" };
@@ -29,9 +32,15 @@ beforeEach(() => {
   resetAccessKeys();
   modelCalls = [];
   modelReply = () => Response.json({ choices: [{ message: { content: '{"explanation":"好"}' } }] });
+  imageCalls = [];
+  imageReply = () => Response.json({ steps: [{ type: "model_output", content: [{ type: "image", data: "AAAA", mime_type: "image/png" }] }] });
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = String(input);
     if (url === `https://${TEAM}/cdn-cgi/access/certs`) return Response.json({ keys: [{ ...publicJwk, kid: KID }] });
+    if (url === GEMINI_URL) {
+      imageCalls.push({ url, init });
+      return imageReply();
+    }
     if (url.startsWith(MODEL_URL)) {
       modelCalls.push({ url, init });
       return modelReply();
@@ -50,6 +59,8 @@ function env(overrides: Partial<GameKitEnv> = {}): GameKitEnv {
     OPENAI_API_URL: `${MODEL_URL}/`,
     OPENAI_API_KEY: "server-secret",
     OPENAI_MODEL: "test-model",
+    GEMINI_APIKEY: "gemini-secret",
+    GEMINI_IMAGE_MODEL: "models/gemini-test-image",
     ...overrides,
   };
 }
@@ -216,16 +227,107 @@ describe("ai gateway", () => {
     expect(modelCalls).toHaveLength(0);
   });
 
-  it("adds the child-safety constraint to image prompts on the server", async () => {
-    let prompt = "";
-    const ai = { run: async (_model: string, input: { prompt: string }) => ((prompt = input.prompt), { image: "AAAA" }) };
+  it("draws with Gemini: refined subject, child-safety rules, configured model", async () => {
+    modelReply = () => Response.json({ choices: [{ message: { content: '{"prompt":"a cute cartoon fox"}' } }] });
     const response = await call("/api/ai", {
       token: await jwt(),
-      env: env({ AI: ai as never }),
-      init: { method: "POST", body: JSON.stringify({ op: "image", prompt: "a green frog" }) },
+      init: { method: "POST", body: JSON.stringify({ op: "image", kind: "sprite", prompt: "小狐狸", variation: 2 }) },
     });
-    expect(await response.json()).toEqual({ image: "AAAA", mediaType: "image/jpeg" });
-    expect(prompt).toContain("a green frog");
-    expect(prompt).toContain("Child-friendly");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ image: "AAAA", mediaType: "image/png" });
+
+    expect(imageCalls).toHaveLength(1);
+    expect(imageCalls[0].url).toBe(GEMINI_URL);
+    const headers = new Headers(imageCalls[0].init.headers);
+    expect(headers.get("x-goog-api-key")).toBe("gemini-secret");
+    const body = JSON.parse(String(imageCalls[0].init.body)) as Record<string, unknown>;
+    // The model comes from GEMINI_IMAGE_MODEL, and the child's words were refined first.
+    expect(body.model).toBe("models/gemini-test-image");
+    expect(String(body.input)).toContain("a cute cartoon fox");
+    expect(String(body.input)).not.toContain("小狐狸");
+    expect(String(modelCalls[0].init.body)).toContain("小狐狸");
+    expect(body.response_modalities).toEqual(["image"]);
+    expect(body.generation_config).toMatchObject({ image_config: { image_size: "1K" }, thinking_level: "minimal" });
+  });
+
+  it("tells the model what a sprite must not contain, and keeps the key server-side", async () => {
+    await call("/api/ai", {
+      token: await jwt(),
+      init: { method: "POST", body: JSON.stringify({ op: "image", kind: "sprite", prompt: "小狐狸" }) },
+    });
+    const input = String((JSON.parse(String(imageCalls[0].init.body)) as { input: string }).input);
+    expect(input).toContain("weapons");
+    expect(input).toContain("watermarks");
+    expect(input).toContain("more than one character");
+    // Sprites and icons are drawn on a flat colour so the browser can cut it out.
+    expect(input).toContain("FF00FF");
+  });
+
+  it("asks for no cutout background on tiles and backgrounds", async () => {
+    for (const kind of ["tile", "background"]) {
+      await call("/api/ai", {
+        token: await jwt(),
+        init: { method: "POST", body: JSON.stringify({ op: "image", kind, prompt: "夜晚的森林" }) },
+      });
+    }
+    for (const call of imageCalls) {
+      expect(String((JSON.parse(String(call.init.body)) as { input: string }).input)).not.toContain("FF00FF");
+    }
+  });
+
+  it("refuses an unknown asset kind and an empty description", async () => {
+    for (const body of [
+      { op: "image", kind: "wallpaper", prompt: "x" },
+      { op: "image", prompt: "小狐狸" },
+      { op: "image", kind: "sprite", prompt: " " },
+    ]) {
+      const response = await call("/api/ai", {
+        token: await jwt(),
+        init: { method: "POST", body: JSON.stringify(body) },
+      });
+      expect(response.status, JSON.stringify(body)).toBe(400);
+    }
+    expect(imageCalls).toHaveLength(0);
+    expect(modelCalls).toHaveLength(0);
+  });
+
+  it("refuses to draw when the Gemini key is not configured", async () => {
+    const response = await call("/api/ai", {
+      token: await jwt(),
+      env: env({ GEMINI_APIKEY: "" }),
+      init: { method: "POST", body: JSON.stringify({ op: "image", kind: "sprite", prompt: "小狐狸" }) },
+    });
+    expect(response.status).toBe(503);
+    expect(imageCalls).toHaveLength(0);
+  });
+
+  it("reports a Gemini failure without echoing its body or the key", async () => {
+    imageReply = () => new Response("bad key gemini-secret", { status: 403 });
+    const response = await call("/api/ai", {
+      token: await jwt(),
+      init: { method: "POST", body: JSON.stringify({ op: "image", kind: "sprite", prompt: "小狐狸" }) },
+    });
+    expect(response.status).toBe(502);
+    expect(await response.text()).not.toContain("gemini-secret");
+  });
+
+  it("answers 502 when the reply carries no image", async () => {
+    imageReply = () => Response.json({ steps: [{ type: "model_output", content: [{ type: "text", text: "no" }] }] });
+    const response = await call("/api/ai", {
+      token: await jwt(),
+      init: { method: "POST", body: JSON.stringify({ op: "image", kind: "sprite", prompt: "小狐狸" }) },
+    });
+    expect(response.status).toBe(502);
+  });
+
+  it("still draws when the text model cannot refine the description", async () => {
+    modelReply = () => new Response("broken", { status: 500 });
+    const response = await call("/api/ai", {
+      token: await jwt(),
+      init: { method: "POST", body: JSON.stringify({ op: "image", kind: "icon", prompt: "小星星" }) },
+    });
+    expect(response.status).toBe(200);
+    const input = String((JSON.parse(String(imageCalls[0].init.body)) as { input: string }).input);
+    expect(input).toContain("小星星");
   });
 });

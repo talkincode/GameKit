@@ -27,8 +27,7 @@ pnpm dev
 ```
 
 `pnpm dev` 使用 Cloudflare Vite 插件，页面和 `/api/*` 都跑在本地 Workers 运行时里。它会读仓库根目录的 `.env`。
-Workers AI 生图绑定只有远程版本，所以默认需要 `wrangler login`；没有 Cloudflare 账号时用
-`GAMEKIT_NO_REMOTE=1 pnpm dev`，除生图外都能用。
+文本模型与生图都走服务端密钥，没有需要 Cloudflare 登录的远程绑定。
 
 ```bash
 pnpm test
@@ -44,6 +43,7 @@ pnpm preview
 
 - `ALLOW_GITHUB_USERS`：授权名单，GitHub 账号邮箱，逗号分隔
 - `OPENAI_API_URL`、`OPENAI_API_KEY`：服务端使用的 OpenAI 兼容文本模型（模型名 `OPENAI_MODEL` 在 `wrangler.jsonc`）
+- `GEMINI_APIKEY`、`GEMINI_IMAGE_MODEL`：生图用的 Gemini 密钥与模型名（游戏图片；只在 Worker 里使用）
 - `LOCAL_DEV_AUTH=1`：本地没有 Cloudflare Access，加上它后「登录」会打开一个本地替身表单，
   填授权名单里的邮箱即可。只在 localhost 生效，不要写进生产配置。
 
@@ -91,6 +91,8 @@ pnpm preview
 
 - 编辑器不包含 pygame。预览和导出都使用 pygame-web 的 pygbag 0.9.3（pygame-ce / Python 3.12 WASM）。
 - 构建只生成文件。没有 itch.io、GitHub Pages 或 Cloudflare Pages 的账号对接，也不托管成品游戏。
+- 游戏图片由服务端调用 Gemini 生成（密钥只在 Worker），提示词与儿童安全约束也由服务端拼装；
+  生成结果在浏览器里去背景、裁边、缩放到像素尺寸后存成 PNG。
 - 小助手一轮最多修两次；只有代码证据（静态问题、traceback）才触发修复，改不动就停下来交给孩子。
   候选改动只在内存里，采用才写入项目，而且可撤销。
 - 不做积木编辑器、不做公开作品广场，完整非目标见 [docs/roadmap.md](docs/roadmap.md#非目标铁律)。

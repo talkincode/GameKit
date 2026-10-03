@@ -2,13 +2,10 @@ import react from "@vitejs/plugin-react";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { defineConfig } from "vite";
 
-// The Workers AI binding only exists remotely, so local dev and preview need a
-// Cloudflare login. GAMEKIT_NO_REMOTE=1 skips it (E2E, CI, no account): image
-// generation then reports "not configured" and everything else still works.
-const remoteBindings = process.env.GAMEKIT_NO_REMOTE !== "1";
-
+// The Worker has no bindings that need a Cloudflare login: text and images both go
+// through server-held keys, so local dev, preview and CI all run the same code.
 export default defineConfig({
-  plugins: process.env.VITEST ? [react()] : [react(), cloudflare({ remoteBindings })],
+  plugins: process.env.VITEST ? [react()] : [react(), cloudflare()],
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "worker/**/*.test.ts"],

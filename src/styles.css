@@ -488,7 +488,20 @@ button:disabled { opacity: 0.45; cursor: default; }
 .modal textarea { width: 100%; resize: vertical; }
 .modal-actions { justify-content: flex-end; }
 .modal-actions .run { min-height: 34px; }
-.generated { width: 180px; height: 180px; object-fit: contain; background: #121418; justify-self: center; }
+
+/* 素材弹层：大小与去背景 */
+.asset-options { display: grid; gap: 8px; }
+.asset-size { display: grid; gap: 4px; }
+.asset-size-label { font-size: 11px; color: var(--muted); }
+.seg.small { padding: 2px; }
+.seg.small button { min-height: 26px; font-size: 12px; padding: 0 10px; }
+.asset-cut { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+.asset-cut input { margin-top: 3px; }
+.asset-cut small { display: block; color: var(--muted); font-size: 11px; }
+.asset-preview { margin: 0; display: grid; gap: 4px; justify-items: center; }
+.asset-preview figcaption { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.asset-note { font-size: 12px; color: var(--brass); }
+.generated { width: 180px; height: 180px; object-fit: contain; background: #121418; justify-self: center; image-rendering: pixelated; }
 .notice, .busy {
   position: fixed;
   left: 50%;

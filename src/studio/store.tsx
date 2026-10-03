@@ -31,7 +31,7 @@ import {
   type CandidateResult,
   type RunOutcome,
 } from "../lib/agent";
-import { assetPrompt, explainMessages, readSay, type ChatMessage } from "../lib/ai";
+import { explainMessages, readSay, type ChatMessage } from "../lib/ai";
 import { buildWebBundle } from "../lib/build";
 import type { DesignCard } from "../lib/design";
 import { diagnoseProject, problemsFromConsole, tracebackTail, type Problem } from "../lib/diagnostics";
@@ -59,6 +59,7 @@ import {
   type TrashedFile,
 } from "../lib/project";
 import { downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
+import { prepareAsset } from "../lib/sprite";
 import { createBlankProject, createStarterProject } from "../lib/starter";
 import { deleteStoredProject, loadProjects, saveProject } from "../lib/storage";
 import { text } from "../ui/text";
@@ -73,10 +74,24 @@ export type StageOwner = "current" | "candidate";
 
 export type AssetKind = "sprite" | "background" | "tile" | "icon";
 
+/** Pixel sizes a child can pick for a sprite or icon. */
+export type AssetSize = 32 | 48 | 64;
+
+/** What a finished asset is resized to before it lands in assets/. */
+function assetTarget(kind: AssetKind, size: AssetSize, cut: boolean) {
+  if (kind === "background") return { width: 640, height: 360, mode: "cover" as const, cut: false };
+  if (kind === "tile") return { width: size, height: size, mode: "cover" as const, cut: false };
+  return { width: size, height: size, mode: "contain" as const, cut };
+}
+
 export type AssetDraft = {
   bytes: Uint8Array;
   mediaType: string;
   suggested: string;
+  width: number;
+  height: number;
+  /** Kid-facing note about the picture itself, when there is something to say. */
+  note?: string;
 };
 
 /**
@@ -143,6 +158,10 @@ type StudioValue = {
   assetDraft: AssetDraft | null;
   assetKind: AssetKind;
   setAssetKind: (kind: AssetKind) => void;
+  assetSize: AssetSize;
+  setAssetSize: (size: AssetSize) => void;
+  assetCut: boolean;
+  setAssetCut: (cut: boolean) => void;
   assetOpen: boolean;
   setAssetOpen: (open: boolean) => void;
   aiBusy: boolean;
@@ -219,6 +238,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [turnBusy, setTurnBusy] = useState(false);
   const [assetDraft, setAssetDraft] = useState<AssetDraft | null>(null);
   const [assetKind, setAssetKind] = useState<AssetKind>("sprite");
+  const [assetSize, setAssetSize] = useState<AssetSize>(48);
+  const [assetCut, setAssetCut] = useState(true);
   const [assetOpen, setAssetOpen] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -678,6 +699,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       assetDraft,
       assetKind,
       setAssetKind,
+      assetSize,
+      setAssetSize,
+      assetCut,
+      setAssetCut,
       assetOpen,
       setAssetOpen,
       aiBusy,
@@ -758,6 +783,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           project.files.map((file) => file.path),
           next,
         );
+        remember();
         commit(upsertFile(project, { path: chosen, bytes }));
         setPath(chosen);
       },
@@ -904,18 +930,30 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         try {
           const payload = await callAi<{ image?: string; mediaType?: string }>({
             op: "image",
-            prompt: assetPrompt(assetKind, promptText, variation.current),
+            kind: assetKind,
+            prompt: promptText,
+            variation: variation.current,
           });
           if (!payload) return;
           if (!payload.image) throw new Error("Image generation failed.");
+          const raw = base64ToBytes(payload.image);
+          const mediaType = payload.mediaType || "image/jpeg";
+          // The picture is resized here, not by the model, so what the child
+          // sees in the preview is exactly what lands in assets/.
+          const target = assetTarget(assetKind, assetSize, assetCut);
+          const prepared = await prepareAsset(raw, mediaType, target);
           const stamp = new Date().toISOString().slice(11, 19).replaceAll(":", "");
           setAssetDraft({
-            bytes: base64ToBytes(payload.image),
-            mediaType: payload.mediaType || "image/jpeg",
-            suggested: `assets/${assetKind}-${stamp}.jpg`,
+            bytes: prepared.bytes,
+            mediaType: "image/png",
+            suggested: `assets/${assetKind}-${stamp}.png`,
+            width: prepared.width,
+            height: prepared.height,
+            note: target.cut && prepared.cut < 0.05 ? text.assets.backgroundKept : undefined,
           });
         } catch (error) {
-          setNotice(error instanceof Error ? error.message : text.ai.failed);
+          console.warn("Image generation failed:", error);
+          setNotice(text.ai.imageFailed);
         } finally {
           setAiBusy(false);
         }
@@ -926,6 +964,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           project.files.map((file) => file.path),
           normalizePath(assetDraft.suggested) ?? `assets/${assetKind}.jpg`,
         );
+        remember();
         commit(upsertFile(project, { path: chosen, bytes: assetDraft.bytes }));
         setPath(chosen);
         setAssetDraft(null);
@@ -964,6 +1003,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     explainSelection,
     assetDraft,
     assetKind,
+    assetSize,
+    assetCut,
     assetOpen,
     aiBusy,
     notice,

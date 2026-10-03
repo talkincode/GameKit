@@ -22,36 +22,79 @@ function AssetDialog() {
     return () => URL.revokeObjectURL(next);
   }, [studio.assetDraft]);
 
+  const kind = studio.assetKind;
+  const sized = kind === "sprite" || kind === "icon";
+
   return (
     <div className="modal-back" role="presentation">
       <form
         className="modal"
+        data-testid="asset-dialog"
         onSubmit={(event) => {
           event.preventDefault();
-          if (prompt.trim().length >= 3) void studio.generateAsset(prompt);
+          if (prompt.trim().length >= 2) void studio.generateAsset(prompt);
         }}
       >
         <h2>{text.assets.title}</h2>
         <p>{text.assets.copy}</p>
         <div className="seg">
-          {(["sprite", "background", "tile", "icon"] as const).map((kind) => (
+          {(["sprite", "background", "tile", "icon"] as const).map((item) => (
             <button
-              key={kind}
+              key={item}
               type="button"
-              className={studio.assetKind === kind ? "on" : ""}
-              onClick={() => studio.setAssetKind(kind)}
+              className={studio.assetKind === item ? "on" : ""}
+              onClick={() => studio.setAssetKind(item)}
             >
-              {text.assets.kinds[kind]}
+              {text.assets.kinds[item]}
             </button>
           ))}
         </div>
         <textarea
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
-          rows={3}
+          rows={2}
           placeholder={text.assets.prompt}
         />
-        {url ? <img className="generated" src={url} alt={text.assets.title} /> : null}
+        {sized ? (
+          <div className="asset-options">
+            <div className="asset-size">
+              <span className="asset-size-label" id="asset-size-label">
+                {text.assets.size}
+              </span>
+              <span className="seg small" role="group" aria-labelledby="asset-size-label">
+                {([32, 48, 64] as const).map((px) => (
+                  <button
+                    key={px}
+                    type="button"
+                    aria-pressed={studio.assetSize === px}
+                    className={studio.assetSize === px ? "on" : ""}
+                    onClick={() => studio.setAssetSize(px)}
+                  >
+                    {text.assets.sizeValue(px)}
+                  </button>
+                ))}
+              </span>
+            </div>
+            <label className="asset-cut">
+              <input
+                type="checkbox"
+                checked={studio.assetCut}
+                onChange={(event) => studio.setAssetCut(event.target.checked)}
+              />
+              <span>
+                {text.assets.cut}
+                <small>{text.assets.cutHint}</small>
+              </span>
+            </label>
+          </div>
+        ) : null}
+        {url && studio.assetDraft ? (
+          <figure className="asset-preview">
+            <img className="generated" src={url} alt={text.assets.title} />
+            <figcaption>{text.assets.pixel(studio.assetDraft.width, studio.assetDraft.height)}</figcaption>
+          </figure>
+        ) : null}
+        {studio.assetDraft?.note ? <p className="asset-note">{studio.assetDraft.note}</p> : null}
         <div className="modal-actions">
           <button
             type="button"
@@ -62,7 +105,7 @@ function AssetDialog() {
           >
             {text.assets.close}
           </button>
-          <button className="ghost" type="submit" disabled={studio.aiBusy || prompt.trim().length < 3}>
+          <button className="ghost" type="submit" disabled={studio.aiBusy || prompt.trim().length < 2}>
             {studio.aiBusy ? text.assets.busy : url ? text.assets.again : text.assets.generate}
           </button>
           <button className="run" type="button" disabled={!studio.assetDraft} onClick={studio.acceptAsset}>

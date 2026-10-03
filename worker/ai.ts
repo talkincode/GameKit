@@ -6,12 +6,105 @@ import { HttpError } from "./http";
  * Rules: docs/ai-rules.md. Keys and model choice stay on the server.
  */
 
-const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+/**
+ * Image model: Gemini's Interactions API. It draws from one prompt (the child's
+ * words, refined by the text model first) and takes the image size, so a sprite
+ * can be square and a background wide.
+ *
+ * The key lives in a Worker secret. Nothing here ever reaches the browser.
+ */
+const GEMINI_INTERACTIONS = "https://generativelanguage.googleapis.com/v1beta/interactions";
+/** Used only when GEMINI_IMAGE_MODEL is not set; the .env / secret value wins. */
+const DEFAULT_IMAGE_MODEL = "models/gemini-3.1-flash-lite-image";
+// 1K is the smallest size this model accepts; the browser resizes from there.
+const IMAGE_SIZE = "1K";
 // Reasoning models spend part of this budget thinking before they answer.
 const MAX_TOKENS = 16_000;
-const IMAGE_SAFETY =
-  "Child-friendly cartoon style for a kids' game. No violence, blood, weapons pointed at people, " +
-  "horror, nudity, real people, text, watermarks, or brand logos.";
+
+export type AssetKind = "sprite" | "background" | "tile" | "icon";
+
+const ASSET_KINDS: AssetKind[] = ["sprite", "background", "tile", "icon"];
+
+/**
+ * Output per asset kind. The size is what the model draws; the browser resizes
+ * and, for sprites and icons, cuts the background out.
+ */
+const IMAGE_SIZES: Record<AssetKind, string> = {
+  sprite: IMAGE_SIZE,
+  icon: IMAGE_SIZE,
+  tile: IMAGE_SIZE,
+  background: IMAGE_SIZE,
+};
+
+/**
+ * The rules of docs/ai-rules.md section 6, as negative instructions the model
+ * itself is told to avoid. They stay server-side: a child's words only ever
+ * become the subject.
+ */
+const IMAGE_AVOID =
+  "Do not draw: weapons, swords, knives, guns, blood, gore, injuries, violence, horror, scary things, " +
+  "text, letters, words, captions, signatures, watermarks, logos, frames, borders, " +
+  "real people, photos, 3D renders, crowds, or more than one character.";
+
+const IMAGE_STYLE = "bright flat cartoon game art for children, thick clean outlines, simple shapes";
+
+/**
+ * Sprites and icons are cut out in the browser, so they are drawn on one flat
+ * colour that never appears in a children's cartoon: magenta.
+ */
+const CUTOUT_BACKGROUND = "on a solid flat magenta background (#FF00FF) with nothing else in the picture";
+
+/** What each kind of asset has to look like on its own. */
+const IMAGE_SHOT: Record<AssetKind, string> = {
+  sprite: `a single friendly cartoon character, whole body, front view, centered with space around it, ${CUTOUT_BACKGROUND}`,
+  icon: `a single simple cartoon symbol, centered with space around it, ${CUTOUT_BACKGROUND}`,
+  tile: "a seamless repeating square texture of this material, seen from directly above, evenly lit, filling the whole picture, no single object",
+  background: "a wide game background of this place, scenery only, no characters, filling the whole picture",
+};
+
+export type ImageRequest = { kind: AssetKind; subject: string; variation: number };
+
+/** Reads and limits the child's request. Unknown kinds are refused, not guessed. */
+export function readImageRequest(record: { kind?: unknown; prompt?: unknown; variation?: unknown }): ImageRequest {
+  const kind = ASSET_KINDS.find((item) => item === record.kind);
+  if (!kind) throw new HttpError(400, "bad_request", "Unknown asset kind.");
+  const subject = typeof record.prompt === "string" ? record.prompt.trim() : "";
+  if (subject.length < 2 || subject.length > 300) {
+    throw new HttpError(400, "bad_request", "Describe the asset in 2 to 300 characters.");
+  }
+  const raw = typeof record.variation === "number" && Number.isFinite(record.variation) ? Math.floor(record.variation) : 1;
+  return { kind, subject, variation: Math.min(Math.max(raw, 1), 12) };
+}
+
+/**
+ * The child describes assets in Chinese; diffusion models are trained on
+ * English. Without this step "小狐狸" is noise to the model and it falls back to
+ * whatever the English words around it say.
+ */
+async function subjectInEnglish(env: GameKitEnv, subject: string): Promise<string> {
+  try {
+    const answer = await complete(env, [
+      {
+        role: "system",
+        content:
+          "You turn a child's description of a game asset into one short English image prompt. " +
+          "Concrete and simple: subject, colours, shape. No sentences, no violence, no weapons, no text, no people. " +
+          'Reply as JSON: {"prompt":"..."}',
+      },
+      { role: "user", content: subject },
+    ]);
+    const parsed = JSON.parse(answer.slice(answer.indexOf("{"), answer.lastIndexOf("}") + 1)) as { prompt?: unknown };
+    const prompt = typeof parsed.prompt === "string" ? parsed.prompt.trim() : "";
+    if (prompt.length >= 3) return prompt.slice(0, 300);
+  } catch {
+    // No text model, or it answered badly: draw the child's own words instead.
+  }
+  return subject;
+}
+
+export function imagePromptFor(kind: AssetKind, subject: string): string {
+  return `${IMAGE_SHOT[kind]}. Subject: ${subject}. Style: ${IMAGE_STYLE}. ${IMAGE_AVOID}`;
+}
 
 export type ChatMessage = { role: "system" | "user"; content: string };
 
@@ -61,14 +154,53 @@ export async function complete(env: GameKitEnv, messages: ChatMessage[]): Promis
   return text;
 }
 
-export async function image(env: GameKitEnv, prompt: unknown): Promise<{ image: string; mediaType: string }> {
-  if (typeof prompt !== "string" || prompt.trim().length < 3 || prompt.length > 1200) {
-    throw new HttpError(400, "bad_request", "The image prompt must be between 3 and 1200 characters.");
+export async function image(env: GameKitEnv, request: ImageRequest): Promise<{ image: string; mediaType: string }> {
+  const key = env.GEMINI_APIKEY?.trim() ?? "";
+  if (!key) throw new HttpError(503, "not_configured", "The image model is not configured for this deployment.");
+  const model = env.GEMINI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
+  // One model call improves the child's words; then one draws them.
+  const subject = await subjectInEnglish(env, request.subject);
+  const response = await fetch(GEMINI_INTERACTIONS, {
+    method: "POST",
+    headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      input: imagePromptFor(request.kind, subject),
+      generation_config: {
+        temperature: 1,
+        top_p: 0.95,
+        max_output_tokens: 65_536,
+        thinking_level: "minimal",
+        image_config: { image_size: IMAGE_SIZES[request.kind] },
+      },
+      response_modalities: ["image"],
+    }),
+  });
+  if (!response.ok) {
+    // The provider's body may echo the request or our key; keep only the status.
+    throw new HttpError(502, "upstream_failed", `The image model returned HTTP ${response.status}.`);
   }
-  if (!env.AI) throw new HttpError(503, "not_configured", "Workers AI is not configured for this deployment.");
-  const result = (await env.AI.run(IMAGE_MODEL, { prompt: `${prompt.trim()} ${IMAGE_SAFETY}`, steps: 4 })) as {
-    image?: string;
-  };
-  if (!result.image) throw new HttpError(502, "upstream_failed", "The image model returned no image.");
-  return { image: result.image, mediaType: "image/jpeg" };
+  return readInteractionImage(await response.json());
+}
+
+/**
+ * An interaction answers with steps; the picture is an `image` part in the
+ * model's output step. Its `data` is base64 and `mime_type` says what it is.
+ */
+export function readInteractionImage(payload: unknown): { image: string; mediaType: string } {
+  const steps = (payload as { steps?: unknown } | null)?.steps;
+  if (Array.isArray(steps)) {
+    for (const step of steps) {
+      const content = (step as { content?: unknown } | null)?.content;
+      if (!Array.isArray(content)) continue;
+      for (const part of content) {
+        const entry = part as { type?: unknown; data?: unknown; mime_type?: unknown } | null;
+        if (!entry || entry.type !== "image") continue;
+        const data = typeof entry.data === "string" ? entry.data : "";
+        const mime = typeof entry.mime_type === "string" && entry.mime_type ? entry.mime_type : "image/jpeg";
+        if (data) return { image: data, mediaType: mime };
+      }
+    }
+  }
+  throw new HttpError(502, "upstream_failed", "The image model returned no image.");
 }

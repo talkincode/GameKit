@@ -199,6 +199,7 @@ export function Sidebar() {
               <button
                 key={file.path}
                 type="button"
+                aria-label={file.path}
                 className={file.path === studio.path ? "card on" : "card"}
                 onClick={() => studio.setPath(file.path)}
               >

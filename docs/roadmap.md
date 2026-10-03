@@ -44,7 +44,7 @@ GameKit 是给孩子用的 AI 驱动的 pygame 游戏设计器：孩子说出想
        ▼                    ▼
 Cloudflare Worker（gamekit.talkincode.net）
   ├─ 身份门：Cloudflare Access（GitHub 身份源）JWT 校验 + 授权名单，默认拒绝
-  ├─ AI 网关：服务端持有密钥 → OpenAI 兼容文本模型；Workers AI 生图；按人配额
+  ├─ AI 网关：服务端持有密钥 → OpenAI 兼容文本模型；Gemini 生图；按人配额
   └─ 同步：项目元数据与文件 → Cloudflare 存储
 静态资源（页面、Monaco、player 模板）  ·  pygbag 运行时来自 pygame-web CDN
 ```
@@ -88,7 +88,7 @@ Cloudflare Worker（gamekit.talkincode.net）
 | 登录 | Cloudflare Access（Zero Trust）单点登录，身份源只开 GitHub；Access 应用只保护 `gamekit.talkincode.net/api`，页面和 PWA 外壳不进 Access。应用由 `scripts/setup-access.sh` 创建 | 用户要求 |
 | 授权 | 授权名单 `ALLOW_GITHUB_USERS`：GitHub 账号邮箱，逗号分隔。Access 策略和 Worker 各校验一次 | 用户提供的 `.env`；Access JWT 只可靠地携带 `email` |
 | 文本 AI | 服务端调用 OpenAI 兼容接口（`OPENAI_API_URL`、`OPENAI_API_KEY`），模型名 `OPENAI_MODEL` 在 `wrangler.jsonc` | 用户提供的 `.env` |
-| 图像 AI | Workers AI 绑定（当前文本接口不提供生图） | `wrangler.jsonc` |
+| 图像 AI | 服务端调用 Gemini Interactions API（`models/gemini-3.1-flash-lite-image`），密钥与模型名来自 `GEMINI_APIKEY`、`GEMINI_IMAGE_MODEL`（secret）。生图前先用文本模型把孩子的中文描述拐成英文提示词 | 用户要求（图片改用 Gemini） |
 | 云存储 | Cloudflare 自家存储；具体用 D1、R2、KV 还是 Durable Objects 由实现者按同步规则选择 | 用户要求 |
 | 外部 Agent | WebMCP：特性检测 `document.modelContext`，不支持的浏览器不注册、不报错 | 用户要求；[WebMCP 提案](https://github.com/webmachinelearning/webmcp) |
 
@@ -162,7 +162,12 @@ Worker 对每个 `/api/*` 请求校验 Access JWT（签名、aud、iss、过期�
 
 - AI 素材生成（仅授权用户）
 
-精灵、背景、瓦片、图标四种提示模板，Workers AI 生图，服务端追加儿童安全约束，预览后接受才存入 `assets/`。
+四种模板（角色/背景/瓦片/图标）。提示词全在服务端拼装：先用文本模型把孩子的中文描述改写成一句英文提示词，
+再加上这一种素材的构图要求和儿童安全约束（不能用正向提示词写「不要…」，安全规则作为明确的禁止列表交给模型），
+然后调 Gemini 生图（`GEMINI_APIKEY` + `GEMINI_IMAGE_MODEL`，密钥只在 Worker）。返回的是 1K 图片，
+浏览器再把它变成真正的素材：角色与图标在纯色（magenta）背景上生成，用角落颜色泛洪法去背景、根据内容裁边、
+最近邻缩放到 32/48/64 像素，存成背景透明的 PNG；背景与瓦片不切背景，直接 cover 到 640×360 / 尺寸。
+预览里看到的就是最后存进 `assets/` 的那张图。入口 `worker/ai.ts`、`src/lib/sprite.ts`、`src/lib/sprite.test.ts`。
 
 - 导出
 
@@ -300,7 +305,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 | 诊断与报错 | 已有 | 中 | ✅（小助手靠静态检查发现 time.sleep 并修好） | ✅ 单元 | 不适用 | 不适用（只读） | `src/lib/diagnostics.test.ts`；`tests/e2e/agent.spec.ts`：`a candidate the checks reject is repaired before the child sees it` |
 | AI 游戏设计器（Agent 循环） | 已有 | 高（改动作品、消耗额度） | ✅（想法 → 候选 → 采用 → 撤销；第二轮在已采用的基础上继续改） | ✅（坏答案不写入；静态问题先修；修复超限停下；中途取消；换项目不串写；越界路径、二进制素材、超大文件） | ✅ 匿名 / 授权 / 已登录未授权 | ✅（采用后撤销；取消、失败、登录丢失后作品不变） | `tests/e2e/agent.spec.ts`（7 条）、`tests/e2e/account.spec.ts`（6 条）、`src/lib/agent.test.ts`（15 条）、`src/lib/ai.test.ts`（12 条）；`worker/index.test.ts`：`ai gateway` |
 | AI 讲解（只读） | 已有 | 低 | ✅（讲讲这段 → 对话面板里出现回答，项目不变） | ✅ 单元（模型没答好时显示「没想好」） | ✅ 匿名时不可用 / 授权可用 | 不适用（不写入） | `tests/e2e/account.spec.ts`：`allowed account: 讲讲这段 reads code and never rewrites the project`；`src/lib/ai.test.ts`：`asks for an explanation without allowing new files` |
-| AI 素材生成 | 已有 | 高（消耗额度、儿童内容） | ❌ 缺口 | ✅ 单元（未配置拒绝） | ✅ 单元（与设计器共用身份门） | 不适用（接受前不写入） | `worker/index.test.ts`：`adds the child-safety constraint to image prompts on the server` |
+| AI 素材生成 | 已有 | 高（消耗额度、儿童内容） | ✅（生成 → 预览 → 放进项目 → 撤销） | ✅ 单元（未配置拒绝、上游失败不回显密钥、无图 502；去背景/裁剪/缩放像素级断言） | ✅ 匿名不可用 / 授权可用 | ✅（接受前不写入，接受后可撤销） | `tests/e2e/assets.spec.ts`（3 条）、`worker/index.test.ts`：`draws with Gemini…`、`tells the model what a sprite must not contain…`、`refuses to draw when the Gemini key is not configured`；`src/lib/sprite.test.ts` |
 | 导入与导出 | 已有 | 中 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用（导入总是新建项目） | `src/lib/export.test.ts` |
 | 部署 | 已有 | 高（线上不可用） | ❌ 缺口 | ✅（单元、类型、构建、E2E 任一失败则不部署） | 不适用 | ❌ 缺口 | `.github/workflows/ci.yml` |
 | 登录与授权 | 已有（Access 应用已创建） | 高（权限） | ✅（本地替身登录） | ✅（错误签名/aud/iss/过期、配置缺失、本地替身出现在非 localhost） | ✅ 匿名 / 授权 / 已登录未授权 | 不适用（不改作品） | `tests/e2e/account.spec.ts`：`anonymous: …`、`signed in but not allowed: …`、`sign-out returns to the anonymous studio`；`worker/index.test.ts`：`identity gate`、`sign-in routes`。真实 Access + GitHub 登录 ❌ 待上线后人工验证 |
@@ -320,7 +325,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 - **浏览器内运行：** 运行起始示例、停下、再次运行；运行一个有语法错误的项目时出错行被定位。
 - **小助手：** 模型回答很慢时的表现（现在的反馈只有“小助手正在忙…”）；
   同一轮里设计卡被孩子改过之后再制作的路径；把常见报错翻成孩子的话。
-- **AI 素材：** 补一条用替身生图的 E2E（生成 → 预览 → 接受后出现在 `assets/`）。
+- **AI 素材：** 同一角色多张一致性的变体（现在每张都是独立的）；精灵表（多帧动画）导出；把生成结果接到精灵编辑器里继续改。
 - **登录与授权：** 上线后用真实 GitHub 账号走一遍登录、被拒、退出；Access 会话过期后的表现要与 E2E 一致。
 - **云端同步：** 两台设备冲突保留两份；网络中断后本地不受影响、恢复后能续传；一个用户读不到另一个用户的项目。
 - **WebMCP：** 未登录时只读工具可用、AI 类工具被拒绝；写入类工具在人点「采用」前不改项目，拒绝后项目不变。
