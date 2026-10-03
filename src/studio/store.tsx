@@ -45,14 +45,18 @@ import {
 } from "../lib/export";
 import {
   base64ToBytes,
+  dropFromTrash,
+  emptyTrash,
   normalizePath,
-  removeFile,
   renameFile,
+  restoreFile,
   slugName,
+  trashFile,
   uniquePath,
   upsertFile,
   type Project,
   type ProjectFile,
+  type TrashedFile,
 } from "../lib/project";
 import { downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
 import { createBlankProject, createStarterProject } from "../lib/starter";
@@ -96,8 +100,8 @@ export type Turn = {
   answer?: string;
 };
 
-/** What 撤销 restores: the files and the design card together. */
-type Snapshot = { files: ProjectFile[]; design?: DesignCard };
+/** What 撤销 restores: files, design card and trash together. */
+type Snapshot = { files: ProjectFile[]; design?: DesignCard; trash?: TrashedFile[] };
 
 /** A candidate preview waiting for evidence (see `RunOutcome`). */
 type PendingRun = { turnId: string; resolve: (outcome: RunOutcome) => void; timer: number };
@@ -147,9 +151,12 @@ type StudioValue = {
   bottomTab: "console" | "problems" | "debug";
   setBottomTab: (tab: "console" | "problems" | "debug") => void;
   updateText: (path: string, text: string) => void;
-  createFile: (path: string) => void;
-  removeCurrent: () => void;
-  renameCurrent: (next: string) => void;
+  createFile: (path: string) => boolean;
+  renameCurrent: (from: string, to: string) => boolean;
+  trashFile: (path: string) => void;
+  restoreFromTrash: (path: string) => void;
+  dropFromTrash: (path: string) => void;
+  emptyTrash: () => void;
   addBytes: (path: string, bytes: Uint8Array) => void;
   importArchive: (file: File) => Promise<void>;
   newSample: () => Promise<void>;
@@ -230,6 +237,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const turnRef = useRef<{ id: string; projectId: string; cancelled: boolean } | null>(null);
   const pendingRun = useRef<PendingRun | null>(null);
   const consoleRef = useRef("");
+  /** Newest project whose save is still waiting on the debounce. */
+  const pendingSave = useRef<{ timer: number | null; project: Project | null }>({ timer: null, project: null });
+  /** Serializes writes so the newest state is always the last one on disk. */
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     let cancel = false;
@@ -308,20 +319,68 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return null;
   }, []);
 
-  useEffect(() => {
-    if (!ready || !project) return;
-    setSaveState("saving");
-    const timer = window.setTimeout(() => {
-      void saveProject(project)
-        .then(() => setSaveState("saved"))
-        .catch(() => setSaveState("error"));
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [project, ready]);
-
   const replaceProject = useCallback((next: Project) => {
     setProjects((current) => current.map((item) => (item.id === next.id ? next : item)));
   }, []);
+
+  /**
+   * One write path for the project, in order. Structural changes (the file tree,
+   * the design card, undo) save right away; text editing is coalesced by the
+   * debounce below, where a few hundred milliseconds is a keystroke, not data.
+   */
+  const queueSave = useCallback((next: Project) => {
+    setSaveState("saving");
+    saveChain.current = saveChain.current
+      .then(() => saveProject(next))
+      .then(() => setSaveState("saved"))
+      .catch(() => setSaveState("error"));
+  }, []);
+
+  const flushSave = useCallback(() => {
+    if (pendingSave.current.timer !== null) {
+      window.clearTimeout(pendingSave.current.timer);
+      pendingSave.current.timer = null;
+    }
+    const pending = pendingSave.current.project;
+    pendingSave.current.project = null;
+    if (pending) queueSave(pending);
+  }, [queueSave]);
+
+  /** Applies a structural change and saves it now. */
+  const commit = useCallback(
+    (next: Project) => {
+      replaceProject(next);
+      flushSave();
+      queueSave(next);
+    },
+    [flushSave, queueSave, replaceProject],
+  );
+
+  useEffect(() => {
+    if (!ready || !project) return;
+    setSaveState("saving");
+    pendingSave.current.project = project;
+    pendingSave.current.timer = window.setTimeout(() => flushSave(), 350);
+    return () => {
+      if (pendingSave.current.timer !== null) {
+        window.clearTimeout(pendingSave.current.timer);
+        pendingSave.current.timer = null;
+      }
+    };
+  }, [project, ready, flushSave]);
+
+  /** Closing the tab or switching away must not drop the last keystrokes. */
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") flushSave();
+    };
+    window.addEventListener("pagehide", flushSave);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.removeEventListener("pagehide", flushSave);
+      document.removeEventListener("visibilitychange", onHidden);
+    };
+  }, [flushSave]);
 
   const staticProblems = useMemo(() => (project ? diagnoseProject(project) : []), [project]);
   const problems = useMemo(() => [...staticProblems, ...runtimeProblems], [staticProblems, runtimeProblems]);
@@ -338,7 +397,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const remember = useCallback(() => {
     if (!project) return;
-    setUndoStack((stack) => [...stack, { files: project.files, design: project.design }].slice(-20));
+    setUndoStack((stack) => [...stack, { files: project.files, design: project.design, trash: project.trash }].slice(-20));
   }, [project]);
 
   /** Resolves the candidate preview that is waiting for evidence, if any. */
@@ -514,7 +573,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     if (turn.adopted || turn.discarded) return;
     if (turn.outcome?.kind !== "ready") return;
     remember();
-    replaceProject({
+    commit({
       ...target,
       files: turn.candidate.project.files,
       design: turn.candidate.design,
@@ -522,7 +581,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     });
     setTurns((list) => list.map((item) => (item.id === turn.id ? { ...item, adopted: true } : item)));
     setStageOwner("current");
-  }, [remember, replaceProject, turns]);
+  }, [commit, remember, turns]);
 
   const discardCandidate = useCallback(() => {
     const turn = turns.at(-1);
@@ -631,31 +690,62 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         const next = normalizePath(raw);
         if (!project || !next) {
           setNotice(text.code.badPath);
-          return;
+          return false;
         }
         if (project.files.some((file) => file.path === next)) {
           setPath(next);
-          return;
+          setNotice(text.code.pathTaken);
+          return false;
         }
-        replaceProject(upsertFile(project, { path: next, text: "" }));
-        setPath(next);
-      },
-      removeCurrent: () => {
-        if (!project) return;
         remember();
-        const next = removeFile(project, path);
-        replaceProject(next);
-        setPath(next.files[0]?.path ?? "main.py");
+        commit(upsertFile(project, { path: next, text: "" }));
+        setPath(next);
+        return true;
       },
-      renameCurrent: (raw) => {
+      trashFile: (target) => {
         if (!project) return;
-        const next = renameFile(project, path, raw);
-        if (!next) {
-          setNotice(text.code.badPath);
-          return;
+        if (!project.files.some((file) => file.path === target)) return;
+        remember();
+        const next = trashFile(project, target);
+        commit(next);
+        if (path === target) {
+          setPath(next.files.some((file) => file.path === "main.py") ? "main.py" : next.files[0]?.path ?? "main.py");
         }
-        replaceProject(next);
-        setPath(normalizePath(raw) ?? path);
+        setNotice(text.code.trashed(target));
+      },
+      restoreFromTrash: (target) => {
+        if (!project) return;
+        if (!project.trash?.some((item) => item.file.path === target)) return;
+        remember();
+        const next = restoreFile(project, target);
+        commit(next);
+        const back = next.files.find((file) => !project.files.some((item) => item.path === file.path));
+        setPath(back?.path ?? next.files[0]?.path ?? "main.py");
+        setNotice(text.code.restored(target));
+      },
+      dropFromTrash: (target) => {
+        if (!project) return;
+        commit(dropFromTrash(project, target));
+      },
+      emptyTrash: () => {
+        if (!project?.trash?.length) return;
+        remember();
+        commit(emptyTrash(project));
+        setNotice(text.code.trashEmptied);
+      },
+      renameCurrent: (from, raw) => {
+        if (!project || from !== path) return false;
+        const next = normalizePath(raw);
+        if (!next || next === from) return false;
+        const renamed = renameFile(project, from, next);
+        if (!renamed) {
+          setNotice(text.code.pathTaken);
+          return false;
+        }
+        remember();
+        commit(renamed);
+        setPath(next);
+        return true;
       },
       addBytes: (raw, bytes) => {
         if (!project) return;
@@ -668,7 +758,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           project.files.map((file) => file.path),
           next,
         );
-        replaceProject(upsertFile(project, { path: chosen, bytes }));
+        commit(upsertFile(project, { path: chosen, bytes }));
         setPath(chosen);
       },
       importArchive: async (file) => {
@@ -719,7 +809,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         if (!project) return;
         const trimmed = name.trim();
         if (!trimmed) return;
-        replaceProject({ ...project, name: trimmed, updatedAt: Date.now() });
+        commit({ ...project, name: trimmed, updatedAt: Date.now() });
       },
       deleteProject: async () => {
         if (!project) return;
@@ -792,7 +882,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       undo: () => {
         const previous = undoStack.at(-1);
         if (!project || !previous) return;
-        replaceProject({ ...project, files: previous.files, design: previous.design, updatedAt: Date.now() });
+        commit({
+          ...project,
+          files: previous.files,
+          design: previous.design,
+          trash: previous.trash,
+          updatedAt: Date.now(),
+        });
         setUndoStack((stack) => stack.slice(0, -1));
       },
       canUndo: undoStack.length > 0,
@@ -830,7 +926,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           project.files.map((file) => file.path),
           normalizePath(assetDraft.suggested) ?? `assets/${assetKind}.jpg`,
         );
-        replaceProject(upsertFile(project, { path: chosen, bytes: assetDraft.bytes }));
+        commit(upsertFile(project, { path: chosen, bytes: assetDraft.bytes }));
         setPath(chosen);
         setAssetDraft(null);
         setAssetOpen(false);
@@ -875,6 +971,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     updateText,
     remember,
     replaceProject,
+    commit,
     run,
     stop,
     abortTurn,

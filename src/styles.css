@@ -72,7 +72,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .account { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .account span { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.ghost, .stop, .side-actions button, .menu button, .file-btn, .modal button, .inline-form button {
+.ghost, .stop, .menu button, .file-btn, .modal button {
   border: 1px solid transparent;
   background: transparent;
   border-radius: 8px;
@@ -146,7 +146,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .menu button.danger { color: var(--danger); }
 .menu small { color: var(--muted); }
 .menu label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); padding: 4px; }
-.menu input, .inline-form input, .modal textarea, .pane-ask textarea {
+.menu input, .modal textarea, .pane-ask textarea {
   border: 1px solid var(--line-strong);
   background: white;
   border-radius: 8px;
@@ -154,6 +154,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 .menu-list { display: grid; max-height: 180px; overflow: auto; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
 .file-btn input { display: none; }
+.card.on { background: #e4efe8; }
 
 /* ---- 工作室：一个舞台，两个视图 ---- */
 .studio { min-height: 0; display: grid; gap: 0; }
@@ -297,40 +298,106 @@ button:disabled { opacity: 0.45; cursor: default; }
 .pane-locked { display: grid; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
 .pane-locked p { margin: 0; color: var(--muted); line-height: 1.5; }
 
-/* ---- 看代码 ---- */
+/* ---- 看代码：文件与素材 ---- */
 .sidebar, .editor, .bottom { min-height: 0; min-width: 0; }
 .sidebar, .bottom { background: rgba(246, 243, 236, 0.72); }
 .sidebar { border-right: 1px solid var(--line-strong); display: flex; flex-direction: column; padding: 8px; gap: 8px; }
 .editor { display: flex; flex-direction: column; background: #14171c; }
 
-.seg, .side-actions, .bottom-tabs, .inline-ai, .modal-actions { display: flex; gap: 4px; align-items: center; }
+.seg, .side-tools, .bottom-tabs, .inline-ai, .modal-actions { display: flex; gap: 4px; align-items: center; }
 .seg { background: #e4dfd4; border-radius: 8px; padding: 2px; }
-.seg button { flex: 1; border: 0; background: transparent; border-radius: 6px; height: 28px; }
-.seg button.on, .side-actions button.on { background: var(--paper-2); }
-.side-actions button, .file-btn {
+.seg button { flex: 1; border: 0; background: transparent; border-radius: 6px; min-height: 28px; }
+.seg button.on { background: var(--paper-2); }
+
+.side-tools { gap: 6px; }
+.side-count { font-size: 11px; color: var(--muted); margin-right: auto; white-space: nowrap; }
+.side-tools button, .side-tools .file-btn {
   border: 1px solid var(--line);
   background: var(--paper-2);
-  min-height: 28px;
-  border-radius: 6px;
-  padding: 0 8px;
+  width: auto;
+  min-height: 30px;
+  border-radius: 8px;
+  padding: 0 10px;
   font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-direction: row;
 }
-.inline-form { display: flex; gap: 4px; }
-.inline-form input { flex: 1; min-width: 0; }
-.tree { overflow: auto; display: grid; align-content: start; }
-.file, .dir {
-  width: 100%;
+.side-tools button:hover, .side-tools .file-btn:hover { border-color: var(--ink); }
+.side-tools svg, .trash svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.side-tools .file-btn { flex-direction: row; }
+
+/* one editable row at a time, and it can always be cancelled */
+.composer { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--brass); border-radius: 10px; background: var(--paper-2); }
+.composer label { display: grid; gap: 4px; }
+.composer label span { font-size: 11px; color: var(--muted); }
+.composer input { width: 100%; font-family: var(--mono); font-size: 12px; }
+.composer-actions { display: flex; gap: 6px; }
+.composer-actions button { border: 1px solid var(--line-strong); background: transparent; border-radius: 6px; min-height: 28px; padding: 0 10px; font-size: 12px; }
+.composer-actions .primary { background: var(--pine); border-color: var(--pine); color: var(--pine-ink); font-weight: 600; }
+.composer-hint { margin: 0; font-size: 11px; color: var(--danger); }
+.row-editing { padding: 4px 6px 4px 0; }
+
+.tree { overflow: auto; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1px; }
+.dir { color: var(--muted); font-size: 11px; padding: 8px 0 2px; text-transform: none; }
+.row { display: flex; align-items: center; border-radius: 8px; min-height: 30px; min-width: 0; }
+.row:hover { background: #eeeade; }
+.row.on { background: #e4efe8; box-shadow: inset 2px 0 0 var(--pine); }
+.row .file {
+  flex: 1;
+  min-width: 0;
   text-align: left;
   border: 0;
   background: transparent;
-  border-radius: 4px;
-  height: 26px;
+  height: 30px;
+  padding: 0 4px 0 2px;
   font-family: var(--mono);
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.dir { color: var(--muted); }
-.file.on, .card.on { background: #e4efe8; }
-.asset-grid { overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.row.on .file { font-weight: 600; }
+/* Row actions stay visible: touch and young users should not need hover. */
+.row-actions { display: flex; gap: 2px; padding-right: 4px; opacity: 0.5; }
+.row:hover .row-actions, .row.on .row-actions, .row:focus-within .row-actions { opacity: 1; }
+.row-actions button {
+  border: 0;
+  background: transparent;
+  width: 26px;
+  min-height: 26px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.row-actions button:hover { background: var(--paper-2); color: var(--ink); }
+.row-actions button.danger:hover { color: var(--danger); }
+.row-actions svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.row-confirm { gap: 6px; padding-right: 6px; background: #f6e7e4; overflow: hidden; }
+.row-confirm span { flex: 1; min-width: 0; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-confirm button { border: 1px solid var(--line-strong); background: var(--paper-2); border-radius: 6px; min-height: 26px; padding: 0 8px; font-size: 11px; white-space: nowrap; }
+.row-confirm button.danger { border-color: var(--danger); color: var(--danger); font-weight: 600; }
+
+.trash { margin-top: auto; border-top: 1px solid var(--line); padding-top: 6px; display: grid; gap: 6px; }
+.trash-head { border: 0; background: transparent; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px; border-radius: 8px; font-size: 12px; color: var(--muted); }
+.trash.open .trash-head { background: #eeeade; color: var(--ink); }
+.trash-head b { margin-left: 6px; background: var(--brass); color: var(--paper-2); border-radius: 99px; padding: 0 6px; font-size: 10px; }
+.trash-head small { font-size: 11px; }
+.trash-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; max-height: 220px; overflow: auto; }
+.trash-row { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 4px; border-radius: 6px; font-size: 12px; }
+.trash-row:hover { background: #eeeade; }
+.trash-name { flex: 1; min-width: 0; font-family: var(--mono); font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: line-through; }
+.trash-row button { border: 1px solid var(--line); background: var(--paper-2); border-radius: 6px; min-height: 24px; padding: 0 8px; font-size: 11px; display: grid; place-items: center; }
+.trash-row button.danger { width: 26px; padding: 0; color: var(--danger); }
+.trash-row.confirm { background: #f6e7e4; }
+.trash-row.confirm span { flex: 1; min-width: 0; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-row.confirm button.danger { width: auto; padding: 0 8px; font-weight: 600; }
+.trash-empty { justify-self: start; border: 1px solid var(--line); background: transparent; border-radius: 6px; min-height: 26px; padding: 0 8px; font-size: 11px; color: var(--muted); }
+.trash-empty:hover { border-color: var(--danger); color: var(--danger); }
+
+.asset-grid { overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start; }
 .card {
   border: 1px solid var(--line);
   background: var(--paper-2);

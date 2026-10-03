@@ -14,7 +14,15 @@ export type Project = {
   files: ProjectFile[];
   /** The design card the child adopted (see src/lib/design.ts). */
   design?: DesignCard;
+  /** Deleted files, newest first. Nothing is gone until the child empties this. */
+  trash?: TrashedFile[];
 };
+
+/** A file the child deleted, kept until they empty the trash. */
+export type TrashedFile = { file: ProjectFile; deletedAt: number };
+
+/** Older deleted files fall out of the trash so a project stays small. */
+export const TRASH_LIMIT = 20;
 
 export type StoredFile = {
   path: string;
@@ -29,6 +37,7 @@ export type StoredProject = {
   updatedAt: number;
   files: StoredFile[];
   design?: DesignCard;
+  trash?: { file: StoredFile; deletedAt: number }[];
 };
 
 const TEXT_EXTENSIONS = new Set([
@@ -83,6 +92,44 @@ export function removeFile(project: Project, path: string): Project {
   };
 }
 
+/**
+ * Deleting moves a file to the trash: reversible, and the only deletion path in
+ * the UI. `dropFromTrash` and `emptyTrash` are the irreversible ones.
+ */
+export function trashFile(project: Project, path: string): Project {
+  const file = project.files.find((item) => item.path === path);
+  if (!file) return project;
+  const next = removeFile(project, path);
+  const trash: TrashedFile[] = [{ file, deletedAt: Date.now() }, ...(project.trash ?? [])].slice(0, TRASH_LIMIT);
+  return { ...next, trash };
+}
+
+/** Puts a trashed file back; keeps both files when the path is used again. */
+export function restoreFile(project: Project, path: string): Project {
+  const entry = (project.trash ?? []).find((item) => item.file.path === path);
+  if (!entry) return project;
+  const taken = project.files.map((file) => file.path);
+  const restored = { ...entry.file, path: uniquePath(taken, entry.file.path) };
+  return {
+    ...project,
+    files: sortFiles([...project.files, restored]),
+    trash: (project.trash ?? []).filter((item) => item.file.path !== path),
+    updatedAt: Date.now(),
+  };
+}
+
+/** Forgets one trashed file for good. */
+export function dropFromTrash(project: Project, path: string): Project {
+  const trash = (project.trash ?? []).filter((item) => item.file.path !== path);
+  if (trash.length === (project.trash ?? []).length) return project;
+  return { ...project, trash, updatedAt: Date.now() };
+}
+
+export function emptyTrash(project: Project): Project {
+  if (!project.trash?.length) return project;
+  return { ...project, trash: [], updatedAt: Date.now() };
+}
+
 export function renameFile(project: Project, from: string, to: string): Project | null {
   const next = normalizePath(to);
   if (!next || next === from) return null;
@@ -123,30 +170,37 @@ export function base64ToBytes(value: string): Uint8Array {
 }
 
 export function toStored(project: Project): StoredProject {
+  const asStored = (file: ProjectFile): StoredFile =>
+    file.bytes ? { path: file.path, base64: bytesToBase64(file.bytes) } : { path: file.path, text: file.text ?? "" };
   return {
     id: project.id,
     name: project.name,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
-    files: project.files.map((file) =>
-      file.bytes ? { path: file.path, base64: bytesToBase64(file.bytes) } : { path: file.path, text: file.text ?? "" },
-    ),
+    files: project.files.map(asStored),
     design: project.design,
+    trash: project.trash?.map((entry) => ({ file: asStored(entry.file), deletedAt: entry.deletedAt })),
   };
 }
 
 export function fromStored(stored: StoredProject): Project {
+  const asFile = (file: StoredFile): ProjectFile =>
+    file.base64
+      ? { path: file.path, bytes: base64ToBytes(file.base64) }
+      : { path: file.path, text: file.text ?? "" };
   return {
     id: stored.id,
     name: stored.name,
     createdAt: stored.createdAt,
     updatedAt: stored.updatedAt,
-    files: sortFiles(
-      stored.files.map((file) =>
-        file.base64 ? { path: file.path, bytes: base64ToBytes(file.base64) } : { path: file.path, text: file.text ?? "" },
-      ),
-    ),
+    files: sortFiles(stored.files.map(asFile)),
     design: designFromRecord(stored.design) ?? undefined,
+    // Older records have no trash; a malformed entry is dropped, not guessed at.
+    trash: Array.isArray(stored.trash)
+      ? stored.trash
+          .filter((entry) => !!entry && typeof entry === "object" && !!entry.file?.path)
+          .map((entry) => ({ file: asFile(entry.file), deletedAt: Number(entry.deletedAt) || 0 }))
+      : undefined,
   };
 }
 

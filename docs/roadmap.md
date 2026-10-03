@@ -113,7 +113,10 @@ Cloudflare Worker（gamekit.talkincode.net）
 - 多文件项目与本地保存
 
 项目存在浏览器 IndexedDB（库 `gamekit`，表 `projects`）。新建示例或空白项目、打开、改名、复制、删除，
-新增/删除/改名文件，导入二进制素材，导入源码 zip。项目上带一张设计卡（`design` 字段），随项目一起保存。
+新增/删除/改名文件，导入二进制素材，导入源码 zip。项目上带一张设计卡（`design` 字段）和一个回收站（`trash` 字段），
+都随项目一起保存。
+写法：结构性变动（文件树、设计卡、采用、撤销）立即写入，只有编辑器的敲字用 350ms 防抖合并；
+写入串成一条队列，保证最后落盘的是最新一版；关闭页面时再冲一次。
 入口 `src/studio/store.tsx`、`src/lib/storage.ts`、`src/lib/project.ts`、`src/lib/design.ts`。
 
 - 起始示例
@@ -122,8 +125,10 @@ Cloudflare Worker（gamekit.talkincode.net）
 
 - 代码编辑
 
-「看代码」视图里的 Monaco 编辑器，Python 高亮；「讲讲这段」把选中的代码发到对话面板里讲解，只读，不改项目
-（`src/ui/CodePane.tsx`、`src/lib/ai.ts` 的 `explainMessages`）。
+「看代码」视图里的 Monaco 编辑器，Python 高亮；左侧是文件与素材：新建/改名都是一次一个行内输入框，
+可以取消（或按 Esc）；删除先进回收站（先问一句），回收站里能恢复、彻底删除或清空，文件不会一步就没。
+「讲讲这段」把选中的代码发到对话面板里讲解，只读，不改项目
+（`src/ui/CodePane.tsx`、`src/ui/Sidebar.tsx`、`src/lib/ai.ts` 的 `explainMessages`）。
 
 - 浏览器内运行
 
@@ -289,7 +294,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 
 | 一级功能 | 状态 | 风险级别 | Happy Path E2E | 失败路径 | 权限角色覆盖 | 失败恢复/回滚 | 证据（测试路径/用例） |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 本地项目管理 | 已有 | 高（作品丢失） | ❌ 缺口 | ❌ 缺口 | 不适用 | ✅（采用后可撤销；换项目取消失败中的一轮） | 单元：`src/lib/project.test.ts`（`rejects traversal and keeps stable names`）；`tests/e2e/agent.spec.ts`：`a round that is still running cannot write into another project` |
+| 本地项目管理 | 已有 | 高（作品丢失） | ✅（新建、改名、删除、恢复、刷新后仍在） | ❌ 缺口（IndexedDB 写失败时的界面提示） | 不适用 | ✅（删除先确认再进回收站，可恢复；采用后可撤销；换项目取消失败中的一轮） | `tests/e2e/files.spec.ts`（4 条）、`tests/e2e/agent.spec.ts`：`a round that is still running cannot write into another project`、单元 `src/lib/project.test.ts`（回收站、存储往返） |
 | 代码编辑 | 已有 | 低 | ✅（在「与代码」视图里看到项目内容） | 不适用 | 不适用 | 不适用（持久化见上一行） | `tests/e2e/agent.spec.ts`：`an idea becomes a candidate, and the child adopts it` |
 | 浏览器内运行 | 已有 | 中 | ✅（候选版本在舞台上跑起来，循环能拿到「在跑」证据） | ❌ 缺口（出错行定位） | 不适用 | 不适用（不改持久状态） | `tests/e2e/agent.spec.ts` 的每一条都要经过运行阶段；`src/lib/export.test.ts`（打包与模板）。画面本身与真实帧率仍需人工看 |
 | 诊断与报错 | 已有 | 中 | ✅（小助手靠静态检查发现 time.sleep 并修好） | ✅ 单元 | 不适用 | 不适用（只读） | `src/lib/diagnostics.test.ts`；`tests/e2e/agent.spec.ts`：`a candidate the checks reject is repaired before the child sees it` |
@@ -309,7 +314,9 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 
 - **E2E 基础设施：** 已搭好（Playwright，`tests/e2e/`，生产构建 + `vite preview`，替身模型 `tests/e2e/mock-model.mjs`
   能按请求类型回答设计卡、文件、修复与讲解）。下一步是给「看到游戏画面」加一条断言（需要 pygame-web CDN）。
-- **本地项目管理：** 编辑后刷新仍在；删除需要确认；IndexedDB 写失败时界面提示且内存中的内容不丢。
+- **本地项目管理：** IndexedDB 写失败时界面提示且内存中的内容不丢（现在只把顶栏状态改成「没有保存成功」）；
+  素材上传与导入的进度提示。
+- **左栏：** 文件多到需要滚动的时的分组与搜索；长按/右键菜单。
 - **浏览器内运行：** 运行起始示例、停下、再次运行；运行一个有语法错误的项目时出错行被定位。
 - **小助手：** 模型回答很慢时的表现（现在的反馈只有“小助手正在忙…”）；
   同一轮里设计卡被孩子改过之后再制作的路径；把常见报错翻成孩子的话。

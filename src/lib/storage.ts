@@ -7,7 +7,7 @@ const STORE = "projects";
  * Schema rule: object stores and indexes need a version bump (plus a migration in
  * `onupgradeneeded`). Adding an optional field to a stored project record does
  * not: old records simply lack it, and `fromStored` tolerates that. `design`
- * (src/lib/design.ts) was added that way.
+ * (src/lib/design.ts) and `trash` (src/lib/project.ts) were added that way.
  */
 const DB_VERSION = 1;
 

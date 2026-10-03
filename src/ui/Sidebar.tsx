@@ -1,18 +1,78 @@
 import { useEffect, useState } from "react";
-import { assetFilter, fileTree, mediaType, type TreeNode } from "../lib/project";
+import { assetFilter, fileTree, mediaType, normalizePath, type TrashedFile, type TreeNode } from "../lib/project";
 import { useStudio } from "../studio/store";
 import { text } from "./text";
 
+/**
+ * 看代码 的左侧：文件与素材。
+ *
+ * One thing happens at a time: either a row is being renamed, or a new file is
+ * being typed, or a row is asking to confirm a delete — never two at once, and
+ * Escape or 取消 closes whichever one is open.
+ * Deleting always goes through the trash, so nothing is one click from gone.
+ */
 export function Sidebar() {
   const studio = useStudio();
   const [pane, setPane] = useState<"files" | "assets">("files");
-  const [draft, setDraft] = useState<string | null>(null);
-  const [rename, setRename] = useState("");
+  /** `{ kind: "new" }` for a new file, `{ kind: "rename", path }` for a row. */
+  const [editing, setEditing] = useState<{ kind: "new" | "rename"; path: string } | null>(null);
+  const [draft, setDraft] = useState("");
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
   const project = studio.project;
   if (!project) return <aside className="sidebar" />;
 
   const tree = fileTree(project.files.map((file) => file.path));
   const assets = project.files.filter((file) => assetFilter(file.path));
+  const trash = project.trash ?? [];
+  const draftPath = normalizePath(draft);
+  const renameTarget = editing?.kind === "rename" ? editing.path : null;
+  const taken = !!draftPath && draftPath !== renameTarget && project.files.some((file) => file.path === draftPath);
+
+  const startNew = () => {
+    setConfirming(null);
+    setPane("files");
+    setEditing({ kind: "new", path: "" });
+    setDraft("");
+  };
+
+  const startRename = (path: string) => {
+    setConfirming(null);
+    setEditing({ kind: "rename", path });
+    setDraft(path);
+  };
+
+  const cancel = () => {
+    setEditing(null);
+    setDraft("");
+  };
+
+  /** Closes whichever row is asking a question (composer or delete confirm). */
+  const cancelConfirm = () => setConfirming(null);
+
+  /** Escape closes the row that is asking, wherever focus happens to be. */
+  useEffect(() => {
+    if (!editing && !confirming) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setEditing(null);
+      setDraft("");
+      setConfirming(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editing, confirming]);
+
+  const submit = () => {
+    if (!editing) return;
+    if (editing.kind === "new") {
+      if (studio.createFile(draft)) cancel();
+      return;
+    }
+    // Submitting the same name is not an error; it just means "no change".
+    if (!draftPath || draftPath === editing.path) cancel();
+    else if (studio.renameCurrent(editing.path, draft)) cancel();
+  };
 
   return (
     <aside className="sidebar">
@@ -27,53 +87,95 @@ export function Sidebar() {
 
       {pane === "files" ? (
         <>
-          <div className="side-actions">
-            <button type="button" onClick={() => setDraft("game/new.py")}>
+          <div className="side-tools">
+            <span className="side-count">{text.code.fileCount(project.files.length)}</span>
+            <button type="button" data-testid="new-file" onClick={startNew} disabled={editing?.kind === "new"}>
+              <IconPlus />
               {text.code.newFile}
             </button>
-            <button type="button" onClick={() => setRename(studio.path)}>
-              {text.code.rename}
-            </button>
-            <button type="button" onClick={studio.removeCurrent}>
-              {text.code.delete}
-            </button>
           </div>
-          {draft !== null ? (
-            <form
-              className="inline-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                studio.createFile(draft);
-                setDraft(null);
-              }}
-            >
-              <input value={draft} onChange={(event) => setDraft(event.target.value)} autoFocus />
-              <button type="submit">{text.code.open}</button>
-            </form>
+
+          {editing?.kind === "new" ? (
+            <FileComposer
+              label={text.code.newFileHint}
+              value={draft}
+              placeholder="game/enemy.py"
+              confirm={text.code.create}
+              disabled={!draftPath || taken}
+              hint={taken ? text.code.pathTaken : ""}
+              onChange={setDraft}
+              onSubmit={submit}
+              onCancel={cancel}
+            />
           ) : null}
-          {rename ? (
-            <form
-              className="inline-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                studio.renameCurrent(rename);
-                setRename("");
-              }}
-            >
-              <input value={rename} onChange={(event) => setRename(event.target.value)} autoFocus />
-              <button type="submit">OK</button>
-            </form>
-          ) : null}
+
           <div className="tree">
             {tree.map((node) => (
-              <Node key={node.path} node={node} depth={0} active={studio.path} onOpen={studio.setPath} />
+              <Node
+                key={node.path}
+                node={node}
+                depth={0}
+                active={studio.path}
+                editing={editing?.kind === "rename" ? editing.path : null}
+                draft={draft}
+                taken={taken}
+                confirming={confirming}
+                onOpen={studio.setPath}
+                onStartRename={startRename}
+                onChangeDraft={setDraft}
+                onSubmitRename={submit}
+                onCancel={cancel}
+                onAskDelete={setConfirming}
+                onConfirmDelete={(path) => {
+                  studio.trashFile(path);
+                  setConfirming(null);
+                }}
+                onCancelConfirm={cancelConfirm}
+              />
             ))}
+            {!project.files.length ? <p className="empty">{text.code.noFiles}</p> : null}
           </div>
+
+          <section className={trashOpen ? "trash open" : "trash"} data-testid="trash">
+            <button type="button" className="trash-head" onClick={() => setTrashOpen(!trashOpen)}>
+              <span>
+                {text.code.trash}
+                {trash.length ? <b>{trash.length}</b> : null}
+              </span>
+              <small>{trashOpen ? text.code.trashHide : text.code.trashShow}</small>
+            </button>
+            {trashOpen ? (
+              <div className="trash-list">
+                {trash.map((entry) => (
+                  <TrashRow
+                    key={entry.file.path}
+                    entry={entry}
+                    confirming={confirming === entry.file.path}
+                    onRestore={() => studio.restoreFromTrash(entry.file.path)}
+                    onAskDelete={setConfirming}
+                    onConfirmDelete={() => {
+                      studio.dropFromTrash(entry.file.path);
+                      setConfirming(null);
+                    }}
+                    onCancelConfirm={() => setConfirming(null)}
+                  />
+                ))}
+                {!trash.length ? <p className="empty">{text.code.trashEmpty}</p> : null}
+                {trash.length ? (
+                  <button className="trash-empty" type="button" onClick={studio.emptyTrash}>
+                    {text.code.trashEmptyAll}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
         </>
       ) : (
         <>
-          <div className="side-actions">
+          <div className="side-tools">
+            <span className="side-count">{text.code.assetCount(assets.length)}</span>
             <label className="file-btn">
+              <IconUpload />
               {text.code.upload}
               <input
                 type="file"
@@ -88,6 +190,7 @@ export function Sidebar() {
               />
             </label>
             <button type="button" onClick={() => studio.setAssetOpen(true)}>
+              <IconSparkle />
               {text.code.generate}
             </button>
           </div>
@@ -103,7 +206,7 @@ export function Sidebar() {
                 <span>{file.path.split("/").pop()}</span>
               </button>
             ))}
-            {!assets.length ? <p className="empty">{text.code.upload}</p> : null}
+            {!assets.length ? <p className="empty">{text.code.noAssets}</p> : null}
           </div>
         </>
       )}
@@ -111,16 +214,92 @@ export function Sidebar() {
   );
 }
 
+/** The one editable row in the sidebar: new file, or renaming an existing one. */
+function FileComposer({
+  label,
+  value,
+  placeholder,
+  confirm,
+  disabled,
+  hint,
+  onChange,
+  onSubmit,
+  onCancel,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  confirm: string;
+  disabled: boolean;
+  hint: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <form
+      className="composer"
+      data-testid="composer"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      <label>
+        <span>{label}</span>
+        <input
+          value={value}
+          placeholder={placeholder}
+          autoFocus
+          onFocus={(event) => event.target.select()}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+      <div className="composer-actions">
+        <button className="primary" type="submit" disabled={disabled}>
+          {confirm}
+        </button>
+        <button type="button" onClick={onCancel}>
+          {text.code.cancel}
+        </button>
+      </div>
+      {hint ? <p className="composer-hint">{hint}</p> : null}
+    </form>
+  );
+}
+
 function Node({
   node,
   depth,
   active,
+  editing,
+  draft,
+  taken,
+  confirming,
   onOpen,
+  onStartRename,
+  onChangeDraft,
+  onSubmitRename,
+  onCancel,
+  onAskDelete,
+  onConfirmDelete,
+  onCancelConfirm,
 }: {
   node: TreeNode;
   depth: number;
   active: string;
+  editing: string | null;
+  draft: string;
+  taken: boolean;
+  confirming: string | null;
   onOpen: (path: string) => void;
+  onStartRename: (path: string) => void;
+  onChangeDraft: (value: string) => void;
+  onSubmitRename: () => void;
+  onCancel: () => void;
+  onAskDelete: (path: string) => void;
+  onConfirmDelete: (path: string) => void;
+  onCancelConfirm: () => void;
 }) {
   if (!node.file) {
     return (
@@ -129,20 +308,163 @@ function Node({
           {node.name}
         </div>
         {node.children.map((child) => (
-          <Node key={child.path} node={child} depth={depth + 1} active={active} onOpen={onOpen} />
+          <Node
+            key={child.path}
+            node={child}
+            depth={depth + 1}
+            active={active}
+            editing={editing}
+            draft={draft}
+            taken={taken}
+            confirming={confirming}
+            onOpen={onOpen}
+            onStartRename={onStartRename}
+            onChangeDraft={onChangeDraft}
+            onSubmitRename={onSubmitRename}
+            onCancel={onCancel}
+            onAskDelete={onAskDelete}
+            onConfirmDelete={onConfirmDelete}
+            onCancelConfirm={onCancelConfirm}
+          />
         ))}
       </div>
     );
   }
+
+  const pad = 8 + depth * 12;
+  if (editing === node.path) {
+    return (
+      <div style={{ paddingLeft: pad }} className="row-editing">
+        <FileComposer
+          label={text.code.renameHint}
+          value={draft}
+          placeholder="main.py"
+          confirm={text.code.rename}
+          disabled={taken}
+          hint={taken ? text.code.pathTaken : ""}
+          onChange={onChangeDraft}
+          onSubmit={onSubmitRename}
+          onCancel={onCancel}
+        />
+      </div>
+    );
+  }
+
+  if (confirming === node.path) {
+    return (
+      <div className="row row-confirm" style={{ paddingLeft: pad }} data-testid="delete-confirm">
+        <span>{text.code.confirmTrash(node.name)}</span>
+        <button type="button" className="danger" onClick={() => onConfirmDelete(node.path)}>
+          {text.code.trashConfirm}
+        </button>
+        <button type="button" onClick={onCancelConfirm}>
+          {text.code.cancel}
+        </button>
+      </div>
+    );
+  }
+  const selected = active === node.path;
   return (
-    <button
-      type="button"
-      className={active === node.path ? "file on" : "file"}
-      style={{ paddingLeft: 8 + depth * 12 }}
-      onClick={() => onOpen(node.path)}
-    >
-      {node.name}
-    </button>
+    <div className={selected ? "row on" : "row"} style={{ paddingLeft: pad }}>
+      <button type="button" className="file" onClick={() => onOpen(node.path)} title={node.path}>
+        {node.name}
+      </button>
+      <span className="row-actions">
+        <button type="button" aria-label={`${text.code.rename} ${node.name}`} onClick={() => onStartRename(node.path)}>
+          <IconPencil />
+        </button>
+        <button
+          type="button"
+          aria-label={`${text.code.delete} ${node.name}`}
+          className="danger"
+          onClick={() => onAskDelete(node.path)}
+        >
+          <IconTrash />
+        </button>
+      </span>
+    </div>
+  );
+}
+
+function TrashRow({
+  entry,
+  confirming,
+  onRestore,
+  onAskDelete,
+  onConfirmDelete,
+  onCancelConfirm,
+}: {
+  entry: TrashedFile;
+  confirming: boolean;
+  onRestore: () => void;
+  onAskDelete: (path: string) => void;
+  onConfirmDelete: () => void;
+  onCancelConfirm: () => void;
+}) {
+  const name = entry.file.path.split("/").pop();
+  if (confirming) {
+    return (
+      <div className="trash-row confirm" data-testid="purge-confirm">
+        <span>{text.code.confirmPurge(name ?? "")}</span>
+        <button type="button" className="danger" onClick={onConfirmDelete}>
+          {text.code.purgeConfirm}
+        </button>
+        <button type="button" onClick={onCancelConfirm}>
+          {text.code.cancel}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="trash-row" title={entry.file.path}>
+      <span className="trash-name">{name}</span>
+      <button type="button" onClick={onRestore}>
+        {text.code.restore}
+      </button>
+      <button type="button" className="danger" aria-label={`${text.code.purge} ${name}`} onClick={() => onAskDelete(entry.file.path)}>
+        <IconTrash />
+      </button>
+    </div>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 3.5v9M3.5 8h9" />
+    </svg>
+  );
+}
+
+function IconPencil() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M11.2 2.6 13.4 4.8 6.2 12H4v-2.2z" />
+    </svg>
+  );
+}
+
+function IconTrash() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M3.5 4.5h9M6.5 4.5V3h3v1.5M4.8 4.5l.6 8h5.2l.6-8" />
+    </svg>
+  );
+}
+
+function IconUpload() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 10.5V3.5M5 6.5 8 3.5l3 3M3.5 12.5h9" />
+    </svg>
+  );
+}
+
+function IconSparkle() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 2.5 9.3 6.7 13.5 8 9.3 9.3 8 13.5 6.7 9.3 2.5 8 6.7 6.7z" />
+    </svg>
   );
 }
 
