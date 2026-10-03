@@ -74,7 +74,7 @@ test("a generated picture becomes a small transparent PNG in assets/", async ({ 
   await page.getByRole("button", { name: text.code.files, exact: true }).click();
   await expect(page.locator(".tree")).toContainText(/sprite-\d+\.png/);
 
-  await page.getByRole("button", { name: text.header.undo }).click();
+  await page.getByRole("button", { name: text.header.undoShort }).click();
   await page.getByRole("button", { name: text.code.assets, exact: true }).click();
   await expect(stored).toHaveCount(0);
 });

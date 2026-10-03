@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   createContext,
   useCallback,
@@ -6,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import template from "../../runtime/player.tmpl?raw";
 import {
@@ -71,6 +71,10 @@ export type MenuId = "project" | "export" | null;
 export type ViewId = "design" | "code";
 /** Whose build the stage is showing. */
 export type StageOwner = "current" | "candidate";
+
+/** 看代码 里的三块面板，各自可以收拢。 */
+export type PanelId = "side" | "stage" | "bottom";
+export type PanelState = Record<PanelId, boolean>;
 
 export type AssetKind = "sprite" | "background" | "tile" | "icon";
 
@@ -146,8 +150,13 @@ type StudioValue = {
   setSelection: (value: string) => void;
   menu: MenuId;
   setMenu: (menu: MenuId) => void;
+  /** 我的项目：a panel of its own, not a dropdown of names. */
+  projectsOpen: boolean;
+  setProjectsOpen: (open: boolean) => void;
   view: ViewId;
   setView: (view: ViewId) => void;
+  panels: PanelState;
+  togglePanel: (panel: PanelId) => void;
   turns: Turn[];
   candidate: CandidateResult | null;
   turnBusy: boolean;
@@ -212,6 +221,26 @@ export function useStudio(): StudioValue {
 }
 
 const ACTIVE_KEY = "gamekit.active";
+/** Panel layout is a preference, not project data: it lives in localStorage. */
+const PANELS_KEY = "gamekit.panels";
+const PANELS_DEFAULT: PanelState = { side: true, stage: true, bottom: true };
+
+function readPanels(): PanelState {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PANELS_KEY) ?? "{}") as Partial<PanelState>;
+    return {
+      side: stored.side !== false,
+      stage: stored.stage !== false,
+      bottom: stored.bottom !== false,
+    };
+  } catch {
+    return PANELS_DEFAULT;
+  }
+}
+
+function writePanels(panels: PanelState): void {
+  localStorage.setItem(PANELS_KEY, JSON.stringify(panels));
+}
 
 /** Folds one agent event into the round it belongs to. */
 function applyEvent(turn: Turn, event: AgentEvent): Turn {
@@ -236,7 +265,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [inputs, setInputs] = useState<string[]>([]);
   const [selection, setSelection] = useState("");
   const [menu, setMenu] = useState<MenuId>(null);
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const [view, setView] = useState<ViewId>("design");
+  const [panels, setPanels] = useState<PanelState>(() => readPanels());
   const [turns, setTurns] = useState<Turn[]>([]);
   const [turnBusy, setTurnBusy] = useState(false);
   const [assetDraft, setAssetDraft] = useState<AssetDraft | null>(null);
@@ -691,8 +722,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSelection,
       menu,
       setMenu,
+      projectsOpen,
+      setProjectsOpen,
       view,
       setView,
+      panels,
+      togglePanel: (panel) => {
+        setPanels((current) => {
+          const next = { ...current, [panel]: !current[panel] };
+          writePanels(next);
+          return next;
+        });
+      },
       turns,
       candidate,
       turnBusy,
@@ -801,6 +842,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         abortTurn();
         setProjects((current) => [imported, ...current]);
         setActiveId(imported.id);
+        setProjectsOpen(false);
         setTurns([]);
         localStorage.setItem(ACTIVE_KEY, imported.id);
         setPath(imported.files.some((item) => item.path === "main.py") ? "main.py" : imported.files[0].path);
@@ -813,6 +855,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         abortTurn();
         setProjects((current) => [created, ...current]);
         setActiveId(created.id);
+        setProjectsOpen(false);
         setTurns([]);
         localStorage.setItem(ACTIVE_KEY, created.id);
         setPath("main.py");
@@ -824,6 +867,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         abortTurn();
         setProjects((current) => [created, ...current]);
         setActiveId(created.id);
+        setProjectsOpen(false);
         setTurns([]);
         localStorage.setItem(ACTIVE_KEY, created.id);
         setPath("main.py");
@@ -833,6 +877,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         abortTurn();
         setActiveId(id);
         setTurns([]);
+        setProjectsOpen(false);
         localStorage.setItem(ACTIVE_KEY, id);
         setPath("main.py");
         setMenu(null);
@@ -861,6 +906,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(ACTIVE_KEY, rest[0].id);
         }
         setTurns([]);
+        setProjectsOpen(false);
         setPath("main.py");
         stop();
       },
@@ -879,6 +925,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         setProjects((current) => [copy, ...current]);
         setTurns([]);
         setActiveId(copy.id);
+        setProjectsOpen(false);
         localStorage.setItem(ACTIVE_KEY, copy.id);
       },
       exportSource: () => {
@@ -998,7 +1045,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     problems,
     selection,
     menu,
+    projectsOpen,
     view,
+    panels,
     turns,
     candidate,
     turnBusy,

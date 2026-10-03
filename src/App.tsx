@@ -3,6 +3,7 @@ import { BottomPanel } from "./ui/BottomPanel";
 import { CodePane } from "./ui/CodePane";
 import { DesignerPane } from "./ui/DesignerPane";
 import { Overlays } from "./ui/Overlays";
+import { ProjectsPanel } from "./ui/ProjectsPanel";
 import { Sidebar } from "./ui/Sidebar";
 import { Stage } from "./ui/Stage";
 import { Toolbar } from "./ui/Toolbar";
@@ -21,7 +22,6 @@ function Shell() {
   // Monaco is heavy; build it the first time the child opens 看代码, then keep it
   // mounted so switching views never loses the file or the editor state.
   const [codeSeen, setCodeSeen] = useState(false);
-
   useEffect(() => {
     if (studio.view === "code") setCodeSeen(true);
   }, [studio.view]);
@@ -41,9 +41,18 @@ function Shell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [studio]);
 
+  // Panels collapse to nothing; the editor always keeps the remaining space.
+  const columns = [
+    studio.panels.side ? "232px" : "0px",
+    "minmax(0, 1fr)",
+    studio.panels.stage ? "minmax(320px, 32vw)" : "0px",
+  ].join(" ");
+  const rows = `minmax(0, 1fr) ${studio.panels.bottom ? "208px" : "0px"}`;
+
   return (
     <div
       className={`shell view-${studio.view}`}
+      style={{ ["--code-columns" as string]: columns, ["--code-rows" as string]: rows }}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
@@ -66,13 +75,14 @@ function Shell() {
         <DesignerPane />
         {codeSeen ? (
           <>
-            <Sidebar />
+            {studio.panels.side ? <Sidebar /> : null}
             <CodePane />
-            <BottomPanel />
+            {studio.panels.bottom ? <BottomPanel /> : null}
           </>
         ) : null}
       </main>
       <Overlays />
+      <ProjectsPanel />
       {studio.notice ? (
         <button className="notice" type="button" onClick={studio.dismissNotice}>
           {studio.notice}

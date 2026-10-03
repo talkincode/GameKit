@@ -120,7 +120,7 @@ test("deleting asks first, then goes to the trash, and can come back", async ({ 
   await page.getByRole("button", { name: `${text.code.delete} main.py` }).click();
   await page.getByTestId("delete-confirm").getByRole("button", { name: text.code.trashConfirm }).click();
   await expect(page.locator(".tree")).not.toContainText("main.py");
-  await page.getByRole("button", { name: text.header.undo }).click();
+  await page.getByRole("button", { name: text.header.undoShort }).click();
   await expect(page.locator(".tree")).toContainText("main.py");
 });
 

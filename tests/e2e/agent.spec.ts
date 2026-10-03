@@ -74,7 +74,7 @@ test("an idea becomes a candidate, and the child adopts it", async ({ page }) =>
   const lines = await openCode(page);
   await expect(lines).toContainText(MARKER);
 
-  await page.getByRole("button", { name: text.header.undo }).click();
+  await page.getByRole("button", { name: text.header.undoShort }).click();
   await expect(lines).not.toContainText(MARKER);
 });
 
@@ -158,9 +158,14 @@ test("a round that is still running cannot write into another project", async ({
   await page.getByRole("tab", { name: text.header.design }).click();
   await page.getByLabel(text.pane.placeholder).fill(IDEA);
   await page.getByRole("button", { name: text.pane.send }).click();
-  // Switch projects while the round is in flight.
-  await page.getByRole("button", { name: text.header.project }).click();
-  await page.getByRole("button", { name: text.project.duplicate }).click();
+  // Switch projects while the round is in flight (the panel's 复制 makes a copy and opens it).
+  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await page
+    .getByTestId("projects-panel")
+    .locator(".project-card")
+    .first()
+    .getByRole("button", { name: text.project.duplicate })
+    .click();
   await page.waitForTimeout(200);
 
   // The new project keeps its own files, and the interrupted round is gone.

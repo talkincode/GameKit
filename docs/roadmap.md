@@ -104,6 +104,19 @@ Cloudflare Worker（gamekit.talkincode.net）
 浏览器不支持就不显示麦克风）。小助手在忙时，顶栏一个 chip、输入框上方一条状态，都在动。
 入口 `src/ui/DesignerPane.tsx`、`src/ui/Stage.tsx`、`src/ui/AgentWorking.tsx`、`src/lib/images.ts`、`src/lib/speech.ts`、`src/App.tsx`。
 
+- 我的项目（项目管理面板）
+
+顶栏「项目」打开一个独立面板：搜索、新建、导入 zip、卡片列表（名字、当前、更新时间、文件数、设计卡标题）、
+每张卡上可以改名/复制/导出源码/删除（删除就在卡内二次确认，不弹系统窗口），底部显示项目数与本机占用。
+切项目、新建、导入、删除都会关掉面板并开新的一局对话；没在打开的项目只能先打开再改。
+入口 `src/ui/ProjectsPanel.tsx`；面板只调 store 的动作，自己不碰存储。
+
+- 看代码视图：面板可收拢
+
+顶栏一组开关（文件栏 / 舞台 / 控制台）分别收放左侧文件栏、右侧舞台和底部控制台，选择存在本机；
+舞台只是收窄到 0，不会被卸载，所以收起来时正在跑的游戏不会重启。「撤销」是图标 + 两个字，完整说明在 tooltip。
+入口 `src/App.tsx`、`src/ui/Toolbar.tsx`（`--code-columns` / `--code-rows`）。
+
 - Agent 循环（小助手的一轮）
 
 听懂想法 → 设计（设计卡）→ 制作（候选版本文件）→ 静态检查 → 自动试运行 → 最多修两次 → 等孩子试玩。
@@ -301,8 +314,8 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 
 | 一级功能 | 状态 | 风险级别 | Happy Path E2E | 失败路径 | 权限角色覆盖 | 失败恢复/回滚 | 证据（测试路径/用例） |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 本地项目管理 | 已有 | 高（作品丢失） | ✅（新建、改名、删除、恢复、刷新后仍在） | ❌ 缺口（IndexedDB 写失败时的界面提示） | 不适用 | ✅（删除先确认再进回收站，可恢复；采用后可撤销；换项目取消失败中的一轮） | `tests/e2e/files.spec.ts`（4 条）、`tests/e2e/agent.spec.ts`：`a round that is still running cannot write into another project`、单元 `src/lib/project.test.ts`（回收站、存储往返） |
-| 代码编辑 | 已有 | 低 | ✅（在「与代码」视图里看到项目内容） | 不适用 | 不适用 | 不适用（持久化见上一行） | `tests/e2e/agent.spec.ts`：`an idea becomes a candidate, and the child adopts it` |
+| 本地项目管理 | 已有 | 高（作品丢失） | ✅（新建、改名、删除、恢复、搜索、刷新后仍在） | ❌ 缺口（IndexedDB 写失败时的界面提示） | 不适用 | ✅（删除先确认再进回收站，可恢复；项目面板删除二次确认；采用后可撤销；换项目取消失败中的一轮） | `tests/e2e/projects.spec.ts`（3 条）、`tests/e2e/files.spec.ts`（4 条）、`tests/e2e/agent.spec.ts`：`a round that is still running cannot write into another project`、单元 `src/lib/project.test.ts` |
+| 代码编辑 | 已有 | 低 | ✅（在「与代码」视图里看到项目内容；三块面板可收拢） | 不适用 | 不适用 | 不适用（持久化见上一行） | `tests/e2e/agent.spec.ts`：`an idea becomes a candidate, and the child adopts it`；`tests/e2e/layout.spec.ts` |
 | 浏览器内运行 | 已有 | 中 | ✅（候选版本在舞台上跑起来，循环能拿到「在跑」证据） | ❌ 缺口（出错行定位） | 不适用 | 不适用（不改持久状态） | `tests/e2e/agent.spec.ts` 的每一条都要经过运行阶段；`src/lib/export.test.ts`（打包与模板）。画面本身与真实帧率仍需人工看 |
 | 诊断与报错 | 已有 | 中 | ✅（小助手靠静态检查发现 time.sleep 并修好） | ✅ 单元 | 不适用 | 不适用（只读） | `src/lib/diagnostics.test.ts`；`tests/e2e/agent.spec.ts`：`a candidate the checks reject is repaired before the child sees it` |
 | AI 游戏设计器（Agent 循环） | 已有 | 高（改动作品、消耗额度） | ✅（想法 → 候选 → 采用 → 撤销；第二轮在已采用的基础上继续改；图片输入） | ✅（坏答案不写入；静态问题先修；修复超限停下；中途取消；换项目不串写；越界路径、二进制素材、超大文件；图片类型/张数/大小） | ✅ 匿名 / 授权 / 已登录未授权 | ✅（采用后撤销；取消、失败、登录丢失后作品不变） | `tests/e2e/agent.spec.ts`（7 条）、`tests/e2e/attachments.spec.ts`（3 条）、`tests/e2e/ask.spec.ts`（3 条）、`tests/e2e/account.spec.ts`（6 条）、`src/lib/agent.test.ts`（15 条）、`src/lib/ai.test.ts`（12 条）；`worker/index.test.ts`：`ai gateway` |

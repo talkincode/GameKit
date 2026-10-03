@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { slugName } from "../lib/project";
 import { useStudio } from "../studio/store";
 import { AgentWorking } from "./AgentWorking";
@@ -11,9 +11,6 @@ import { text } from "./text";
 export function Toolbar() {
   const studio = useStudio();
   const root = useRef<HTMLElement>(null);
-  const [name, setName] = useState("");
-
-  useEffect(() => setName(studio.project?.name ?? ""), [studio.project?.name]);
   useEffect(() => {
     const close = (event: PointerEvent) => {
       if (!root.current?.contains(event.target as Node)) studio.setMenu(null);
@@ -59,10 +56,45 @@ export function Toolbar() {
       <AgentWorking where="header" />
 
       <div className="cluster">
+        {studio.view === "code" ? (
+          <div className="panel-toggles" role="group" aria-label={text.header.panels}>
+            {(
+              [
+                ["side", text.header.panelFiles],
+                ["stage", text.header.panelStage],
+                ["bottom", text.header.panelConsole],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={studio.panels[id]}
+                data-testid={`panel-${id}`}
+                className={studio.panels[id] ? "on" : ""}
+                onClick={() => studio.togglePanel(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <button
           className="ghost"
           type="button"
-          onClick={() => studio.setMenu(studio.menu === "project" ? null : "project")}
+          title={text.header.undo}
+          disabled={!studio.canUndo}
+          onClick={studio.undo}
+        >
+          <IconUndo />
+          {text.header.undoShort}
+        </button>
+        <button
+          className="ghost"
+          type="button"
+          onClick={() => {
+            studio.setMenu(null);
+            studio.setProjectsOpen(true);
+          }}
         >
           {text.header.project}
         </button>
@@ -73,9 +105,6 @@ export function Toolbar() {
         >
           {text.header.export}
         </button>
-        <button className="ghost" type="button" disabled={!studio.canUndo} onClick={studio.undo}>
-          {text.header.undo}
-        </button>
       </div>
 
       <div className={`save save-${studio.saveState}`} title={text.header.saveHint}>
@@ -83,75 +112,6 @@ export function Toolbar() {
       </div>
 
       <Account />
-
-      {studio.menu === "project" && studio.project ? (
-        <div className="menu menu-project" data-testid="project-menu">
-          <label>
-            {text.project.name}
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              onBlur={() => studio.renameProject(name)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") studio.renameProject(name);
-              }}
-            />
-          </label>
-          <p>{text.project.switchHint}</p>
-          <button type="button" onClick={() => void studio.newSample()}>
-            {text.project.newSample}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const next = window.prompt(text.project.namePrompt, "untitled");
-              if (next) studio.newBlank(next);
-            }}
-          >
-            {text.project.newBlank}
-          </button>
-          <button type="button" onClick={() => void studio.duplicateProject()}>
-            {text.project.duplicate}
-          </button>
-          <button type="button" onClick={studio.exportSource}>
-            {text.project.exportSource}
-          </button>
-          <label className="file-btn">
-            {text.project.importZip}
-            <input
-              type="file"
-              accept=".zip,application/zip"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void studio.importArchive(file);
-                event.target.value = "";
-              }}
-            />
-          </label>
-          <small className="menu-foot">{text.project.open}</small>
-          <div className="menu-list">
-            {studio.projects.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={item.id === studio.project?.id ? "current" : ""}
-                onClick={() => studio.openProject(item.id)}
-              >
-                {item.name}
-              </button>
-            ))}
-          </div>
-          <button
-            className="danger"
-            type="button"
-            onClick={() => {
-              if (window.confirm(text.project.confirmDelete)) void studio.deleteProject();
-            }}
-          >
-            {text.project.delete}
-          </button>
-        </div>
-      ) : null}
 
       {studio.menu === "export" ? (
         <div className="menu menu-export">
@@ -179,8 +139,16 @@ export function Toolbar() {
   );
 }
 
-function Account() {
-  const studio = useStudio();
+function IconUndo() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="undo-icon">
+      <path d="M3.2 8a4.8 4.8 0 1 0 1.6-3.6" />
+      <path d="M3 2.8v2.6h2.6" />
+    </svg>
+  );
+}
+
+function Account() {  const studio = useStudio();
   const account = studio.account;
   if (account.kind === "checking") return <div className="account">{text.account.checking}</div>;
   if (account.kind === "signed-in") {

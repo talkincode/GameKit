@@ -67,6 +67,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .view-switch button.on { background: var(--paper-2); box-shadow: 0 1px 2px rgba(28, 30, 26, 0.12); }
 
 .cluster { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.panel-toggles { display: flex; gap: 2px; padding: 2px; background: #e4dfd4; border-radius: 9px; }
+.panel-toggles button {
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.panel-toggles button.on { background: var(--paper-2); color: var(--ink); box-shadow: 0 1px 2px rgba(28, 30, 26, 0.12); }
+.undo-icon { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.ghost:has(.undo-icon) { display: inline-flex; align-items: center; gap: 6px; }
 .save { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .save-error { color: var(--danger); }
 .account { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
@@ -161,9 +174,10 @@ button:disabled { opacity: 0.45; cursor: default; }
 .studio > * { min-width: 0; min-height: 0; }
 .view-design .studio { grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); }
 .view-code .studio {
-  grid-template-columns: 232px minmax(0, 1fr) minmax(320px, 32vw);
-  grid-template-rows: minmax(0, 1fr) 208px;
+  grid-template-columns: var(--code-columns, 232px minmax(0, 1fr) minmax(320px, 32vw));
+  grid-template-rows: var(--code-rows, minmax(0, 1fr) 208px);
 }
+.view-code .bottom-hidden { display: none; }
 .view-design .stage-pane { grid-area: 1 / 1 / 2 / 2; }
 .view-design .pane { grid-area: 1 / 2 / 2 / 3; border-left: 1px solid var(--line-strong); }
 .view-code .sidebar { grid-area: 1 / 1 / 2 / 2; }
@@ -579,6 +593,45 @@ button:disabled { opacity: 0.45; cursor: default; }
   gap: 10px;
   box-shadow: 0 24px 60px rgba(28, 30, 26, 0.2);
 }
+
+/* 我的项目：一层自己的面，不是菜单 */
+.modal.projects { width: min(920px, 100%); height: min(640px, 88vh); grid-template-rows: auto minmax(0, 1fr) auto; }
+.projects-head { display: flex; align-items: center; gap: 8px; }
+.projects-head h2 { margin: 0; font-size: 17px; letter-spacing: -0.03em; white-space: nowrap; }
+.projects-search { flex: 1; min-width: 120px; }
+.projects-head .run { min-height: 32px; white-space: nowrap; }
+.projects-head .file-btn { border: 1px solid var(--line-strong); background: var(--paper-2); border-radius: 8px; min-height: 32px; padding: 0 10px; font-size: 12px; }
+.projects-body {
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-content: start;
+}
+.projects-empty { grid-column: 1 / -1; margin: 12px 0; color: var(--muted); }
+.project-card {
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+.project-card.current { border-color: var(--pine); box-shadow: inset 3px 0 0 var(--pine); }
+.project-open { border: 0; background: transparent; text-align: left; display: grid; gap: 4px; padding: 0; }
+.project-name { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.project-name em { font-style: normal; font-size: 10px; background: var(--pine); color: var(--pine-ink); border-radius: 99px; padding: 1px 7px; }
+.project-meta { color: var(--muted); font-size: 11px; }
+.project-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.project-actions button { border: 1px solid var(--line); background: var(--paper-2); border-radius: 7px; min-height: 26px; padding: 0 8px; font-size: 12px; }
+.project-actions button:hover:not(:disabled) { border-color: var(--ink); }
+.project-actions button.danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.project-actions .run { min-height: 28px; }
+.project-confirm { display: grid; gap: 6px; font-size: 12px; color: var(--danger); }
+.project-card.renaming form { display: grid; gap: 8px; }
+.project-card.renaming label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
+.project-card.renaming input { width: 100%; }
+.projects-foot { display: flex; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 11px; color: var(--muted); }
 .modal h2, .modal h3 { margin: 0; letter-spacing: -0.03em; }
 .modal p { margin: 0; color: var(--muted); }
 .modal textarea { width: 100%; resize: vertical; }
