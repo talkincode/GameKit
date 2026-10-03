@@ -1,3 +1,9 @@
 allowBuilds:
   esbuild: true
   workerd: true
+  # Dependencies of @google/adk that we never build from source: the browser
+  # bundle uses their prebuilt output, so their install scripts stay off.
+  '@google/genai': false
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
