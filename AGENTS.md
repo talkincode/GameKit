@@ -107,6 +107,7 @@ E2E 在 `tests/e2e/`（Playwright，配置 `playwright.config.ts`），CI 中失
 | `src/lib/diagnostics.ts`、`src/lib/messages.ts` | 静态诊断、预览桥消息 |
 | `src/lib/ai.ts` | 提示词与模型输出校验 |
 | `src/lib/sprite.ts` | 把生成的图片变成素材（去背景、裁边、缩放到像素尺寸） |
+| `src/lib/pixel/`、`src/ui/PixelEditor.tsx`、`src/ui/PixelNewDialog.tsx` | 像素编辑器与新建图片：纯逻辑（缓冲区、PNG、尺寸与命名规则、撤销栈、保存计划）+ 弹层；只经 `store.tsx` 的 `savePixelImage` 写项目 |
 | `src/lib/export.ts` | 各种导出包与源码导入 |
 | `src/lib/starter.ts`、`src/lib/samples/` | 起始示例 |
 | `runtime/` | pygbag player 模板（MIT，改动记录在 `docs/runtime.md`） |
