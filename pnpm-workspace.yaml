@@ -7,3 +7,5 @@ allowBuilds:
   cpu-features: false
   protobufjs: false
   ssh2: false
+  # Only used at build time by tooling; nothing installs from its scripts.
+  core-js-pure: false

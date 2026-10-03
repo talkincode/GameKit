@@ -263,6 +263,39 @@ button:disabled { opacity: 0.45; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .working .dots i,
   .ask-listening .dots i { animation: none; opacity: 0.75; }
+  .collab-dot { animation: none; }
+}
+
+/* MCP 外部协作状态 */
+.collab-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  min-height: 28px;
+  border: 1px solid #b8dfc8;
+  background: #eef8f2;
+  color: #1a633a;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.collab-badge:hover {
+  background: #e2f4e9;
+  border-color: #9eccaf;
+}
+.collab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2ea043;
+  box-shadow: 0 0 0 2px rgba(46, 160, 67, 0.2);
+  animation: collab-glow 2s infinite ease-in-out;
+}
+@keyframes collab-glow {
+  0%, 100% { opacity: 0.6; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
 .welcome h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -0.03em; }
 .welcome p { margin: 0 0 10px; color: var(--muted); line-height: 1.5; }
@@ -660,6 +693,45 @@ button:disabled { opacity: 0.45; cursor: default; }
 .settings-choices button.on { border-color: var(--pine); box-shadow: inset 3px 0 0 var(--pine); }
 .settings-choices small { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .settings-choices small.warn { color: var(--brass); }
+
+.collab-group {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.collab-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+.collab-status {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.collab-status.active {
+  color: #1a633a;
+}
+.collab-url-box {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+.collab-url-input-row {
+  display: flex;
+  gap: 8px;
+}
+.collab-url-input-row input {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-2);
+}
 .projects-foot { display: flex; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 11px; color: var(--muted); }
 .modal h2, .modal h3 { margin: 0; letter-spacing: -0.03em; }
 .modal p { margin: 0; color: var(--muted); }

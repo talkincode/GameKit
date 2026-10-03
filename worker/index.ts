@@ -1,7 +1,12 @@
 import { complete, image, modelInfo, readImageRequest, readMessages, readSoundRequest, sound } from "./ai";
+import { collabRoute } from "./collab-routes";
 import type { GameKitEnv } from "./env";
 import { HttpError, errorResponse, json, redirect } from "./http";
 import { DEV_COOKIE, readCookie, requireIdentity, usesLocalAuth } from "./identity";
+import { getOAuthProvider, handleAuthorize } from "./oauth";
+
+export { GameKitMcp } from "./mcp";
+export { CollabSession } from "./collab";
 
 /**
  * Routes. Static files (the studio page, PWA shell) never reach this Worker.
@@ -13,12 +18,20 @@ import { DEV_COOKIE, readCookie, requireIdentity, usesLocalAuth } from "./identi
  * - GET /api/login   Cloudflare Access signs the user in, then we send them back to `/?login=<result>`.
  * - GET /api/logout  Ends the Access session.
  */
-export default {
+const defaultHandler: ExportedHandler<GameKitEnv> = {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/oauth/authorize") return await handleAuthorize(request, env, url);
       if (url.pathname === "/api/login") return await login(request, env, url);
       if (url.pathname === "/api/logout") return logout(env, url);
+
+      if (url.pathname.startsWith("/api/collab/")) {
+        const identity = await requireIdentity(request, env);
+        const action = url.pathname.slice("/api/collab/".length);
+        return await collabRoute(request, env, identity.email, action);
+      }
+
       if (!url.pathname.startsWith("/api/")) return json({ error: "Not found.", code: "not_found" }, 404);
 
       const identity = await requireIdentity(request, env);
@@ -30,6 +43,15 @@ export default {
     } catch (error) {
       return errorResponse(error);
     }
+  },
+};
+
+export default {
+  async fetch(request, env, ctx): Promise<Response> {
+    const url = new URL(request.url);
+    const origin = `${url.protocol}//${url.host}`;
+    const provider = getOAuthProvider(origin, defaultHandler);
+    return await provider.fetch(request, env, ctx);
   },
 } satisfies ExportedHandler<GameKitEnv>;
 
@@ -55,6 +77,9 @@ async function ai(request: Request, env: GameKitEnv): Promise<Response> {
 const LOGIN_RESULT: Record<number, string> = { 401: "failed", 403: "denied", 503: "unavailable" };
 
 async function login(request: Request, env: GameKitEnv, url: URL): Promise<Response> {
+  const returnTo = url.searchParams.get("return_to");
+  const target = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/?login=ok";
+
   let local: boolean;
   try {
     local = usesLocalAuth(env, url);
@@ -65,13 +90,18 @@ async function login(request: Request, env: GameKitEnv, url: URL): Promise<Respo
   if (local && request.method === "POST") {
     const form = await request.formData();
     const email = String(form.get("email") ?? "").trim().toLowerCase();
-    return redirect("/api/login", { "Set-Cookie": devCookie(email, 60 * 60 * 24) });
+    const formReturnTo = String(form.get("return_to") ?? "");
+    const targetUrl =
+      formReturnTo && formReturnTo.startsWith("/") && !formReturnTo.startsWith("//")
+        ? `/api/login?return_to=${encodeURIComponent(formReturnTo)}`
+        : "/api/login";
+    return redirect(targetUrl, { "Set-Cookie": devCookie(email, 60 * 60 * 24) });
   }
-  if (local && !readCookie(request, DEV_COOKIE)) return localSignInForm();
+  if (local && !readCookie(request, DEV_COOKIE)) return localSignInForm(returnTo ?? undefined);
 
   try {
     await requireIdentity(request, env);
-    return redirect("/?login=ok");
+    return redirect(target);
   } catch (error) {
     if (!(error instanceof HttpError) || !LOGIN_RESULT[error.status]) throw error;
     // Locally, forget a refused email so the form can be used again.
@@ -95,7 +125,8 @@ function devCookie(value: string, maxAge: number): string {
   return `${DEV_COOKIE}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
-function localSignInForm(): Response {
+function localSignInForm(returnTo?: string): Response {
+  const hiddenReturn = returnTo ? `<input type="hidden" name="return_to" value="${returnTo}">` : "";
   const html = `<!doctype html>
 <html lang="zh-CN">
 <meta charset="utf-8">
@@ -105,6 +136,7 @@ function localSignInForm(): Response {
 <h1>本地开发登录</h1>
 <p>这是本地开发用的替身。正式站点使用 Cloudflare Access 的 GitHub 登录。</p>
 <form method="post" action="/api/login">
+${hiddenReturn}
 <label>GitHub 账号邮箱 <input name="email" type="email" required autofocus></label>
 <button type="submit">登录</button>
 </form>

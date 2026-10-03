@@ -22,6 +22,7 @@ import {
 } from "../lib/account";
 import {
   RUN_EVIDENCE_MS,
+  candidateDiff,
   foldStep,
   runAgentTurn,
   type AgentEvent,
@@ -167,6 +168,10 @@ type StudioValue = {
   modelLimit: number | null;
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+  collabActive: boolean;
+  collabUrl: string;
+  startCollab: () => Promise<boolean>;
+  stopCollab: () => Promise<void>;
   /** 我的项目：a panel of its own, not a dropdown of names. */
   projectsOpen: boolean;
   setProjectsOpen: (open: boolean) => void;
@@ -746,6 +751,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     if (!turn?.candidate || !target || turn.candidate.project.id !== target.id) return;
     if (turn.adopted || turn.discarded) return;
     if (turn.outcome?.kind !== "ready") return;
+    if (turn.id.startsWith("collab-")) {
+      const candidateId = turn.id.slice("collab-".length);
+      collabSettledRef.current.push({ candidateId, adopted: true });
+    }
     remember();
     commit({
       ...target,
@@ -760,6 +769,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const discardCandidate = useCallback(() => {
     const turn = turns.at(-1);
     if (!turn?.candidate) return;
+    if (turn.id.startsWith("collab-")) {
+      const candidateId = turn.id.slice("collab-".length);
+      collabSettledRef.current.push({ candidateId, adopted: false });
+    }
     setTurns((list) => list.map((item) => (item.id === turn.id ? { ...item, discarded: true } : item)));
     setStageOwner((owner) => {
       if (owner === "candidate") stop();
@@ -804,6 +817,151 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }, [account.kind, callModel, path, selection]);
 
+  const [collabActive, setCollabActive] = useState(false);
+  const collabSettledRef = useRef<{ candidateId: string; adopted: boolean }[]>([]);
+  const handledCandidateIdsRef = useRef<Set<string>>(new Set());
+
+  const collabUrl = useMemo(() => {
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}/mcp`;
+    }
+    return "https://gamekit.talkincode.net/mcp";
+  }, []);
+
+  const makeCollabSnapshot = useCallback((target: Project) => {
+    return {
+      projectId: target.id,
+      name: target.name,
+      files: target.files.map((file) => {
+        if (typeof file.bytes === "number") return { path: file.path, bytes: file.bytes };
+        return { path: file.path, text: file.text ?? "" };
+      }),
+    };
+  }, []);
+
+  const startCollab = useCallback(async (): Promise<boolean> => {
+    if (account.kind !== "signed-in") {
+      setNotice(text.collab.needsSignIn);
+      return false;
+    }
+    const current = projectRef.current;
+    if (!current) {
+      setNotice(text.collab.needsProject);
+      return false;
+    }
+    const outcome = await callApi<{ session: string }>("/api/collab/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ snapshot: makeCollabSnapshot(current) }),
+    });
+    if (!outcome.ok) {
+      setNotice(outcome.message);
+      return false;
+    }
+    collabSettledRef.current = [];
+    handledCandidateIdsRef.current.clear();
+    setCollabActive(true);
+    return true;
+  }, [account.kind, makeCollabSnapshot]);
+
+  const stopCollab = useCallback(async (): Promise<void> => {
+    setCollabActive(false);
+    collabSettledRef.current = [];
+    handledCandidateIdsRef.current.clear();
+    await callApi("/api/collab/stop", { method: "POST" }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!collabActive || account.kind !== "signed-in") return;
+    let cancelled = false;
+
+    const poll = async () => {
+      const current = projectRef.current;
+      if (!current || cancelled) return;
+      const settled = collabSettledRef.current.splice(0);
+      const outcome = await callApi<{
+        candidates: { id: string; tool: string; say: string; files: { path: string; text: string }[]; createdAt: number }[];
+        activity: { at: number; tool: string; summary: string }[];
+      }>("/api/collab/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          snapshot: makeCollabSnapshot(current),
+          settled,
+        }),
+      });
+
+      if (cancelled) return;
+
+      if (!outcome.ok) {
+        if (settled.length) collabSettledRef.current.unshift(...settled);
+        if (outcome.problem === "sign-in" || outcome.problem === "denied") {
+          setCollabActive(false);
+        }
+        return;
+      }
+
+      const open = outcome.value.candidates ?? [];
+      for (const cand of open) {
+        if (handledCandidateIdsRef.current.has(cand.id)) continue;
+        handledCandidateIdsRef.current.add(cand.id);
+
+        let candidateProject = current;
+        for (const file of cand.files) {
+          candidateProject = upsertFile(candidateProject, { path: file.path, text: file.text });
+        }
+        const diff = candidateDiff(current, candidateProject);
+        if (diff.length === 0) continue;
+
+        const candidateResult: CandidateResult = {
+          project: candidateProject,
+          design: current.design ?? { title: current.name, hero: "", goal: "", controls: [], look: "" },
+          say: cand.say || text.collab.candidateSay,
+          repairs: 0,
+          diff,
+        };
+
+        const turnId = `collab-${cand.id}`;
+        const newTurn: Turn = {
+          id: turnId,
+          kind: "design",
+          request: text.collab.candidateRequest(cand.tool),
+          steps: [
+            {
+              key: "collab",
+              kind: "finish",
+              status: "done",
+              detail: cand.say || "收到外部助手修改建议",
+            },
+          ],
+          say: cand.say || text.collab.candidateSay,
+          candidate: candidateResult,
+          outcome: { kind: "ready" },
+          adopted: false,
+          discarded: false,
+        };
+
+        setTurns((list) => [...list, newTurn]);
+        setView("design");
+        void runProject(candidateProject, "candidate").catch(() => {});
+      }
+    };
+
+    const timer = setInterval(() => {
+      void poll();
+    }, 2500);
+
+    const initialTimer = setTimeout(() => {
+      void poll();
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      clearTimeout(initialTimer);
+    };
+  }, [collabActive, account.kind, makeCollabSnapshot, runProject]);
+
   const value = useMemo<StudioValue>(() => {
     const requireProject = () => {
       if (!project) throw new Error("No project is open.");
@@ -814,6 +972,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       account,
       signIn: () => location.assign(LOGIN_PATH),
       signOut: () => {
+        void stopCollab();
         setSignInHint(false);
         location.assign(LOGOUT_PATH);
       },
@@ -847,6 +1006,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       modelLimit,
       settingsOpen,
       setSettingsOpen,
+      collabActive,
+      collabUrl,
+      startCollab,
+      stopCollab,
       projectsOpen,
       setProjectsOpen,
       view,
@@ -1003,6 +1166,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         stop();
       },
       openProject: (id) => {
+        handledCandidateIdsRef.current.clear();
         abortTurn();
         setActiveId(id);
         setTurns([]);
@@ -1211,6 +1375,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     settings,
     modelLimit,
     settingsOpen,
+    collabActive,
+    collabUrl,
+    startCollab,
+    stopCollab,
     projectsOpen,
     view,
     panels,

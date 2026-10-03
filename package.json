@@ -14,14 +14,18 @@
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.worker.json --noEmit"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^1.2.1",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/schibsted-grotesk": "^5.3.0",
     "@google/adk": "^2.2.0",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@monaco-editor/react": "^4.7.0",
+    "agents": "^0.25.0",
     "fflate": "^0.8.3",
     "monaco-editor": "^0.57.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.60.2",

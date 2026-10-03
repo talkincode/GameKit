@@ -86,7 +86,7 @@ function Shell() {
       <ProjectsPanel />
       <SettingsPanel />
       {studio.notice ? (
-        <button className="notice" type="button" onClick={studio.dismissNotice}>
+        <button className="notice" type="button" data-testid="notice" onClick={studio.dismissNotice}>
           {studio.notice}
         </button>
       ) : null}

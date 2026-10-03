@@ -370,6 +370,8 @@ function DesignTurn({ turn }: { turn: Turn }) {
           </ul>
           {turn.say ? <p className="say">{turn.say}</p> : null}
         </article>
+      ) : turn.say ? (
+        <p className="say">{turn.say}</p>
       ) : null}
       {showCandidate && turn.candidate ? (
         <div className="candidate" data-testid="candidate">

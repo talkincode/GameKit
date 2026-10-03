@@ -337,7 +337,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 | 登录与授权 | 已有（Access 应用已创建） | 高（权限） | ✅（本地替身登录） | ✅（错误签名/aud/iss/过期、配置缺失、本地替身出现在非 localhost） | ✅ 匿名 / 授权 / 已登录未授权 | 不适用（不改作品） | `tests/e2e/account.spec.ts`：`anonymous: …`、`signed in but not allowed: …`、`sign-out returns to the anonymous studio`；`worker/index.test.ts`：`identity gate`、`sign-in routes`。真实 Access + GitHub 登录 ❌ 待上线后人工验证 |
 | 云端同步 | 未实现 | 高（作品丢失、权限） | ❌ 缺口 | ❌ 缺口 | ❌ 缺口 | ❌ 缺口 | 无 |
 | PWA 与离线 | 未实现 | 中 | ❌ 缺口 | ❌ 缺口 | 不适用 | ❌ 缺口（更新失败回到旧版本） | 无 |
-| WebMCP | 未实现 | 高（外部写入） | ❌ 缺口 | ❌ 缺口 | ❌ 缺口 | ❌ 缺口 | 无 |
+| MCP / WebMCP 外部协作 | 已有 | 高（外部写入、权限） | ✅（开启协作、显示状态与 MCP URL、外部提案生成候选、采用写入并支持撤销） | ✅（未登录拒绝开启、丢弃提案后项目不变、无效 Token 拒绝） | ✅ 匿名 / 授权用户 | ✅（丢弃提案项目不变；采用后可撤销） | `tests/e2e/collab.spec.ts`（4 条）、`worker/mcp.test.ts`（OAuth 2.1 鉴权与 MCP 协议测试） |
 | 游戏配方与教程 | 未实现 | 中 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用（加载总是新建项目） | 无 |
 | 内置创作工具 | 未实现 | 中 | ❌ 缺口 | ❌ 缺口 | 不适用 | ❌ 缺口 | 无 |
 

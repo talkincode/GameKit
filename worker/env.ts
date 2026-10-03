@@ -1,3 +1,5 @@
+import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
+
 /**
  * Everything the Worker reads from its environment.
  *
@@ -6,6 +8,13 @@
  * A missing value never widens access: see identity.ts and ai.ts.
  */
 export type GameKitEnv = {
+  /** OAuth 2.1 storage for client registrations, grants, and tokens. */
+  OAUTH_KV: KVNamespace;
+  /** Injected by OAuthProvider during request handling. */
+  OAUTH_PROVIDER?: OAuthHelpers;
+  /** Durable Objects: the MCP server itself, and the sessions it works on. */
+  MCP_OBJECT: DurableObjectNamespace;
+  COLLAB: DurableObjectNamespace;
   /** Zero Trust team domain, e.g. `<team>.cloudflareaccess.com`. */
   ACCESS_TEAM_DOMAIN?: string;
   /** Audience tag of the GameKit Access application. */

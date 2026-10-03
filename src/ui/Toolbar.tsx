@@ -55,6 +55,19 @@ export function Toolbar() {
 
       <AgentWorking where="header" />
 
+      {studio.collabActive ? (
+        <button
+          type="button"
+          className="collab-badge"
+          data-testid="collab-badge"
+          title={text.collab.badgeTitle}
+          onClick={() => studio.setSettingsOpen(true)}
+        >
+          <span className="collab-dot" />
+          <span>{text.collab.badge}</span>
+        </button>
+      ) : null}
+
       <div className="cluster">
         {studio.view === "code" ? (
           <div className="panel-toggles" role="group" aria-label={text.header.panels}>

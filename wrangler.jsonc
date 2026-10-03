@@ -2,7 +2,7 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "gamekit",
   "compatibility_date": "2026-09-27",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "main": "./worker/index.ts",
   "workers_dev": false,
   "routes": [{ "pattern": "gamekit.talkincode.net", "custom_domain": true }],
@@ -12,8 +12,14 @@
   },
   "assets": {
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/mcp*", "/.well-known/*", "/oauth/*", "/authorize*"]
   },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "77abb3b6f30e4512b47b285a810ac822"
+    }
+  ],
   // Not secret. ACCESS_AUD is filled in by scripts/setup-access.sh; while it is
   // empty every /api route refuses (fail closed). Secrets (ALLOW_GITHUB_USERS,
   // OPENAI_API_URL, OPENAI_API_KEY, GEMINI_APIKEY, GEMINI_IMAGE_MODEL) are set
@@ -22,5 +28,19 @@
     "ACCESS_TEAM_DOMAIN": "toughstruct.cloudflareaccess.com",
     "ACCESS_AUD": "fd42066577db27a3be622d97a732bf2113bef9cf2ba2204734d695bf5cba4b56",
     "OPENAI_MODEL": "deepseek-flash"
-  }
+  },
+  // Durable Objects for the MCP server and the collaboration sessions it works
+  // on. Neither stores project files beyond the session (docs/ai-rules.md §7.1).
+  "durable_objects": {
+    "bindings": [
+      { "name": "MCP_OBJECT", "class_name": "GameKitMcp" },
+      { "name": "COLLAB", "class_name": "CollabSession" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["GameKitMcp", "CollabSession"]
+    }
+  ]
 }
