@@ -679,6 +679,9 @@ button:disabled { opacity: 0.45; cursor: default; }
 .asset-preview { margin: 0; display: grid; gap: 4px; justify-items: center; }
 .asset-preview figcaption { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .asset-note { font-size: 12px; color: var(--brass); }
+.sound-preview { margin: 0; display: grid; gap: 6px; justify-items: center; }
+.sound-preview audio { width: 100%; }
+.sound-preview figcaption { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .asset-keep { margin: 0; font-size: 12px; color: var(--muted); }
 .generated { width: 180px; height: 180px; object-fit: contain; background: #121418; justify-self: center; image-rendering: pixelated; }
 .notice, .busy {

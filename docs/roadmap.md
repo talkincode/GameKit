@@ -178,6 +178,13 @@ Worker 对每个 `/api/*` 请求校验 Access JWT（签名、aud、iss、过期�
 
 「看代码」里「讲讲这段」把当前文件与选区发给模型，答案只回到对话面板，不允许返回文件，不改项目。
 
+- 声音生成（仅授权用户）
+
+音效与音乐两种。模型只挑参数（振荡器/包络/扫频，或 bpm/调式/和弦/三个声部），**不写采样**；
+浏览器按同一份参数确定性地合成 PCM 并写成 16-bit 单声道 22.05 kHz WAV，预览播放的就是最后存进 assets/ 的那一份，
+面板还会写上「在代码里这样用：pygame.mixer.Sound(...)」。入口 `worker/ai.ts`（提示词与参数校验）、
+`src/lib/audio/spec.ts`、`src/lib/audio/render.ts`（纯函数合成）、`src/lib/audio/wav.ts`、`src/ui/Overlays.tsx`。
+
 - AI 素材生成（仅授权用户）
 
 四种模板（角色/背景/瓦片/图标）。提示词全在服务端拼装：先用文本模型把孩子的中文描述改写成一句英文提示词，
@@ -323,6 +330,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 | 诊断与报错 | 已有 | 中 | ✅（小助手靠静态检查发现 time.sleep 并修好） | ✅ 单元 | 不适用 | 不适用（只读） | `src/lib/diagnostics.test.ts`；`tests/e2e/agent.spec.ts`：`a candidate the checks reject is repaired before the child sees it` |
 | AI 游戏设计器（Agent 循环） | 已有 | 高（改动作品、消耗额度） | ✅（想法 → 候选 → 采用 → 撤销；第二轮在已采用的基础上继续改；图片输入） | ✅（坏答案不写入；静态问题先修；修复超限停下；中途取消；换项目不串写；越界路径、二进制素材、超大文件；图片类型/张数/大小） | ✅ 匿名 / 授权 / 已登录未授权 | ✅（采用后撤销；取消、失败、登录丢失后作品不变） | `tests/e2e/agent.spec.ts`（7 条）、`tests/e2e/attachments.spec.ts`（3 条）、`tests/e2e/ask.spec.ts`（3 条）、`tests/e2e/account.spec.ts`（6 条）、`src/lib/agent.test.ts`（15 条）、`src/lib/ai.test.ts`（12 条）；`worker/index.test.ts`：`ai gateway` |
 | AI 讲解（只读） | 已有 | 低 | ✅（讲讲这段 → 对话面板里出现回答，项目不变） | ✅ 单元（模型没答好时显示「没想好」） | ✅ 匿名时不可用 / 授权可用 | 不适用（不写入） | `tests/e2e/account.spec.ts`：`allowed account: 讲讲这段 reads code and never rewrites the project`；`src/lib/ai.test.ts`：`asks for an explanation without allowing new files` |
+| 声音生成 | 已有 | 中（消耗额度、噪音扰人） | ✅（音效与音乐生成 → 试听 → 保存到项目 → 撤销） | ✅ 单元（参数越界全部夹紧、非 JSON 拒绝、确定性渲染、循环长度与首尾无爆音、WAV 头） | ✅ 匿名不可用 / 授权可用 | ✅（接受前不写入，保存后可撤销） | `tests/e2e/sounds.spec.ts`（3 条）、`src/lib/audio/render.test.ts`（10 条） |
 | AI 素材生成 | 已有 | 高（消耗额度、儿童内容） | ✅（生成 → 预览 → 放进项目 → 撤销） | ✅ 单元（未配置拒绝、上游失败不回显密钥、无图 502；去背景/裁剪/缩放像素级断言） | ✅ 匿名不可用 / 授权可用 | ✅（接受前不写入，接受后可撤销） | `tests/e2e/assets.spec.ts`（3 条）、`worker/index.test.ts`：`draws with Gemini…`、`tells the model what a sprite must not contain…`、`refuses to draw when the Gemini key is not configured`；`src/lib/sprite.test.ts` |
 | 导入与导出 | 已有 | 中 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用（导入总是新建项目） | `src/lib/export.test.ts` |
 | 部署 | 已有 | 高（线上不可用） | ❌ 缺口 | ✅（单元、类型、构建、E2E 任一失败则不部署） | 不适用 | ❌ 缺口 | `.github/workflows/ci.yml` |

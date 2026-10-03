@@ -269,3 +269,47 @@ export function readInteractionImage(payload: unknown): { image: string; mediaTy
   }
   throw new HttpError(502, "upstream_failed", "The image model returned no image.");
 }
+
+export type SoundRequest = { kind: "sfx" | "music"; prompt: string };
+
+/** Reads a sound request: the child's words plus which kind they want. */
+export function readSoundRequest(record: { kind?: unknown; prompt?: unknown }): SoundRequest {
+  const kind = record.kind === "music" ? "music" : record.kind === "sfx" ? "sfx" : null;
+  if (!kind) throw new HttpError(400, "bad_request", "Unknown sound kind.");
+  const prompt = typeof record.prompt === "string" ? record.prompt.trim() : "";
+  if (prompt.length < 2 || prompt.length > 300) {
+    throw new HttpError(400, "bad_request", "Describe the sound in 2 to 300 characters.");
+  }
+  return { kind, prompt };
+}
+
+const SOUND_SHAPES: Record<SoundRequest["kind"], string> = {
+  sfx:
+    'Return {"say":"给孩子的一句话","name":"short-english-name","layers":[{"wave":"square","from":880,"to":440,"gain":0.4,"attack":0.005,"decay":0.08,"sustain":0.2,"release":0.12,"duration":0.3}]}\n' +
+    "wave is sine, triangle, square, saw or noise. from/to are Hz (20-8000), duration is seconds (0.02-1). " +
+    "One layer is a beep or a step; two or three layers layered together make coins, hits or jumps. " +
+    "A jump rises, a hit falls, a coin is two quick rising tones.",
+  music:
+    'Return {"say":"给孩子的一句话","name":"short-english-name","bpm":100,"bars":4,"root":57,"scale":"minor","chords":[1,4,5,6],"tracks":[{"wave":"triangle","gain":0.25,"role":"lead","octave":0},{"wave":"square","gain":0.2,"role":"bass","octave":-1},{"wave":"noise","gain":0.12,"role":"hat","octave":0}]}\n' +
+    "scale is major, minor or pentatonic; chords are scale degrees (1-7), one per bar; role is lead, bass or hat; " +
+    "octave shifts that track (-2 to 2). Keep it under eight bars so it loops nicely.",
+};
+
+/**
+ * Sound design: the model chooses musical parameters, never samples. That keeps
+ * rendering deterministic (same answer, same audio) and the file small.
+ */
+export async function sound(env: GameKitEnv, request: SoundRequest): Promise<ChatAnswer> {
+  return complete(env, [
+    {
+      role: "system",
+      content:
+        "You design small sound effects and short music loops for games teenagers make. " +
+        "You never write audio data: you choose numbers that a simple synthesizer plays. " +
+        "Stay calm and clear, nothing harsh or very loud. " +
+        "Write \"say\" in Simplified Chinese, one short sentence, no jargon. " +
+        SOUND_SHAPES[request.kind],
+    },
+    { role: "user", content: request.prompt },
+  ]);
+}

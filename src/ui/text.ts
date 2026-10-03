@@ -42,6 +42,7 @@ export const text = {
     signInToUse: "登录后使用小助手",
     failed: "小助手这次没想好，再试一次吧。",
     imageFailed: "这张画没生成成功，再试一次吧。",
+    soundFailed: "这个声音没做成功，再试一次吧。",
   },
   stage: {
     idle: "还没开始",
@@ -175,6 +176,23 @@ export const text = {
     restore: "恢复",
     trashed: (name: string) => `已经把 ${name} 放进回收站，可以找回来。`,
     restored: (name: string) => `${name} 回来了。`,
+  },
+  sounds: {
+    title: "生成声音",
+    /** Sidebar label: short, and never collides with 「生成」 for pictures. */
+    entry: "声音",
+    copy: "说一句想要什么声音，小助手调好参数，再在浏览器里合成。点「保存到项目」才会存进 assets/。",
+    kinds: { sfx: "音效", music: "音乐" },
+    promptSfx: "例如：跳起来的声音、捡到金币的声音、撞到墙的声音",
+    promptMusic: "例如：太空里的背景音乐、紧张的打怪音乐、轻快的草地音乐",
+    generate: "生成",
+    again: "再生成一个",
+    play: "试听",
+    accept: "保存到项目",
+    close: "关闭",
+    busy: "正在做…",
+    seconds: (value: string) => `${value} 秒 · WAV`,
+    use: (path: string) => `在代码里这样用：pygame.mixer.Sound("${path}")`,
   },
   assets: {
     title: "生成素材",

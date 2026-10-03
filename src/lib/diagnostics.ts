@@ -71,7 +71,12 @@ export function diagnoseProject(project: Project): Problem[] {
         id: `audio-${file.path}`,
         severity: "warning",
         path: file.path,
-        message: "The browser runtime plays OGG Vorbis. This file stays in the project for desktop Pygame, and may stay silent on the web.",
+        // WAV loads in the browser runtime (verified with a probe); MP3/AIFF may
+        // not decode. OGG is still the safest choice for a web build.
+        message:
+          ext === "wav"
+            ? "WAV loads in the browser runtime too. Sound only starts after someone taps the game once."
+            : "The browser runtime decodes OGG Vorbis and WAV. This format may stay silent on the web, but still plays on desktop Pygame.",
       });
     }
   }

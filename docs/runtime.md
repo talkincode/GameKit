@@ -10,6 +10,7 @@ GameKit 没有自己实现 Pygame。预览和导出使用同一套 [pygbag 0.9.3
 | 预览要加载任意项目文件 | 相对地址的 `.apk` 不能放在 blob iframe 里 | 页面 Service Worker 把本次构建放进 Cache，iframe 打开 `/play/<id>/` | 浏览器必须支持 Service Worker。第一次安装后如果没有接管页面，需要刷新再按 Run |
 | 导出后不依赖 GameKit | 成品必须能单独打开 | ZIP 里只有 `index.html`、`favicon.png` 和 `gamekit.apk` | 运行时脚本仍从 pygame-web CDN 加载。GameKit 下线不影响；pygame-web CDN 下线会影响。把整份 CPython/pygame WASM 打进每个 ZIP 大约几十 MB，而且要自己跟上游版本，所以没有内置 |
 | 桌面项目直接拷进来 | pygbag 不能在一个同步死循环里刷新页面 | 模板诊断 `await asyncio.sleep(0)`、`time.sleep` 和 `pygame.time.wait` | 这不是私有 API。同一份 async 循环也能在安装了 pygame 的桌面 Python 上运行。GameKit 不会在构建时偷偷改写用户源码 |
+| 音频格式 | 项目里生成的声音是 WAV（浏览器里合成，无需服务端） | 实测 pygame-web 运行时能 `pygame.mixer.Sound("assets/probe.wav")` 并读到正确时长（0.3 秒），所以 WAV 可用；OGG 仍是体积上更好的选择 | MP3/AIFF 仍给警告。声音要等孩子点一下画面才会响 |
 | 音频 | 浏览器需要用户手势，且 pygame-web 支持的是 OGG Vorbis | 示例把 `mixer.init()` 放在第一次跳跃；WAV/MP3 只给出警告 | 打开预览后要点一下画面，声音才会响。桌面 WAV 文件不会被自动转码 |
 | 停止游戏 | WASM 进程活在 iframe 里 | Stop 把 iframe 设为 `about:blank`，重新 Run 使用新的会话 | 没有进程级调试器，也不能在任意行暂停 |
 | 离开页面 | pygbag 运行时在 `can_close` 为假时会注册 `window.onbeforeunload`（`pythons.js`: `if (!vm.config.can_close)`），浏览器就会弹「Leave site? Changes you made may not be saved.」 | 构建时渲染 `can_close = 1`（`src/lib/build.ts`），预览与导出都不再出现这个弹窗 | 游戏自己不再拦住关闭页面。游戏里没有未保存的数据，工作室的保存由 store 负责，所以这是想要的 |

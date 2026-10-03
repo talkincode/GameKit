@@ -1,4 +1,4 @@
-import { complete, image, modelInfo, readImageRequest, readMessages } from "./ai";
+import { complete, image, modelInfo, readImageRequest, readMessages, readSoundRequest, sound } from "./ai";
 import type { GameKitEnv } from "./env";
 import { HttpError, errorResponse, json, redirect } from "./http";
 import { DEV_COOKIE, readCookie, requireIdentity, usesLocalAuth } from "./identity";
@@ -41,12 +41,14 @@ async function ai(request: Request, env: GameKitEnv): Promise<Response> {
     throw new HttpError(400, "bad_request", "The request body must be JSON.");
   }
   if (!body || typeof body !== "object") throw new HttpError(400, "bad_request", "The request body must be an object.");
-  const record = body as { op?: unknown; messages?: unknown; prompt?: unknown };
+  const record = body as { op?: unknown; messages?: unknown; kind?: unknown; prompt?: unknown; variation?: unknown };
   if (record.op === "complete") {
     const answer = await complete(env, readMessages(record.messages));
     return json({ text: answer.text, usage: answer.usage });
   }
   if (record.op === "image") return json(await image(env, readImageRequest(record)));
+  // Sound: the model picks a patch or a few bars; the browser renders the samples.
+  if (record.op === "sound") return json({ text: (await sound(env, readSoundRequest(record))).text });
   throw new HttpError(400, "bad_request", "Unknown AI operation.");
 }
 

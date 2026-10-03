@@ -62,6 +62,9 @@ import {
 } from "../lib/project";
 import { downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
 import { budgetFor, loadSettings, saveSettings, type Settings } from "../lib/settings";
+import { renderMusic, renderSfx } from "../lib/audio/render";
+import { readSoundSpec } from "../lib/audio/spec";
+import { pcmToWav } from "../lib/audio/wav";
 import { prepareAsset } from "../lib/sprite";
 import { createBlankProject, createStarterProject } from "../lib/starter";
 import { deleteStoredProject, loadProjects, saveProject } from "../lib/storage";
@@ -91,6 +94,8 @@ function assetTarget(kind: AssetKind, size: AssetSize, cut: boolean) {
   return { width: size, height: size, mode: "contain" as const, cut };
 }
 
+export type SoundKind = "sfx" | "music";
+
 export type AssetDraft = {
   bytes: Uint8Array;
   mediaType: string;
@@ -99,6 +104,8 @@ export type AssetDraft = {
   height: number;
   /** Kid-facing note about the picture itself, when there is something to say. */
   note?: string;
+  /** Sound drafts also carry what to tell the child about using it. */
+  sound?: { kind: SoundKind; say: string; seconds: number };
 };
 
 /**
@@ -186,6 +193,10 @@ type StudioValue = {
   setAssetCut: (cut: boolean) => void;
   assetOpen: boolean;
   setAssetOpen: (open: boolean) => void;
+  soundOpen: boolean;
+  setSoundOpen: (open: boolean) => void;
+  soundKind: SoundKind;
+  setSoundKind: (kind: SoundKind) => void;
   aiBusy: boolean;
   notice: string;
   dismissNotice: () => void;
@@ -218,6 +229,7 @@ type StudioValue = {
   undo: () => void;
   canUndo: boolean;
   generateAsset: (prompt: string) => Promise<void>;
+  generateSound: (prompt: string) => Promise<void>;
   acceptAsset: () => void;
   clearAsset: () => void;
 };
@@ -303,6 +315,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [assetSize, setAssetSize] = useState<AssetSize>(48);
   const [assetCut, setAssetCut] = useState(true);
   const [assetOpen, setAssetOpen] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
+  const [soundKind, setSoundKind] = useState<SoundKind>("sfx");
   const [aiBusy, setAiBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [bottomTab, setBottomTab] = useState<"console" | "problems" | "debug">("console");
@@ -864,6 +878,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setAssetCut,
       assetOpen,
       setAssetOpen,
+      soundOpen,
+      setSoundOpen,
+      soundKind,
+      setSoundKind,
       aiBusy,
       notice,
       dismissNotice: () => setNotice(""),
@@ -1084,6 +1102,37 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         setUndoStack((stack) => stack.slice(0, -1));
       },
       canUndo: undoStack.length > 0,
+      generateSound: async (promptText) => {
+        if (account.kind !== "signed-in") {
+          setSoundOpen(false);
+          setNotice(text.ai.needsSignIn);
+          return;
+        }
+        variation.current += 1;
+        setAiBusy(true);
+        setNotice("");
+        try {
+          const payload = await callAi<{ text?: string }>({ op: "sound", kind: soundKind, prompt: promptText });
+          if (!payload?.text) throw new Error("Sound generation failed.");
+          // The model chose numbers; we render the samples here, deterministically.
+          const spec = readSoundSpec(payload.text, soundKind, soundKind === "sfx" ? "sound" : "music");
+          const pcm = spec.kind === "sfx" ? renderSfx(spec) : renderMusic(spec);
+          const bytes = pcmToWav(pcm);
+          setAssetDraft({
+            bytes,
+            mediaType: "audio/wav",
+            suggested: `assets/${spec.name}.wav`,
+            width: 0,
+            height: 0,
+            sound: { kind: soundKind, say: spec.say, seconds: pcm.samples.length / pcm.sampleRate },
+          });
+        } catch (error) {
+          console.warn("Sound generation failed:", error);
+          setNotice(text.ai.soundFailed);
+        } finally {
+          setAiBusy(false);
+        }
+      },
       generateAsset: async (promptText) => {
         if (account.kind !== "signed-in") {
           setAssetOpen(false);
@@ -1135,6 +1184,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         setPath(chosen);
         setAssetDraft(null);
         setAssetOpen(false);
+        setSoundOpen(false);
       },
       clearAsset: () => setAssetDraft(null),
     };
@@ -1179,6 +1229,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     assetSize,
     assetCut,
     assetOpen,
+    soundOpen,
+    soundKind,
     aiBusy,
     notice,
     bottomTab,

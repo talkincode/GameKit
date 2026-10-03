@@ -193,6 +193,10 @@ export function Sidebar() {
               <IconSparkle />
               {text.code.generate}
             </button>
+            <button type="button" data-testid="sound-open" title={text.sounds.title} onClick={() => studio.setSoundOpen(true)}>
+              <IconNote />
+              {text.sounds.entry}
+            </button>
           </div>
           <div className="asset-grid">
             {assets.map((file) => (
@@ -457,6 +461,16 @@ function IconUpload() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true">
       <path d="M8 10.5V3.5M5 6.5 8 3.5l3 3M3.5 12.5h9" />
+    </svg>
+  );
+}
+
+function IconNote() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M6.5 12V4.5l5-1.2v7.2" />
+      <circle cx="5" cy="12" r="1.6" />
+      <circle cx="10" cy="10.5" r="1.6" />
     </svg>
   );
 }
