@@ -174,7 +174,7 @@ export function Sidebar() {
         <>
           <div className="side-tools">
             <span className="side-count">{text.code.assetCount(assets.length)}</span>
-            <label className="file-btn">
+            <label className="file-btn" title={text.code.uploadHint}>
               <IconUpload />
               {text.code.upload}
               <input
@@ -189,7 +189,7 @@ export function Sidebar() {
                 }}
               />
             </label>
-            <button type="button" onClick={() => studio.setAssetOpen(true)}>
+            <button type="button" title={text.code.generateHint} onClick={() => studio.setAssetOpen(true)}>
               <IconSparkle />
               {text.code.generate}
             </button>

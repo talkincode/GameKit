@@ -34,8 +34,14 @@ async function signIn(page: Page, email: string) {
 async function askForGame(page: Page, idea: string = IDEA) {
   await page.getByLabel(text.pane.placeholder).fill(idea);
   await page.getByRole("button", { name: text.pane.send }).click();
+  // While the round runs, both live indicators are up: the header chip (visible
+  // from either view) and the strip above the ask box.
+  await expect(page.getByTestId("agent-header")).toBeVisible();
+  await expect(page.getByTestId("agent-pane")).toBeVisible();
   await expect(page.getByTestId("candidate")).toBeVisible();
   await expect(page.getByTestId("adopt")).toBeVisible();
+  await expect(page.getByTestId("agent-header")).toHaveCount(0);
+  await expect(page.getByTestId("agent-pane")).toHaveCount(0);
 }
 
 async function openCode(page: Page) {

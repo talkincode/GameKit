@@ -100,7 +100,9 @@ Cloudflare Worker（gamekit.talkincode.net）
 
 左边（窄屏时在上面）是游戏舞台：你的作品和小助手做的候选版本都在这里跑，上面标着「正在试玩：……」；
 右边是对话面板：每一轮一张卡，写着"你说"、行动步骤、设计卡、改了什么、以及「采用这一版 / 丢掉这一版」。
-入口 `src/ui/DesignerPane.tsx`、`src/ui/Stage.tsx`、`src/App.tsx`。
+输入框会随文字长高，可以粘贴/选择/拖入图片（最多 4 张，浏览器先缩图再发），也能用麦克风说（Web Speech API，
+浏览器不支持就不显示麦克风）。小助手在忙时，顶栏一个 chip、输入框上方一条状态，都在动。
+入口 `src/ui/DesignerPane.tsx`、`src/ui/Stage.tsx`、`src/ui/AgentWorking.tsx`、`src/lib/images.ts`、`src/lib/speech.ts`、`src/App.tsx`。
 
 - Agent 循环（小助手的一轮）
 
@@ -303,7 +305,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 | 代码编辑 | 已有 | 低 | ✅（在「与代码」视图里看到项目内容） | 不适用 | 不适用 | 不适用（持久化见上一行） | `tests/e2e/agent.spec.ts`：`an idea becomes a candidate, and the child adopts it` |
 | 浏览器内运行 | 已有 | 中 | ✅（候选版本在舞台上跑起来，循环能拿到「在跑」证据） | ❌ 缺口（出错行定位） | 不适用 | 不适用（不改持久状态） | `tests/e2e/agent.spec.ts` 的每一条都要经过运行阶段；`src/lib/export.test.ts`（打包与模板）。画面本身与真实帧率仍需人工看 |
 | 诊断与报错 | 已有 | 中 | ✅（小助手靠静态检查发现 time.sleep 并修好） | ✅ 单元 | 不适用 | 不适用（只读） | `src/lib/diagnostics.test.ts`；`tests/e2e/agent.spec.ts`：`a candidate the checks reject is repaired before the child sees it` |
-| AI 游戏设计器（Agent 循环） | 已有 | 高（改动作品、消耗额度） | ✅（想法 → 候选 → 采用 → 撤销；第二轮在已采用的基础上继续改） | ✅（坏答案不写入；静态问题先修；修复超限停下；中途取消；换项目不串写；越界路径、二进制素材、超大文件） | ✅ 匿名 / 授权 / 已登录未授权 | ✅（采用后撤销；取消、失败、登录丢失后作品不变） | `tests/e2e/agent.spec.ts`（7 条）、`tests/e2e/account.spec.ts`（6 条）、`src/lib/agent.test.ts`（15 条）、`src/lib/ai.test.ts`（12 条）；`worker/index.test.ts`：`ai gateway` |
+| AI 游戏设计器（Agent 循环） | 已有 | 高（改动作品、消耗额度） | ✅（想法 → 候选 → 采用 → 撤销；第二轮在已采用的基础上继续改；图片输入） | ✅（坏答案不写入；静态问题先修；修复超限停下；中途取消；换项目不串写；越界路径、二进制素材、超大文件；图片类型/张数/大小） | ✅ 匿名 / 授权 / 已登录未授权 | ✅（采用后撤销；取消、失败、登录丢失后作品不变） | `tests/e2e/agent.spec.ts`（7 条）、`tests/e2e/attachments.spec.ts`（3 条）、`tests/e2e/ask.spec.ts`（3 条）、`tests/e2e/account.spec.ts`（6 条）、`src/lib/agent.test.ts`（15 条）、`src/lib/ai.test.ts`（12 条）；`worker/index.test.ts`：`ai gateway` |
 | AI 讲解（只读） | 已有 | 低 | ✅（讲讲这段 → 对话面板里出现回答，项目不变） | ✅ 单元（模型没答好时显示「没想好」） | ✅ 匿名时不可用 / 授权可用 | 不适用（不写入） | `tests/e2e/account.spec.ts`：`allowed account: 讲讲这段 reads code and never rewrites the project`；`src/lib/ai.test.ts`：`asks for an explanation without allowing new files` |
 | AI 素材生成 | 已有 | 高（消耗额度、儿童内容） | ✅（生成 → 预览 → 放进项目 → 撤销） | ✅ 单元（未配置拒绝、上游失败不回显密钥、无图 502；去背景/裁剪/缩放像素级断言） | ✅ 匿名不可用 / 授权可用 | ✅（接受前不写入，接受后可撤销） | `tests/e2e/assets.spec.ts`（3 条）、`worker/index.test.ts`：`draws with Gemini…`、`tells the model what a sprite must not contain…`、`refuses to draw when the Gemini key is not configured`；`src/lib/sprite.test.ts` |
 | 导入与导出 | 已有 | 中 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用（导入总是新建项目） | `src/lib/export.test.ts` |

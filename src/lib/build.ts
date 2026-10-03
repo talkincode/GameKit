@@ -54,7 +54,6 @@ export function buildWebBundle(project: Project, options: BuildOptions): WebBund
     width: String(size.width),
     height: String(size.height),
     ume_block: "0",
-    can_close: "0",
     archive: RUNTIME.archive,
     autorun: "0",
     authors: "GameKit",
@@ -66,6 +65,11 @@ export function buildWebBundle(project: Project, options: BuildOptions): WebBund
     PYBUILD: RUNTIME.pybuild,
     comment: "",
     gamekit_debug: options.preview ? "1" : "0",
+    // pygbag 只有在 can_close 为假时才注册 window.onbeforeunload
+    // （pythons.js: `if (!vm.config.can_close) { window.onbeforeunload = ... }`）。
+    // 那个处理只会弹出浏览器的「Leave site?」—— 游戏里没有未保存的数据，
+    // 工作室的保存由 store 负责，所以预览与导出都不需要它。
+    can_close: "1",
   };
   const packed: Record<string, Uint8Array> = {};
   for (const file of project.files) {

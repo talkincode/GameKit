@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { designLines, type DesignCard } from "../lib/design";
+import { MAX_ATTACHMENTS, imagesFrom, prepareImage, type PreparedImage } from "../lib/images";
+import { listen, voiceSupported, type VoiceSession } from "../lib/speech";
 import { useStudio, type Turn } from "../studio/store";
+import { AgentWorking } from "./AgentWorking";
 import { text } from "./text";
 
 /**
@@ -10,20 +13,25 @@ import { text } from "./text";
 export function DesignerPane() {
   const studio = useStudio();
   const [draft, setDraft] = useState("");
-  const ready = draft.trim().length > 0 && studio.canTurn;
+  const [images, setImages] = useState<PreparedImage[]>([]);
+  const ready = (draft.trim().length > 0 || images.length > 0) && studio.canTurn;
 
   const send = () => {
     if (!ready) return;
-    const request = draft.trim();
+    const request = draft.trim() || text.pane.imageOnly;
     setDraft("");
-    void studio.startTurn(request);
+    const attached = images;
+    setImages([]);
+    void studio.startTurn(
+      request,
+      attached.map((image) => ({ dataUrl: image.dataUrl })),
+    );
   };
 
   return (
     <section className="pane" data-testid="pane">
       <header className="pane-head">
         <strong>{text.pane.title}</strong>
-        {studio.turnBusy ? <span className="pane-busy">{text.pane.busy}</span> : null}
       </header>
       <div className="pane-scroll">
         {!studio.turns.length ? <Welcome design={studio.project?.design} /> : null}
@@ -31,7 +39,18 @@ export function DesignerPane() {
           <TurnCard key={turn.id} turn={turn} />
         ))}
       </div>
-      <Ask draft={draft} setDraft={setDraft} send={send} ready={ready} />
+      <div className="pane-bottom">
+        {/* The same live status as the header chip, right where the child is looking. */}
+        <AgentWorking where="pane" />
+        <Ask
+          draft={draft}
+          setDraft={setDraft}
+          send={send}
+          ready={ready}
+          images={images}
+          setImages={setImages}
+        />
+      </div>
     </section>
   );
 }
@@ -65,13 +84,80 @@ function Ask({
   setDraft,
   send,
   ready,
+  images,
+  setImages,
 }: {
   draft: string;
   setDraft: (value: string) => void;
   send: () => void;
   ready: boolean;
+  images: PreparedImage[];
+  setImages: (images: PreparedImage[]) => void;
 }) {
   const studio = useStudio();
+  const box = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const session = useRef<VoiceSession | null>(null);
+  const [listening, setListening] = useState(false);
+  const [guess, setGuess] = useState("");
+  const [voiceNote, setVoiceNote] = useState("");
+  const [dropping, setDropping] = useState(false);
+
+  // Grow with the text, up to a few lines, then scroll.
+  useEffect(() => {
+    const element = box.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${Math.min(element.scrollHeight, 168)}px`;
+  }, [draft, guess]);
+
+  useEffect(() => () => session.current?.stop(), []);
+
+  const addImages = async (files: File[]) => {
+    const room = MAX_ATTACHMENTS - images.length;
+    if (room <= 0 || !files.length) return;
+    try {
+      const prepared = await Promise.all(files.slice(0, room).map((file) => prepareImage(file)));
+      setImages([...images, ...prepared]);
+      setVoiceNote("");
+    } catch {
+      setVoiceNote(text.pane.imageFailed);
+    }
+  };
+
+  const stopListening = () => {
+    session.current?.stop();
+    session.current = null;
+    setListening(false);
+    setGuess("");
+  };
+
+  const toggleListening = () => {
+    if (listening) {
+      stopListening();
+      return;
+    }
+    setVoiceNote("");
+    session.current = listen({
+      onText: (text, final) => {
+        if (final) setDraft(`${draft ? `${draft} ` : ""}${text.trim()}`);
+        else setGuess(text.trim());
+      },
+      onError: (reason) => {
+        setVoiceNote(
+          reason === "denied" ? text.pane.voiceDenied : reason === "unsupported" ? text.pane.voiceUnsupported : text.pane.voiceFailed,
+        );
+        setListening(false);
+        setGuess("");
+      },
+      onEnd: () => {
+        setListening(false);
+        setGuess("");
+      },
+    });
+    if (session.current) setListening(true);
+  };
+
   if (studio.account.kind === "checking") return <div className="pane-locked">{text.account.checking}</div>;
   if (studio.account.kind !== "signed-in") {
     return (
@@ -85,18 +171,54 @@ function Ask({
   }
   return (
     <form
-      className="pane-ask"
+      className={dropping ? "pane-ask dropping" : "pane-ask"}
+      data-testid="ask"
       onSubmit={(event) => {
         event.preventDefault();
         send();
       }}
+      onDragOver={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDropping(true);
+      }}
+      onDragLeave={() => setDropping(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDropping(false);
+        void addImages(imagesFrom(event.dataTransfer.files));
+      }}
     >
+      {images.length ? (
+        <ul className="attachments" data-testid="attachments">
+          {images.map((image, index) => (
+            <li key={`${image.dataUrl.slice(-24)}-${index}`}>
+              <img src={image.dataUrl} alt={text.pane.attached(index + 1)} />
+              <button
+                type="button"
+                aria-label={text.pane.removeImage}
+                onClick={() => setImages(images.filter((_, at) => at !== index))}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <textarea
+        ref={box}
         value={draft}
         rows={2}
         aria-label={text.pane.placeholder}
         placeholder={studio.turns.length ? text.pane.placeholderNext : text.pane.placeholder}
+        title={text.pane.attachHint}
         onChange={(event) => setDraft(event.target.value)}
+        onPaste={(event) => {
+          const files = imagesFrom(event.clipboardData?.files);
+          if (!files.length) return;
+          event.preventDefault();
+          void addImages(files);
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
@@ -104,7 +226,53 @@ function Ask({
           }
         }}
       />
+      {listening ? (
+        <p className="ask-listening" data-testid="listening">
+          <span className="dots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          {guess ? `${text.pane.listening}${guess}` : text.pane.listening}
+        </p>
+      ) : null}
+      {voiceNote ? <p className="ask-note">{voiceNote}</p> : null}
       <div className="pane-actions">
+        <input
+          ref={picker}
+          className="visually-hidden"
+          type="file"
+          accept="image/*"
+          multiple
+          data-testid="image-input"
+          onChange={(event) => {
+            void addImages(imagesFrom(event.target.files));
+            event.target.value = "";
+          }}
+        />
+        <button
+          className="attach"
+          type="button"
+          title={text.pane.attachHint}
+          aria-label={text.pane.attachLabel}
+          onClick={() => picker.current?.click()}
+        >
+          <IconPicture />
+        </button>
+        {voiceSupported() ? (
+          <button
+            className={listening ? "mic on" : "mic"}
+            type="button"
+            data-testid="mic"
+            aria-label={text.pane.voiceLabel}
+            aria-pressed={listening}
+            title={text.pane.voice}
+            onClick={toggleListening}
+          >
+            <IconMic />
+            <span>{listening ? text.pane.listening : text.pane.voice}</span>
+          </button>
+        ) : null}
         <button className="run" type="submit" disabled={!ready}>
           {studio.turns.length ? text.pane.sendNext : text.pane.send}
         </button>
@@ -115,6 +283,25 @@ function Ask({
         ) : null}
       </div>
     </form>
+  );
+}
+
+function IconPicture() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M2.5 3.5h11v9h-11z" />
+      <path d="M2.5 10.5l3.2-3 2.6 2.4 2-1.8 3.2 2.9" />
+      <circle cx="6" cy="6" r="1" />
+    </svg>
+  );
+}
+
+function IconMic() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 2.5a1.8 1.8 0 0 1 1.8 1.8v3.4a1.8 1.8 0 0 1-3.6 0V4.3A1.8 1.8 0 0 1 8 2.5Z" />
+      <path d="M4.2 7.4v.6a3.8 3.8 0 0 0 7.6 0v-.6M8 11.8v1.7" />
+    </svg>
   );
 }
 
@@ -151,6 +338,15 @@ function DesignTurn({ turn }: { turn: Turn }) {
         <em>{text.pane.youSaid}</em>
         {turn.request}
       </p>
+      {turn.images?.length ? (
+        <ul className="attachments said-images">
+          {turn.images.map((image, index) => (
+            <li key={`${image.slice(-24)}-${index}`}>
+              <img src={image} alt={text.pane.attached(index + 1)} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <ol className="steps">
         {turn.steps.map((step) => (
           <li key={step.key} className={`step ${step.status}`}>

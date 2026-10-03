@@ -31,7 +31,7 @@ import {
   type CandidateResult,
   type RunOutcome,
 } from "../lib/agent";
-import { explainMessages, readSay, type ChatMessage } from "../lib/ai";
+import { explainMessages, readSay, type ChatImage, type ChatMessage } from "../lib/ai";
 import { buildWebBundle } from "../lib/build";
 import type { DesignCard } from "../lib/design";
 import { diagnoseProject, problemsFromConsole, tracebackTail, type Problem } from "../lib/diagnostics";
@@ -103,6 +103,8 @@ export type Turn = {
   kind: "design" | "explain";
   /** What the child asked, in their own words. */
   request: string;
+  /** Pictures attached to this round, kept only for the conversation. */
+  images?: string[];
   steps: AgentStep[];
   design?: DesignCard;
   say: string;
@@ -149,8 +151,9 @@ type StudioValue = {
   turns: Turn[];
   candidate: CandidateResult | null;
   turnBusy: boolean;
+  activeStep?: AgentStep;
   canTurn: boolean;
-  startTurn: (request: string) => Promise<void>;
+  startTurn: (request: string, images?: ChatImage[]) => Promise<void>;
   cancelTurn: () => void;
   adoptCandidate: () => void;
   discardCandidate: () => void;
@@ -521,7 +524,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   );
 
   const startTurn = useCallback(
-    async (request: string) => {
+    async (request: string, images?: ChatImage[]) => {
       const base = projectRef.current;
       if (!base) return;
       if (account.kind !== "signed-in") {
@@ -533,6 +536,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         id: turnId,
         kind: "design",
         request: request.trim(),
+        images: images?.map((image) => image.dataUrl),
         steps: [],
         say: "",
         adopted: false,
@@ -546,7 +550,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         setTurns((list) => list.map((item) => (item.id === turnId ? change(item) : item)));
       let outcome: AgentTurnOutcome;
       try {
-        outcome = await runAgentTurn({ id: turnId, request: fresh.request }, base, {
+        outcome = await runAgentTurn({ id: turnId, request: fresh.request, images }, base, {
           model: callModel,
           diagnose: diagnoseProject,
           run: runCandidate,
@@ -584,6 +588,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, [settleRun]);
 
   const activeTurn = turns.at(-1) ?? null;
+  /** The step the loop is on right now, for the live status in the UI. */
+  const activeStep = activeTurn?.steps.filter((step) => step.status === "active").at(-1);
   const candidate = activeTurn && !activeTurn.adopted && !activeTurn.discarded ? activeTurn.candidate ?? null : null;
   const canTurn = account.kind === "signed-in" && !!project && !turnBusy;
 
@@ -690,6 +696,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       turns,
       candidate,
       turnBusy,
+      activeStep,
       canTurn,
       startTurn,
       cancelTurn,
@@ -995,6 +1002,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     turns,
     candidate,
     turnBusy,
+    activeStep,
     canTurn,
     startTurn,
     cancelTurn,

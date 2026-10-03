@@ -223,6 +223,33 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 .pane-busy { color: var(--brass); font-size: 12px; }
 .pane-scroll { overflow: auto; padding: 12px; display: grid; gap: 14px; align-content: start; }
+.pane-bottom { border-top: 1px solid var(--line); display: grid; }
+
+/* 小助手在忙：头部一个 chip，面板底部一条状态（两处同一份动画） */
+.working { display: inline-flex; align-items: center; gap: 8px; color: var(--brass); font-size: 12px; }
+.working-header { padding: 0 10px; min-height: 30px; border: 1px solid #e6d5b8; background: #f6efe1; border-radius: 99px; }
+.working-pane { padding: 8px 12px 2px; }
+.working .dots { display: inline-flex; gap: 3px; }
+.working .dots i,
+.ask-listening .dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: working-pulse 1.05s infinite ease-in-out both;
+}
+.working .dots i:nth-child(2),
+.ask-listening .dots i:nth-child(2) { animation-delay: 0.15s; }
+.working .dots i:nth-child(3),
+.ask-listening .dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes working-pulse {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .working .dots i,
+  .ask-listening .dots i { animation: none; opacity: 0.75; }
+}
 .welcome h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -0.03em; }
 .welcome p { margin: 0 0 10px; color: var(--muted); line-height: 1.5; }
 
@@ -291,11 +318,79 @@ button:disabled { opacity: 0.45; cursor: default; }
 .turn-foot.good { color: var(--pine); }
 .turn-foot.blocked, .turn-foot.failed { color: var(--danger); }
 
-.pane-ask { display: grid; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--line); }
-.pane-ask textarea { width: 100%; resize: vertical; }
+.pane-ask { display: grid; gap: 8px; padding: 8px 12px 12px; }
+.pane-ask textarea {
+  width: 100%;
+  resize: none;
+  overflow-y: auto;
+  max-height: 168px;
+  line-height: 1.5;
+}
 .pane-actions { display: flex; gap: 8px; align-items: center; }
 .pane-actions .run { flex: 1; }
-.pane-locked { display: grid; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.mic {
+  border: 1px solid var(--line-strong);
+  background: var(--paper-2);
+  border-radius: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.mic svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.attach {
+  border: 1px solid var(--line-strong);
+  background: var(--paper-2);
+  border-radius: 10px;
+  min-height: 42px;
+  width: 42px;
+  display: grid;
+  place-items: center;
+}
+.attach svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.attach:hover { border-color: var(--ink); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.attachments { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.attachments li { position: relative; }
+.attachments img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: #101214;
+}
+.attachments button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-2);
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+.pane-ask.dropping { background: #f2f6f1; outline: 2px dashed var(--pine); outline-offset: -4px; }
+.said-images img { width: 76px; height: 76px; object-fit: cover; }
+.mic:hover { border-color: var(--ink); }
+.mic.on { border-color: var(--brass); background: #f6efe1; color: var(--brass); }
+.ask-listening {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--brass);
+}
+.ask-listening .dots { display: inline-flex; gap: 3px; }
+.ask-note { margin: 0; font-size: 12px; color: var(--danger); }
+.pane-locked { display: grid; gap: 8px; padding: 12px; }
 .pane-locked p { margin: 0; color: var(--muted); line-height: 1.5; }
 
 /* ---- 看代码：文件与素材 ---- */
@@ -309,7 +404,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .seg button { flex: 1; border: 0; background: transparent; border-radius: 6px; min-height: 28px; }
 .seg button.on { background: var(--paper-2); }
 
-.side-tools { gap: 6px; }
+.side-tools { gap: 6px; flex-wrap: wrap; }
 .side-count { font-size: 11px; color: var(--muted); margin-right: auto; white-space: nowrap; }
 .side-tools button, .side-tools .file-btn {
   border: 1px solid var(--line);
@@ -323,6 +418,7 @@ button:disabled { opacity: 0.45; cursor: default; }
   align-items: center;
   gap: 5px;
   flex-direction: row;
+  white-space: nowrap;
 }
 .side-tools button:hover, .side-tools .file-btn:hover { border-color: var(--ink); }
 .side-tools svg, .trash svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -501,6 +597,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .asset-preview { margin: 0; display: grid; gap: 4px; justify-items: center; }
 .asset-preview figcaption { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .asset-note { font-size: 12px; color: var(--brass); }
+.asset-keep { margin: 0; font-size: 12px; color: var(--muted); }
 .generated { width: 180px; height: 180px; object-fit: contain; background: #121418; justify-self: center; image-rendering: pixelated; }
 .notice, .busy {
   position: fixed;

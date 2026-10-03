@@ -330,4 +330,44 @@ describe("ai gateway", () => {
     const input = String((JSON.parse(String(imageCalls[0].init.body)) as { input: string }).input);
     expect(input).toContain("小星星");
   });
+
+  it("passes attached pictures through to the model", async () => {
+    const tiny = `data:image/jpeg;base64,${btoa("jpeg-bytes")}`;
+    const response = await call("/api/ai", {
+      token: await jwt(),
+      init: {
+        method: "POST",
+        body: JSON.stringify({
+          op: "complete",
+          messages: [
+            { role: "user", content: [{ type: "text", text: "看看这张图" }, { type: "image_url", image_url: { url: tiny } }] },
+          ],
+        }),
+      },
+    });
+    expect(response.status).toBe(200);
+    const sent = JSON.parse(String(modelCalls[0].init.body)) as { messages: { content: unknown }[] };
+    expect(sent.messages[0].content).toEqual([
+      { type: "text", text: "看看这张图" },
+      { type: "image_url", image_url: { url: tiny } },
+    ]);
+  });
+
+  it("refuses attachments that are not pictures, too many, or too big", async () => {
+    const attempts = [
+      [{ type: "image_url", image_url: { url: "https://example.com/x.png" } }],
+      [{ type: "image_url", image_url: { url: "data:text/html;base64,AAAA" } }],
+      [{ type: "file", file: { id: "1" } }],
+      Array.from({ length: 5 }, () => ({ type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } })),
+      [{ type: "image_url", image_url: { url: `data:image/png;base64,${"A".repeat(900_001)}` } }],
+    ];
+    for (const content of attempts) {
+      const response = await call("/api/ai", {
+        token: await jwt(),
+        init: { method: "POST", body: JSON.stringify({ op: "complete", messages: [{ role: "user", content }] }) },
+      });
+      expect(response.status, JSON.stringify(content).slice(0, 60)).toBe(400);
+    }
+    expect(modelCalls).toHaveLength(0);
+  });
 });

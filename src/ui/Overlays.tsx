@@ -95,11 +95,12 @@ function AssetDialog() {
           </figure>
         ) : null}
         {studio.assetDraft?.note ? <p className="asset-note">{studio.assetDraft.note}</p> : null}
+        {studio.assetDraft ? <p className="asset-keep">{text.assets.keepHint}</p> : null}
         <div className="modal-actions">
           <button
             type="button"
             onClick={() => {
-              studio.clearAsset();
+              // Closing keeps the picture: nothing is lost until 保存到项目 happens.
               studio.setAssetOpen(false);
             }}
           >

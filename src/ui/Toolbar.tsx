@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { slugName } from "../lib/project";
 import { useStudio } from "../studio/store";
+import { AgentWorking } from "./AgentWorking";
 import { text } from "./text";
 
 /**
@@ -55,6 +56,8 @@ export function Toolbar() {
         </button>
       </div>
 
+      <AgentWorking where="header" />
+
       <div className="cluster">
         <button
           className="ghost"
@@ -75,7 +78,9 @@ export function Toolbar() {
         </button>
       </div>
 
-      <div className={`save save-${studio.saveState}`}>{text.header.save[studio.saveState]}</div>
+      <div className={`save save-${studio.saveState}`} title={text.header.saveHint}>
+        {text.header.save[studio.saveState]}
+      </div>
 
       <Account />
 

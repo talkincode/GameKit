@@ -106,22 +106,58 @@ export function imagePromptFor(kind: AssetKind, subject: string): string {
   return `${IMAGE_SHOT[kind]}. Subject: ${subject}. Style: ${IMAGE_STYLE}. ${IMAGE_AVOID}`;
 }
 
-export type ChatMessage = { role: "system" | "user"; content: string };
+/** A message is text, or text plus pictures the child attached to this round. */
+export type ChatPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+export type ChatMessage = { role: "system" | "user"; content: string | ChatPart[] };
+
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_IMAGES_PER_REQUEST = 4;
+// The browser downscales before sending; this is the upper bound we accept.
+const MAX_IMAGE_CHARS = 900_000;
 
 export function readMessages(value: unknown): ChatMessage[] {
   if (!Array.isArray(value) || value.length < 1 || value.length > 8) {
     throw new HttpError(400, "bad_request", "A completion needs 1 to 8 messages.");
   }
+  let images = 0;
   return value.map((message) => {
     if (!message || typeof message !== "object") throw new HttpError(400, "bad_request", "Invalid message.");
     const entry = message as { role?: unknown; content?: unknown };
     if (entry.role !== "system" && entry.role !== "user") {
       throw new HttpError(400, "bad_request", "Unsupported message role.");
     }
-    if (typeof entry.content !== "string" || entry.content.length > 24_000) {
-      throw new HttpError(400, "bad_request", "A message is missing or too long.");
+    if (typeof entry.content === "string") {
+      if (entry.content.length > 24_000) throw new HttpError(400, "bad_request", "A message is missing or too long.");
+      return { role: entry.role, content: entry.content };
     }
-    return { role: entry.role, content: entry.content };
+    if (!Array.isArray(entry.content) || !entry.content.length || entry.content.length > 8) {
+      throw new HttpError(400, "bad_request", "Invalid message content.");
+    }
+    const parts: ChatPart[] = entry.content.map((part) => {
+      const item = part as { type?: unknown; text?: unknown; image_url?: { url?: unknown } } | null;
+      if (item?.type === "text") {
+        const text = typeof item.text === "string" ? item.text : "";
+        if (text.length > 24_000) throw new HttpError(400, "bad_request", "A message is too long.");
+        return { type: "text", text };
+      }
+      if (item?.type === "image_url") {
+        const url = typeof item.image_url?.url === "string" ? item.image_url.url : "";
+        const header = /^data:(image\/[a-z0-9.+-]+);base64,/.exec(url)?.[1] ?? "";
+        if (!IMAGE_TYPES.includes(header)) {
+          throw new HttpError(400, "bad_request", "Only PNG, JPEG or WebP pictures can be attached.");
+        }
+        if (url.length > MAX_IMAGE_CHARS) throw new HttpError(400, "bad_request", "That picture is too big.");
+        images += 1;
+        if (images > MAX_IMAGES_PER_REQUEST) {
+          throw new HttpError(400, "bad_request", "At most four pictures per request.");
+        }
+        return { type: "image_url", image_url: { url } };
+      }
+      throw new HttpError(400, "bad_request", "Unsupported message content.");
+    });
+    return { role: entry.role, content: parts };
   });
 }
 

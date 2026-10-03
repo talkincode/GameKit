@@ -2,7 +2,15 @@ import { designFromRecord, designText, type DesignCard } from "./design";
 import type { Problem } from "./diagnostics";
 import { normalizePath, type Project, type ProjectFile } from "./project";
 
-export type ChatMessage = { role: "system" | "user"; content: string };
+export type ChatMessage = { role: "system" | "user"; content: string | ChatPart[] };
+
+/** Text, or text plus the pictures the child attached to this round. */
+export type ChatPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+/** A picture the child pasted or picked: a data URL the model can read. */
+export type ChatImage = { dataUrl: string };
 
 export type TextChange = { path: string; content: string };
 
@@ -120,18 +128,21 @@ function problemsBlock(problems: Problem[], consoleTail: string): string {
   return `检查发现的问题：\n${lines.join("\n")}\n${console}`;
 }
 
-/** Turns the child's words into a design card. */
-export function designMessages(input: { request: string; base: Project }): ChatMessage[] {
+/** Turns the child's words (and any pictures they attached) into a design card. */
+export function designMessages(input: { request: string; base: Project; images?: ChatImage[] }): ChatMessage[] {
+  const text =
+    `孩子说的话：${clip(input.request.trim(), 1_500)}\n\n` +
+    `现在项目里的文件：\n${clip(filesForPrompt(input.base.files, 3_000), 3_000)}\n` +
+    `把这句话整理成这张游戏的设计卡。孩子没想到的地方你替他拿主意，用孩子看得懂的说法。\n` +
+    (input.images?.length
+      ? `孩子还发了 ${input.images.length} 张图片，先看懂它们（可能是想做的样子，也可能是游戏出错的截图），再写设计卡。\n`
+      : "") +
+    `返回 {"say":"给孩子的一句话","title":"游戏名","hero":"主角","goal":"玩法目标","controls":["操作"],"look":"画面"}。`;
+  const content: ChatPart[] = [{ type: "text", text }];
+  for (const image of input.images ?? []) content.push({ type: "image_url", image_url: { url: image.dataUrl } });
   return [
     { role: "system", content: SYSTEM },
-    {
-      role: "user",
-      content:
-        `孩子说的话：${clip(input.request.trim(), 1_500)}\n\n` +
-        `现在项目里的文件：\n${clip(filesForPrompt(input.base.files, 3_000), 3_000)}\n` +
-        `把这句话整理成这张游戏的设计卡。孩子没想到的地方你替他拿主意，用孩子看得懂的说法。\n` +
-        `返回 {"say":"给孩子的一句话","title":"游戏名","hero":"主角","goal":"玩法目标","controls":["操作"],"look":"画面"}。`,
-    },
+    { role: "user", content: input.images?.length ? content : text },
   ];
 }
 

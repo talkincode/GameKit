@@ -13,6 +13,7 @@ import {
   readCandidateFiles,
   readDesign,
   repairMessages,
+  type ChatImage,
   type ChatMessage,
   type TextChange,
 } from "./ai";
@@ -66,7 +67,7 @@ export type AgentEvent =
   | { kind: "design"; design: DesignCard; say: string }
   | { kind: "candidate"; candidate: CandidateResult };
 
-export type AgentTurnInput = { id: string; request: string };
+export type AgentTurnInput = { id: string; request: string; images?: ChatImage[] };
 
 export type AgentEffects = {
   /** One model call. Throws when the call or the answer is unusable. */
@@ -139,7 +140,7 @@ export async function runAgentTurn(
   let design: DesignCard;
   let say = "";
   try {
-    const answer = readDesign(await fx.model(designMessages({ request: input.request, base })));
+    const answer = readDesign(await fx.model(designMessages({ request: input.request, base, images: input.images })));
     design = answer.card;
     say = answer.say;
   } catch (error) {

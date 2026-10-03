@@ -107,6 +107,32 @@ test("the size choice changes what lands in assets/, and 去掉背景 can be tur
   expect(corner).toEqual({ r: 255, g: 255, b: 255, a: 255 });
 });
 
+test("closing the maker keeps the picture until it is saved", async ({ page }) => {
+  await stubPicture(page);
+  await signIn(page);
+  await page.getByRole("tab", { name: text.header.code }).click();
+  await page.getByRole("button", { name: text.code.assets, exact: true }).click();
+  await page.getByRole("button", { name: text.code.generate }).click();
+
+  const dialog = page.getByTestId("asset-dialog");
+  await dialog.getByRole("textbox").fill("小狐狸");
+  await dialog.getByRole("button", { name: text.assets.generate }).click();
+  await expect(dialog.locator("img.generated")).toBeVisible({ timeout: 60_000 });
+  await expect(dialog).toContainText(text.assets.keepHint);
+
+  // Nothing is saved yet: closing must not throw the picture away.
+  await dialog.getByRole("button", { name: text.assets.close }).click();
+  await expect(page.getByTestId("asset-dialog")).toHaveCount(0);
+  await expect(page.locator(".asset-grid .card")).toHaveCount(2);
+
+  await page.getByRole("button", { name: text.code.generate }).click();
+  const reopened = page.getByTestId("asset-dialog");
+  await expect(reopened.locator("img.generated")).toBeVisible();
+  await reopened.getByRole("button", { name: text.assets.accept }).click();
+  const stored = page.locator(".asset-grid .card", { hasText: /sprite-\d+\.png/ });
+  await expect(stored).toHaveCount(1);
+});
+
 test("an anonymous child cannot start the asset maker", async ({ page }) => {
   const apiCalls: string[] = [];
   page.on("request", (request) => {
