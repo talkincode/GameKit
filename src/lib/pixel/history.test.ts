@@ -86,4 +86,47 @@ describe("history", () => {
     expect(readPixel(pixels, 1, 0)).toEqual(RED);
     expect(readPixel(pixels, 2, 0)).toEqual([0, 0, 0, 0]);
   });
+
+  it("stores a step as typed arrays, so a whole-canvas fill stays small", () => {
+    const pixels = createPixels(64, 64);
+    const history = createHistory();
+    const stroke = beginStroke();
+    for (let index = 0; index < 64 * 64; index += 1) paintAt(pixels, stroke, index % 64, Math.floor(index / 64), RED);
+    const change = finishStroke(pixels, stroke, history.next);
+    expect(change?.indices).toBeInstanceOf(Uint32Array);
+    expect(change?.before).toBeInstanceOf(Uint32Array);
+    expect(change?.after).toBeInstanceOf(Uint32Array);
+  });
+
+  it("lets go of the oldest steps once the pixels they hold pass the budget, and still undoes the newest", () => {
+    const pixels = createPixels(10, 10);
+    const history = createHistory(200, 250);
+    const fill = (colour: readonly [number, number, number, number]) => {
+      const stroke = beginStroke();
+      for (let y = 0; y < 10; y += 1) for (let x = 0; x < 10; x += 1) paintAt(pixels, stroke, x, y, colour);
+      const change = finishStroke(pixels, stroke, history.next);
+      if (change) record(history, change);
+    };
+    for (let round = 0; round < 6; round += 1) fill([round + 1, 0, 0, 255]); // 100 pixels each
+    expect(history.done.length).toBe(2); // 3 × 100 would pass 250
+    expect(currentSerial(history)).toBe(6);
+    expect(history.floor).toBe(4);
+    expect(undo(history, pixels)).not.toBeNull();
+    expect(readPixel(pixels, 5, 5)).toEqual([5, 0, 0, 255]);
+    expect(undo(history, pixels)).not.toBeNull();
+    expect(readPixel(pixels, 5, 5)).toEqual([4, 0, 0, 255]);
+    expect(undo(history, pixels)).toBeNull(); // older steps are gone
+  });
+
+  it("always keeps the newest step, even one bigger than the whole budget", () => {
+    const pixels = createPixels(10, 10);
+    const history = createHistory(200, 50);
+    const stroke = beginStroke();
+    for (let y = 0; y < 10; y += 1) for (let x = 0; x < 10; x += 1) paintAt(pixels, stroke, x, y, RED);
+    const change = finishStroke(pixels, stroke, history.next);
+    if (change) record(history, change);
+    expect(history.done.length).toBe(1);
+    expect(undo(history, pixels)).not.toBeNull();
+    expect(readPixel(pixels, 3, 3)).toEqual([0, 0, 0, 0]);
+  });
 });

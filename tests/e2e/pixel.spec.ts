@@ -623,8 +623,8 @@ test("pygame in the preview loads the pictures that were drawn and edited", asyn
   await expect(page.locator(".console")).toContainText("PIXEL-EDITOR-OK (16, 16) (239, 125, 87, 255) (0, 0, 0, 0) (239, 125, 87, 255)", { timeout: 120_000 });
 });
 
-test("a generated picture can be touched up at the pixel level and saved as its own file", async ({ page }) => {
-  test.setTimeout(120_000);
+/** A signed-in child with a generated 48×48 picture waiting in the asset maker. */
+async function generatePicture(page: Page) {
   await page.route("**/api/ai", async (route) => {
     if (!(route.request().postData() ?? "").includes('"op":"image"')) {
       await route.fallback();
@@ -650,6 +650,12 @@ test("a generated picture can be touched up at the pixel level and saved as its 
   await dialog.getByRole("textbox").fill("小狐狸");
   await dialog.getByRole("button", { name: text.assets.generate }).click();
   await expect(dialog.locator("img.generated")).toBeVisible({ timeout: 60_000 });
+  return dialog;
+}
+
+test("a generated picture can be touched up at the pixel level and saved as its own file", async ({ page }) => {
+  test.setTimeout(120_000);
+  const dialog = await generatePicture(page);
 
   // Back out without drawing: the generated picture is still waiting in its dialog.
   await dialog.getByTestId("pixel-edit-draft").click();
@@ -677,4 +683,21 @@ test("a generated picture can be touched up at the pixel level and saved as its 
   // Saved: the picture is a project file now, and the maker has nothing left to keep.
   await expect(page.getByTestId("asset-dialog")).toHaveCount(0);
   await expect(page.getByRole("button", { name: path, exact: true })).toBeVisible();
+});
+
+test("保存 in the unsaved question closes the editor for good, without the maker coming back", async ({ page }) => {
+  test.setTimeout(120_000);
+  const dialog = await generatePicture(page);
+  await dialog.getByTestId("pixel-edit-draft").click();
+  await pickColor(page, text.pixel.colors[GREEN]);
+  await click(page, 0, 0);
+  await page.getByTestId("pixel-close").click();
+  await page.getByTestId("pixel-save-close").click();
+
+  await expect(page.getByTestId("pixel-editor")).toHaveCount(0);
+  // The picture is a project file now; an empty maker must not pop back up.
+  await expect(page.getByTestId("asset-dialog")).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId("asset-dialog")).toHaveCount(0);
+  await expect(page.locator(".card-cell").filter({ hasText: /sprite-\d+\.png/ })).toHaveCount(1);
 });

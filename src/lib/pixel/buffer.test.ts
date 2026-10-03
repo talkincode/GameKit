@@ -137,9 +137,9 @@ describe("painting", () => {
     paintAt(pixels, stroke, 1, 1, RED);
     expect(rowsOf(pixels)).toEqual(["...", ".R."]);
     const change = finishStroke(pixels, stroke, 1);
-    expect(change?.indices).toEqual([4]);
-    expect(change?.before).toEqual([packColor(TRANSPARENT)]);
-    expect(change?.after).toEqual([packColor(RED)]);
+    expect(Array.from(change?.indices ?? [])).toEqual([4]);
+    expect(Array.from(change?.before ?? [])).toEqual([packColor(TRANSPARENT)]);
+    expect(Array.from(change?.after ?? [])).toEqual([packColor(RED)]);
   });
 
   it("ignores points outside the picture instead of wrapping or throwing", () => {
@@ -178,9 +178,9 @@ describe("painting", () => {
     paintAt(pixels, stroke, 2, 0, BLUE);
     const change = finishStroke(pixels, stroke, 7);
     expect(change?.serial).toBe(7);
-    expect(change?.indices).toEqual([1, 2]);
-    expect(change?.before).toEqual([packColor(TRANSPARENT), packColor(TRANSPARENT)]);
-    expect(change?.after).toEqual([packColor(RED), packColor(BLUE)]);
+    expect(Array.from(change?.indices ?? [])).toEqual([1, 2]);
+    expect(Array.from(change?.before ?? [])).toEqual([packColor(TRANSPARENT), packColor(TRANSPARENT)]);
+    expect(Array.from(change?.after ?? [])).toEqual([packColor(RED), packColor(BLUE)]);
   });
 
   it("drops pixels that ended up unchanged, and returns null when nothing changed", () => {

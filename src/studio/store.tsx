@@ -382,6 +382,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const saveChain = useRef<Promise<void>>(Promise.resolve());
   const pixelSessionRef = useRef(pixelSession);
   pixelSessionRef.current = pixelSession;
+  // Read at the moment of closing, not at the render the click came from: 保存并关闭 consumes the draft first.
+  const assetDraftRef = useRef(assetDraft);
+  assetDraftRef.current = assetDraft;
   const pixelCount = useRef(0);
 
   useEffect(() => {
@@ -641,8 +644,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const closePixelEditor = useCallback(() => {
     setPixelSession(null);
     // A generated picture the child was touching up goes back to the result they came from.
-    if (pixelSessionRef.current?.source === "draft" && assetDraft) setAssetOpen(true);
-  }, [assetDraft]);
+    if (pixelSessionRef.current?.source === "draft" && assetDraftRef.current) setAssetOpen(true);
+  }, []);
 
   const savePixelImage = useCallback(
     async (input: PixelSaveInput): Promise<PixelSaveResult> => {
@@ -668,7 +671,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         current.map((item) => (item.id === base.id ? upsertFile(item, { path: plan.path, bytes: input.bytes }) : item)),
       );
       setPath(plan.path);
-      if (session?.source === "draft") setAssetDraft(null);
+      if (session?.source === "draft") {
+        assetDraftRef.current = null;
+        setAssetDraft(null);
+      }
       return { ok: true, path: plan.path };
     },
     [flushSave],

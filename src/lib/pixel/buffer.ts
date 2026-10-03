@@ -104,7 +104,7 @@ export function linePoints(x0: number, y0: number, x1: number, y1: number): [num
 export type Stroke = { before: Map<number, number> };
 
 /** One undo step: the pixels a stroke really changed, with both sides. */
-export type Change = { serial: number; indices: number[]; before: number[]; after: number[] };
+export type Change = { serial: number; indices: Uint32Array; before: Uint32Array; after: Uint32Array };
 
 export function beginStroke(): Stroke {
   return { before: new Map() };
@@ -208,7 +208,9 @@ export function finishStroke(pixels: Pixels, stroke: Stroke, serial: number): Ch
     before.push(was);
     after.push(now);
   }
-  return indices.length ? { serial, indices, before, after } : null;
+  return indices.length
+    ? { serial, indices: Uint32Array.from(indices), before: Uint32Array.from(before), after: Uint32Array.from(after) }
+    : null;
 }
 
 /** Undo is `before`, redo is `after`: the same pixels, written the other way. */

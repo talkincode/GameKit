@@ -85,7 +85,7 @@ function paeth(left: number, up: number, upLeft: number): number {
   return pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft;
 }
 
-/** Reads a PNG into 8-bit RGBA. `maxPixels` is checked before anything is inflated. */
+/** Reads a PNG into 8-bit RGBA. `maxPixels` is checked before anything is inflated, and the inflater is capped at what the header needs. */
 export function decodePng(bytes: Uint8Array, maxPixels = 4096 * 4096): PngDecode {
   if (bytes.length < 8 || SIGNATURE.some((value, index) => bytes[index] !== value)) return { ok: false, problem: "not-png" };
   const corrupt = { ok: false, problem: "corrupt" } as const;
@@ -137,7 +137,9 @@ export function decodePng(bytes: Uint8Array, maxPixels = 4096 * 4096): PngDecode
       joined.set(part, offset);
       offset += part.length;
     }
-    raw = unzlibSync(joined);
+    // The header decides how much memory a file may use: a stream that claims
+    // more than width × height needs is cut off instead of being inflated in full.
+    raw = unzlibSync(joined, { out: new Uint8Array((stride + 1) * height) });
   } catch {
     return corrupt;
   }
