@@ -5,6 +5,7 @@ import "monaco-editor/languages/definitions/python/register.js";
 import "monaco-editor/languages/definitions/html/register.js";
 import "monaco-editor/languages/definitions/css/register.js";
 import { useEffect, useState } from "react";
+import { canEditPixels } from "../lib/pixel/rules";
 import { assetFilter, editorLanguage, mediaType } from "../lib/project";
 import { useStudio } from "../studio/store";
 import { text } from "./text";
@@ -71,6 +72,11 @@ export function CodePane() {
       ) : kind === "images" && url ? (
         <div className="preview-asset">
           <img src={url} alt={file.path} />
+          {canEditPixels(file.path) ? (
+            <button type="button" className="run pixel-edit-cta" data-testid="pixel-edit-preview" onClick={() => studio.editPixelFile(file.path)}>
+              {text.pixel.edit}
+            </button>
+          ) : null}
         </div>
       ) : kind === "audio" && url ? (
         <div className="preview-asset">

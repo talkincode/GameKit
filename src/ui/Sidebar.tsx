@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { canEditPixels } from "../lib/pixel/rules";
 import { assetFilter, fileTree, mediaType, normalizePath, type TrashedFile, type TreeNode } from "../lib/project";
 import { useStudio } from "../studio/store";
 import { text } from "./text";
@@ -93,6 +94,10 @@ export function Sidebar() {
               <IconPlus />
               {text.code.newFile}
             </button>
+            <button type="button" data-testid="pixel-new" title={text.pixel.newImageHint} onClick={() => studio.setPixelNewOpen(true)}>
+              <IconPixel />
+              {text.pixel.newImage}
+            </button>
           </div>
 
           {editing?.kind === "new" ? (
@@ -121,6 +126,7 @@ export function Sidebar() {
                 taken={taken}
                 confirming={confirming}
                 onOpen={studio.setPath}
+                onEditPixels={studio.editPixelFile}
                 onStartRename={startRename}
                 onChangeDraft={setDraft}
                 onSubmitRename={submit}
@@ -189,6 +195,10 @@ export function Sidebar() {
                 }}
               />
             </label>
+            <button type="button" data-testid="pixel-new" title={text.pixel.newImageHint} onClick={() => studio.setPixelNewOpen(true)}>
+              <IconPixel />
+              {text.pixel.newImage}
+            </button>
             <button type="button" title={text.code.generateHint} onClick={() => studio.setAssetOpen(true)}>
               <IconSparkle />
               {text.code.generate}
@@ -200,16 +210,29 @@ export function Sidebar() {
           </div>
           <div className="asset-grid">
             {assets.map((file) => (
-              <button
-                key={file.path}
-                type="button"
-                aria-label={file.path}
-                className={file.path === studio.path ? "card on" : "card"}
-                onClick={() => studio.setPath(file.path)}
-              >
-                <AssetThumb path={file.path} bytes={file.bytes} />
-                <span>{file.path.split("/").pop()}</span>
-              </button>
+              <div key={file.path} className="card-cell">
+                <button
+                  type="button"
+                  aria-label={file.path}
+                  className={file.path === studio.path ? "card on" : "card"}
+                  onClick={() => studio.setPath(file.path)}
+                >
+                  <AssetThumb path={file.path} bytes={file.bytes} />
+                  <span>{file.path.split("/").pop()}</span>
+                </button>
+                {canEditPixels(file.path) ? (
+                  <button
+                    type="button"
+                    className="card-edit"
+                    data-testid="pixel-edit"
+                    aria-label={text.pixel.editFile(file.path)}
+                    title={text.pixel.edit}
+                    onClick={() => studio.editPixelFile(file.path)}
+                  >
+                    <IconPixel />
+                  </button>
+                ) : null}
+              </div>
             ))}
             {!assets.length ? <p className="empty">{text.code.noAssets}</p> : null}
           </div>
@@ -282,6 +305,7 @@ function Node({
   taken,
   confirming,
   onOpen,
+  onEditPixels,
   onStartRename,
   onChangeDraft,
   onSubmitRename,
@@ -298,6 +322,7 @@ function Node({
   taken: boolean;
   confirming: string | null;
   onOpen: (path: string) => void;
+  onEditPixels: (path: string) => void;
   onStartRename: (path: string) => void;
   onChangeDraft: (value: string) => void;
   onSubmitRename: () => void;
@@ -323,6 +348,7 @@ function Node({
             taken={taken}
             confirming={confirming}
             onOpen={onOpen}
+            onEditPixels={onEditPixels}
             onStartRename={onStartRename}
             onChangeDraft={onChangeDraft}
             onSubmitRename={onSubmitRename}
@@ -375,6 +401,17 @@ function Node({
         {node.name}
       </button>
       <span className="row-actions">
+        {canEditPixels(node.path) ? (
+          <button
+            type="button"
+            data-testid="pixel-edit"
+            aria-label={text.pixel.editFile(node.name)}
+            title={text.pixel.edit}
+            onClick={() => onEditPixels(node.path)}
+          >
+            <IconPixel />
+          </button>
+        ) : null}
         <button type="button" aria-label={`${text.code.rename} ${node.name}`} onClick={() => onStartRename(node.path)}>
           <IconPencil />
         </button>
@@ -441,6 +478,13 @@ function IconPlus() {
   );
 }
 
+function IconPixel() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M3 3h4v4H3zM9 9h4v4H9zM9 3h4v2.5H9zM3 9h4v4H3z" />
+    </svg>
+  );
+}
 function IconPencil() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true">

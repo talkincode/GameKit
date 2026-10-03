@@ -61,6 +61,9 @@ import {
   type ProjectFile,
   type TrashedFile,
 } from "../lib/project";
+import { parseHex } from "../lib/pixel/buffer";
+import { canEditPixels, checkSize, imagePath } from "../lib/pixel/rules";
+import { planPixelSave, type PixelSaveFailure, type PixelSaveInput } from "../lib/pixel/save";
 import { downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
 import { budgetFor, loadSettings, saveSettings, type Settings } from "../lib/settings";
 import { renderMusic, renderSfx } from "../lib/audio/render";
@@ -108,6 +111,19 @@ export type AssetDraft = {
   /** Sound drafts also carry what to tell the child about using it. */
   sound?: { kind: SoundKind; say: string; seconds: number };
 };
+
+/** What the pixel editor was opened on. Bytes are copied in, so the editor owns its picture. */
+export type PixelOpen =
+  | { source: "new"; path: string; width: number; height: number; background: string | null }
+  | { source: "file"; path: string; bytes: Uint8Array }
+  | { source: "draft"; path: string; bytes: Uint8Array };
+
+/** An open editor. `projectId` pins it to the project it was opened for; `id` makes each opening fresh. */
+export type PixelSession = PixelOpen & { id: number; projectId: string };
+
+export type PixelNewInput = { path: string; width: unknown; height: unknown; background: string | null };
+
+export type PixelSaveResult = { ok: true; path: string } | { ok: false; reason: PixelSaveFailure };
 
 /**
  * One round in the conversation pane. It is a record of what happened, not a
@@ -200,6 +216,21 @@ type StudioValue = {
   setAssetOpen: (open: boolean) => void;
   soundOpen: boolean;
   setSoundOpen: (open: boolean) => void;
+  pixelNewOpen: boolean;
+  setPixelNewOpen: (open: boolean) => void;
+  pixelSession: PixelSession | null;
+  /** Opens a blank canvas. False when the size or name is not allowed or the name is taken. */
+  startPixelNew: (input: PixelNewInput) => boolean;
+  /** Opens an existing PNG for editing. False when it is not a PNG in the project. */
+  editPixelFile: (path: string) => boolean;
+  /** Opens the generated picture that has not been saved yet. */
+  editDraftPixels: () => void;
+  closePixelEditor: () => void;
+  /**
+   * The only way the editor writes. The picture is on disk before the project
+   * changes in memory, so a failed write leaves everything (and the canvas) as it was.
+   */
+  savePixelImage: (input: PixelSaveInput) => Promise<PixelSaveResult>;
   soundKind: SoundKind;
   setSoundKind: (kind: SoundKind) => void;
   aiBusy: boolean;
@@ -322,6 +353,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [assetOpen, setAssetOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [soundKind, setSoundKind] = useState<SoundKind>("sfx");
+  const [pixelNewOpen, setPixelNewOpen] = useState(false);
+  const [pixelSession, setPixelSession] = useState<PixelSession | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [bottomTab, setBottomTab] = useState<"console" | "problems" | "debug">("console");
@@ -347,6 +380,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const pendingSave = useRef<{ timer: number | null; project: Project | null }>({ timer: null, project: null });
   /** Serializes writes so the newest state is always the last one on disk. */
   const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const pixelSessionRef = useRef(pixelSession);
+  pixelSessionRef.current = pixelSession;
+  const pixelCount = useRef(0);
 
   useEffect(() => {
     let cancel = false;
@@ -559,6 +595,84 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     if (!project) return;
     setUndoStack((stack) => [...stack, { files: project.files, design: project.design, trash: project.trash }].slice(-20));
   }, [project]);
+
+  const openPixelEditor = useCallback((open: PixelOpen) => {
+    const current = projectRef.current;
+    if (!current) return;
+    pixelCount.current += 1;
+    setPixelNewOpen(false);
+    setPixelSession({ ...open, id: pixelCount.current, projectId: current.id });
+  }, []);
+
+  const startPixelNew = useCallback(
+    (input: PixelNewInput) => {
+      const current = projectRef.current;
+      const size = checkSize(input.width, input.height);
+      const path = imagePath(input.path);
+      if (!current || !size.ok || !path || current.files.some((file) => file.path === path)) return false;
+      if (input.background !== null && !parseHex(input.background)) return false;
+      openPixelEditor({ source: "new", path, width: size.width, height: size.height, background: input.background });
+      return true;
+    },
+    [openPixelEditor],
+  );
+
+  const editPixelFile = useCallback(
+    (filePath: string) => {
+      const file = projectRef.current?.files.find((item) => item.path === filePath);
+      if (!file?.bytes || !canEditPixels(file.path)) return false;
+      openPixelEditor({ source: "file", path: file.path, bytes: new Uint8Array(file.bytes) });
+      return true;
+    },
+    [openPixelEditor],
+  );
+
+  const editDraftPixels = useCallback(() => {
+    const current = projectRef.current;
+    if (!current || !assetDraft || assetDraft.sound) return;
+    const chosen = uniquePath(
+      current.files.map((file) => file.path),
+      imagePath(assetDraft.suggested) ?? "assets/my-image.png",
+    );
+    setAssetOpen(false);
+    openPixelEditor({ source: "draft", path: chosen, bytes: new Uint8Array(assetDraft.bytes) });
+  }, [assetDraft, openPixelEditor]);
+
+  const closePixelEditor = useCallback(() => {
+    setPixelSession(null);
+    // A generated picture the child was touching up goes back to the result they came from.
+    if (pixelSessionRef.current?.source === "draft" && assetDraft) setAssetOpen(true);
+  }, [assetDraft]);
+
+  const savePixelImage = useCallback(
+    async (input: PixelSaveInput): Promise<PixelSaveResult> => {
+      const session = pixelSessionRef.current;
+      const base = projectRef.current;
+      const plan = planPixelSave(base, session?.projectId ?? null, input);
+      if (!base || !plan.ok) return plan.ok ? { ok: false, reason: "no-project" } : plan;
+      // Pending text edits go to disk first, so the write below is the newest state.
+      flushSave();
+      const written = saveChain.current.then(() => saveProject(plan.next));
+      saveChain.current = written.then(
+        () => undefined,
+        () => undefined,
+      );
+      try {
+        await written;
+      } catch (error) {
+        console.warn("Saving the picture failed:", error);
+        return { ok: false, reason: "write-failed" };
+      }
+      setUndoStack((stack) => [...stack, { files: base.files, design: base.design, trash: base.trash }].slice(-20));
+      setProjects((current) =>
+        current.map((item) => (item.id === base.id ? upsertFile(item, { path: plan.path, bytes: input.bytes }) : item)),
+      );
+      setPath(plan.path);
+      if (session?.source === "draft") setAssetDraft(null);
+      return { ok: true, path: plan.path };
+    },
+    [flushSave],
+  );
 
   /** Resolves the candidate preview that is waiting for evidence, if any. */
   const settleRun = useCallback((outcome: RunOutcome) => {
@@ -1351,6 +1465,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         setSoundOpen(false);
       },
       clearAsset: () => setAssetDraft(null),
+      pixelNewOpen,
+      setPixelNewOpen,
+      pixelSession,
+      startPixelNew,
+      editPixelFile,
+      editDraftPixels,
+      closePixelEditor,
+      savePixelImage,
     };
   }, [
     ready,
@@ -1399,6 +1521,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     assetOpen,
     soundOpen,
     soundKind,
+    pixelNewOpen,
+    pixelSession,
+    startPixelNew,
+    editPixelFile,
+    editDraftPixels,
+    closePixelEditor,
+    savePixelImage,
     aiBusy,
     notice,
     bottomTab,

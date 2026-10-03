@@ -2,6 +2,8 @@
  * lives in the pane, not in a modal. */
 import { useEffect, useState } from "react";
 import { useStudio } from "../studio/store";
+import { PixelEditor } from "./PixelEditor";
+import { PixelNewDialog } from "./PixelNewDialog";
 import { text } from "./text";
 
 export function Overlays() {
@@ -10,6 +12,8 @@ export function Overlays() {
     <>
       {studio.assetOpen ? <AssetDialog /> : null}
       {studio.soundOpen ? <SoundDialog /> : null}
+      {studio.pixelNewOpen ? <PixelNewDialog /> : null}
+      <PixelEditor />
     </>
   );
 }
@@ -177,6 +181,9 @@ function AssetDialog() {
           <figure className="asset-preview">
             <img className="generated" src={url} alt={text.assets.title} />
             <figcaption>{text.assets.pixel(studio.assetDraft.width, studio.assetDraft.height)}</figcaption>
+            <button type="button" className="ghost" data-testid="pixel-edit-draft" onClick={studio.editDraftPixels}>
+              {text.pixel.editDraft}
+            </button>
           </figure>
         ) : null}
         {studio.assetDraft?.note ? <p className="asset-note">{studio.assetDraft.note}</p> : null}
