@@ -20,6 +20,10 @@ export function Stage() {
       if (frame.current?.contentWindow && event.source !== frame.current.contentWindow) return;
       const payload = parseGamekitEvent(event.data);
       if (!payload) return;
+      if (payload.type === "archive-request") {
+        studioRef.current.sendPreviewArchive(event.source as WindowProxy | null);
+        return;
+      }
       if (payload.type === "console") studioRef.current.noteConsole(payload.text);
       if (payload.type === "ready") studioRef.current.noteReady();
       if (payload.type === "tick") studioRef.current.noteTick(payload.fps, payload.frameMs);
@@ -77,7 +81,9 @@ export function Stage() {
         <iframe
           ref={frame}
           title={text.brand.name}
+          sandbox="allow-scripts"
           src={studio.frameSrc}
+          srcDoc={studio.frameHtml}
           allow="autoplay; fullscreen; gamepad"
           onLoad={focusGame}
         />

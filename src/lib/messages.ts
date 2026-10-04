@@ -1,4 +1,5 @@
 export type GamekitEvent =
+  | { source: "gamekit"; type: "archive-request" }
   | { source: "gamekit"; type: "console"; text: string }
   | { source: "gamekit"; type: "tick"; fps: number; frameMs: number }
   | { source: "gamekit"; type: "raf"; fps: number }
@@ -10,6 +11,7 @@ export function parseGamekitEvent(data: unknown): GamekitEvent | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   if (record.source !== "gamekit" || typeof record.type !== "string") return null;
+  if (record.type === "archive-request") return { source: "gamekit", type: "archive-request" };
   if (record.type === "console" && typeof record.text === "string") return { source: "gamekit", type: "console", text: record.text };
   if (record.type === "ready") return { source: "gamekit", type: "ready" };
   if (record.type === "input" && typeof record.detail === "string") {

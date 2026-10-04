@@ -34,6 +34,15 @@ function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
+function transactionToPromise(transaction: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    const fail = () => reject(transaction.error ?? new Error("IndexedDB transaction did not commit."));
+    transaction.onerror = fail;
+    transaction.onabort = fail;
+  });
+}
+
 export async function loadProjects(): Promise<Project[]> {
   const db = await openDb();
   const rows = await requestToPromise(db.transaction(STORE).objectStore(STORE).getAll() as IDBRequest<StoredProject[]>);
@@ -43,8 +52,16 @@ export async function loadProjects(): Promise<Project[]> {
 
 export async function saveProject(project: Project): Promise<void> {
   const db = await openDb();
-  await requestToPromise(db.transaction(STORE, "readwrite").objectStore(STORE).put(toStored(project)));
-  db.close();
+  const transaction = db.transaction(STORE, "readwrite");
+  const committed = transactionToPromise(transaction);
+  try {
+    await Promise.all([
+      requestToPromise(transaction.objectStore(STORE).put(toStored(project))),
+      committed,
+    ]);
+  } finally {
+    db.close();
+  }
 }
 
 export async function deleteStoredProject(id: string): Promise<void> {

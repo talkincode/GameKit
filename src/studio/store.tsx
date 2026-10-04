@@ -64,7 +64,7 @@ import {
 import { parseHex } from "../lib/pixel/buffer";
 import { canEditPixels, checkSize, imagePath } from "../lib/pixel/rules";
 import { planPixelSave, type PixelSaveFailure, type PixelSaveInput } from "../lib/pixel/save";
-import { downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
+import { discardPlay, downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
 import { budgetFor, loadSettings, saveSettings, type Settings } from "../lib/settings";
 import { renderMusic, renderSfx } from "../lib/audio/render";
 import { readSoundSpec } from "../lib/audio/spec";
@@ -149,7 +149,7 @@ export type Turn = {
 };
 
 /** What 撤销 restores: files, design card and trash together. */
-type Snapshot = { files: ProjectFile[]; design?: DesignCard; trash?: TrashedFile[] };
+type Snapshot = { projectId: string; files: ProjectFile[]; design?: DesignCard; trash?: TrashedFile[] };
 
 /** A candidate preview waiting for evidence (see `RunOutcome`). */
 type PendingRun = { turnId: string; resolve: (outcome: RunOutcome) => void; timer: number };
@@ -166,6 +166,8 @@ type StudioValue = {
   saveState: SaveState;
   runState: RunState;
   frameSrc: string;
+  frameHtml: string;
+  sendPreviewArchive: (target: WindowProxy | null) => void;
   stageOwner: StageOwner;
   consoleText: string;
   statusNote: string;
@@ -330,6 +332,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [runState, setRunState] = useState<RunState>("idle");
   const [frameSrc, setFrameSrc] = useState("about:blank");
+  const [frameHtml, setFrameHtml] = useState("");
   const [stageOwner, setStageOwner] = useState<StageOwner>("current");
   const [consoleText, setConsoleText] = useState("");
   const [statusNote, setStatusNote] = useState(text.stage.idle);
@@ -375,6 +378,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   /** The round in flight, if any. Guards writes after a cancel or project switch. */
   const turnRef = useRef<{ id: string; projectId: string; cancelled: boolean } | null>(null);
   const pendingRun = useRef<PendingRun | null>(null);
+  const previewGeneration = useRef(0);
+  const previewActive = useRef(false);
+  const runtimeError = useRef(false);
+  const activePlaySession = useRef<string | null>(null);
+  const previewArchive = useRef<Uint8Array | null>(null);
   const consoleRef = useRef("");
   /** Newest project whose save is still waiting on the debounce. */
   const pendingSave = useRef<{ timer: number | null; project: Project | null }>({ timer: null, project: null });
@@ -478,6 +486,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, [noteApiProblem]);
 
   const replaceProject = useCallback((next: Project) => {
+    if (projectRef.current?.id === next.id) projectRef.current = next;
     setProjects((current) => current.map((item) => (item.id === next.id ? next : item)));
   }, []);
 
@@ -594,10 +603,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     [project, replaceProject],
   );
 
-  const remember = useCallback(() => {
-    if (!project) return;
-    setUndoStack((stack) => [...stack, { files: project.files, design: project.design, trash: project.trash }].slice(-20));
-  }, [project]);
+  const remember = useCallback((target = projectRef.current) => {
+    if (!target) return;
+    setUndoStack((stack) => [...stack, { projectId: target.id, files: target.files, design: target.design, trash: target.trash }].slice(-20));
+  }, []);
 
   const openPixelEditor = useCallback((open: PixelOpen) => {
     const current = projectRef.current;
@@ -666,7 +675,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         console.warn("Saving the picture failed:", error);
         return { ok: false, reason: "write-failed" };
       }
-      setUndoStack((stack) => [...stack, { files: base.files, design: base.design, trash: base.trash }].slice(-20));
+      setUndoStack((stack) => [...stack, { projectId: base.id, files: base.files, design: base.design, trash: base.trash }].slice(-20));
       setProjects((current) =>
         current.map((item) => (item.id === base.id ? upsertFile(item, { path: plan.path, bytes: input.bytes }) : item)),
       );
@@ -691,7 +700,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const stop = useCallback(() => {
+    previewGeneration.current += 1;
+    previewActive.current = false;
+    runtimeError.current = false;
+    const session = activePlaySession.current;
+    activePlaySession.current = null;
+    previewArchive.current = null;
+    if (session) {
+      void discardPlay(session).catch((error: unknown) => console.warn("Preview cleanup failed:", error));
+    }
     setFrameSrc("about:blank");
+    setFrameHtml("");
     setRunState((state) => (state === "idle" ? state : "stopped"));
     setStatusNote(text.stage.stopped);
     // Stopping mid-check means we have no evidence; never a code problem.
@@ -700,9 +719,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   /** Publishes a build to the stage. Throws when the preview cannot start. */
   const runProject = useCallback(async (target: Project, owner: StageOwner) => {
+    const generation = ++previewGeneration.current;
+    previewActive.current = false;
+    runtimeError.current = false;
+    previewArchive.current = null;
     if (!target.files.some((file) => file.path === "main.py" && file.text?.trim())) {
       throw new Error(text.stage.needMain);
     }
+    const previousSession = activePlaySession.current;
+    activePlaySession.current = null;
+    if (previousSession) void discardPlay(previousSession).catch((error: unknown) => console.warn("Preview cleanup failed:", error));
     setMenu(null);
     setRunState("starting");
     consoleRef.current = "";
@@ -713,21 +739,33 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setInputs([]);
     setStatusNote(text.stage.preparing);
     setFrameSrc("about:blank");
+    setFrameHtml("");
     setStageOwner(owner);
     await ensurePlayerServiceWorker();
+    if (generation !== previewGeneration.current) return;
     const bundle = buildWebBundle(target, { template, preview: true });
     const session = crypto.randomUUID();
-    const href = await publishPlay(session, bundle);
-    setFrameSrc(`${href}?run=${session}`);
+    await publishPlay(session, bundle);
+    if (generation !== previewGeneration.current) {
+      await discardPlay(session);
+      return;
+    }
+    activePlaySession.current = session;
+    previewArchive.current = bundle.apk;
+    previewActive.current = true;
+    setFrameSrc("about:srcdoc");
+    setFrameHtml(bundle.html);
     setStatusNote(text.stage.loading);
   }, []);
 
   const run = useCallback(async () => {
     const current = projectRef.current;
     if (!current) return;
+    const generation = previewGeneration.current + 1;
     try {
       await runProject(current, "current");
     } catch (error) {
+      if (generation !== previewGeneration.current) return;
       setRunState("error");
       setStatusNote(text.stage.failed);
       setNotice(error instanceof Error ? error.message : text.stage.failed);
@@ -741,7 +779,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       return new Promise<RunOutcome>((resolve) => {
         const timer = window.setTimeout(() => settleRun({ kind: "quiet" }), RUN_EVIDENCE_MS);
         pendingRun.current = { turnId: turn.id, resolve, timer };
+        const generation = previewGeneration.current + 1;
         void runProject(candidate, "candidate").catch((error: unknown) => {
+          if (generation !== previewGeneration.current) return;
           settleRun({
             kind: "unavailable",
             detail: error instanceof Error ? error.message : "The preview could not start.",
@@ -754,13 +794,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const noteConsole = useCallback(
     (chunk: string) => {
+      if (!previewActive.current) return;
       const next = (consoleRef.current + chunk).slice(-20_000);
       consoleRef.current = next;
       setConsoleText(next);
       const found = problemsFromConsole(next);
       if (found.length) {
+        runtimeError.current = true;
         setRuntimeProblems(found);
         setRunState("error");
+        setStatusNote(text.stage.runtimeError);
         setBottomTab("problems");
         settleRun({ kind: "error", detail: tracebackTail(next) });
       }
@@ -1106,6 +1149,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       saveState,
       runState,
       frameSrc,
+      frameHtml,
+      sendPreviewArchive: (target) => {
+        const archive = previewArchive.current;
+        if (!archive || !target) return;
+        const bytes = new ArrayBuffer(archive.byteLength);
+        new Uint8Array(bytes).set(archive);
+        target.postMessage({ source: "gamekit", type: "archive", bytes }, "*", [bytes]);
+      },
       stageOwner,
       consoleText,
       statusNote,
@@ -1233,24 +1284,27 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         return true;
       },
       addBytes: (raw, bytes) => {
-        if (!project) return;
+        const current = projectRef.current;
+        if (!current) return;
         const next = normalizePath(raw);
         if (!next) {
           setNotice(text.code.badPath);
           return;
         }
         const chosen = uniquePath(
-          project.files.map((file) => file.path),
+          current.files.map((file) => file.path),
           next,
         );
-        remember();
-        commit(upsertFile(project, { path: chosen, bytes }));
+        remember(current);
+        commit(upsertFile(current, { path: chosen, bytes }));
         setPath(chosen);
       },
       importArchive: async (file) => {
         const archive = new Uint8Array(await file.arrayBuffer());
         const imported = projectFromArchive(file.name, archive);
         await saveProject(imported);
+        flushSave();
+        stop();
         abortTurn();
         setProjects((current) => [imported, ...current]);
         setActiveId(imported.id);
@@ -1264,6 +1318,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       newSample: async () => {
         const created = await createStarterProject(`sample-${projects.length + 1}`);
         await saveProject(created);
+        flushSave();
+        stop();
         abortTurn();
         setProjects((current) => [created, ...current]);
         setActiveId(created.id);
@@ -1274,6 +1330,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         stop();
       },
       newBlank: (name) => {
+        flushSave();
         const created = createBlankProject(name.trim() || "untitled");
         void saveProject(created);
         abortTurn();
@@ -1287,6 +1344,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       },
       openProject: (id) => {
         handledCandidateIdsRef.current.clear();
+        flushSave();
+        stop();
         abortTurn();
         setActiveId(id);
         setTurns([]);
@@ -1304,10 +1363,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       },
       deleteProject: async () => {
         if (!project) return;
+        abortTurn();
+        stop();
+        flushSave();
+        await saveChain.current;
         forgetProjectRunner(project.id);
         await deleteStoredProject(project.id);
         const rest = projects.filter((item) => item.id !== project.id);
-        abortTurn();
         if (!rest.length) {
           const created = createBlankProject("untitled");
           await saveProject(created);
@@ -1322,18 +1384,21 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         setTurns([]);
         setProjectsOpen(false);
         setPath("main.py");
-        stop();
       },
       duplicateProject: async () => {
         if (!project) return;
+        const current = projectRef.current;
+        if (!current) return;
+        flushSave();
         abortTurn();
+        stop();
         const copy: Project = {
-          ...project,
+          ...current,
           id: crypto.randomUUID(),
-          name: `${project.name} copy`,
+          name: `${current.name} copy`,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          files: project.files.map((file) => ({ ...file, bytes: file.bytes ? file.bytes.slice() : undefined })),
+          files: current.files.map((file) => ({ ...file, bytes: file.bytes ? file.bytes.slice() : undefined })),
         };
         await saveProject(copy);
         setProjects((current) => [copy, ...current]);
@@ -1347,25 +1412,34 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         downloadBytes(`${slugName(project.name)}-source.zip`, sourceZip(project), "application/zip");
       },
       exportKind: (kind) => {
-        const current = requireProject();
-        const bundle = buildWebBundle(current, { template, preview: false });
-        const slug = slugName(current.name);
-        if (kind === "web") downloadBytes(`${slug}-web.zip`, webZip(bundle), "application/zip");
-        if (kind === "static") downloadBytes(`${slug}-folder.zip`, staticFolderZip(bundle, current.name), "application/zip");
-        if (kind === "itch") downloadBytes(`${slug}-itch.zip`, itchZip(bundle), "application/zip");
-        if (kind === "embed") downloadBytes(`${slug}-embed.zip`, embedZip(bundle), "application/zip");
-        setMenu(null);
+        try {
+          const current = requireProject();
+          const bundle = buildWebBundle(current, { template, preview: false });
+          const slug = slugName(current.name);
+          if (kind === "web") downloadBytes(`${slug}-web.zip`, webZip(bundle), "application/zip");
+          if (kind === "static") downloadBytes(`${slug}-folder.zip`, staticFolderZip(bundle, current.name), "application/zip");
+          if (kind === "itch") downloadBytes(`${slug}-itch.zip`, itchZip(bundle), "application/zip");
+          if (kind === "embed") downloadBytes(`${slug}-embed.zip`, embedZip(bundle), "application/zip");
+        } catch (error) {
+          console.warn("Export build failed:", error);
+          setNotice(text.export.buildFailed);
+          setBottomTab("problems");
+        } finally {
+          setMenu(null);
+        }
       },
       run,
       stop,
       noteStatus: setStatusNote,
       noteConsole,
       noteReady: () => {
+        if (!previewActive.current || runtimeError.current) return;
         setRunState("running");
         setStatusNote(text.stage.running);
         settleRun({ kind: "running" });
       },
       noteTick: (nextFps, nextFrame) => {
+        if (!previewActive.current || runtimeError.current) return;
         setFps(nextFps);
         setFrameMs(nextFrame);
         setRunState((state) => (state === "error" ? state : "running"));
@@ -1374,7 +1448,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       },
       noteInput: (detail) => setInputs((current) => [detail, ...current].slice(0, 12)),
       undo: () => {
-        const previous = undoStack.at(-1);
+        const projectHistory = project ? undoStack.filter((snapshot) => snapshot.projectId === project.id) : [];
+        const previous = projectHistory.at(-1);
         if (!project || !previous) return;
         commit({
           ...project,
@@ -1383,9 +1458,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           trash: previous.trash,
           updatedAt: Date.now(),
         });
-        setUndoStack((stack) => stack.slice(0, -1));
+        setUndoStack((stack) => {
+          const index = stack.lastIndexOf(previous);
+          return index < 0 ? stack : stack.filter((_, candidateIndex) => candidateIndex !== index);
+        });
       },
-      canUndo: undoStack.length > 0,
+      canUndo: !!project && undoStack.some((snapshot) => snapshot.projectId === project.id),
       generateSound: async (promptText) => {
         if (account.kind !== "signed-in") {
           setSoundOpen(false);
@@ -1490,6 +1568,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     saveState,
     runState,
     frameSrc,
+    frameHtml,
     stageOwner,
     consoleText,
     statusNote,

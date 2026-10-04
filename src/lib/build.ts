@@ -57,7 +57,7 @@ export function buildWebBundle(project: Project, options: BuildOptions): WebBund
     archive: RUNTIME.archive,
     autorun: "0",
     authors: "GameKit",
-    icon: "favicon.png",
+    icon: options.preview ? `data:image/png;base64,${FAVICON_BASE64}` : "favicon.png",
     title,
     directory: RUNTIME.archive,
     spdx: "see project",

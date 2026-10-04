@@ -41,4 +41,14 @@ describe("problemsFromConsole", () => {
     expect(problem.line).toBe(9);
     expect(problem.message).toContain("NameError");
   });
+  it("reads a syntax error even when Python omits the traceback header", () => {
+    const [problem] = problemsFromConsole('  File "main.py", line 1\nSyntaxError: invalid syntax');
+    expect(problem).toMatchObject({
+      id: expect.stringContaining("runtime-main.py-1"),
+      severity: "error",
+      path: "main.py",
+      line: 1,
+      message: "SyntaxError: invalid syntax",
+    });
+  });
 });

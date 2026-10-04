@@ -619,7 +619,7 @@ test("pygame in the preview loads the pictures that were drawn and edited", asyn
   await page.getByRole("button", { name: text.stage.play }).click();
   // pygbag holds the game until the page gets a click or touch.
   await expect(page.locator(".console")).toContainText("async: ok", { timeout: 120_000 });
-  await page.frameLocator(`iframe[title="${text.brand.name}"]`).locator("body").click({ force: true });
+  await page.frameLocator(`iframe[title="${text.brand.name}"]`).locator("#canvas").click({ position: { x: 10, y: 10 }, force: true });
   await expect(page.locator(".console")).toContainText("PIXEL-EDITOR-OK (16, 16) (239, 125, 87, 255) (0, 0, 0, 0) (239, 125, 87, 255)", { timeout: 120_000 });
 });
 

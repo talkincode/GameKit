@@ -1,4 +1,22 @@
-<html lang="en-us"><script src="{{cookiecutter.cdn}}pythons.js" type=module id="site" data-python="python{{cookiecutter.PYBUILD}}" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#<!--
+<html lang="en-us">
+<script type="application/javascript">
+window.gamekitArchiveUrl = "";
+window.gamekitArchiveError = "";
+const archiveTimeout = window.setTimeout(() => {
+    window.gamekitArchiveError = "The preview archive did not arrive.";
+}, 30000);
+const receiveGamekitArchive = (event) => {
+    if (event.source !== window.parent) return;
+    const message = event.data;
+    if (!message || message.source !== "gamekit" || message.type !== "archive" || !(message.bytes instanceof ArrayBuffer)) return;
+    window.clearTimeout(archiveTimeout);
+    window.removeEventListener("message", receiveGamekitArchive);
+    window.gamekitArchiveUrl = URL.createObjectURL(new Blob([message.bytes], { type: "application/zip" }));
+};
+window.addEventListener("message", receiveGamekitArchive);
+window.parent.postMessage({ source: "gamekit", type: "archive-request" }, "*");
+</script>
+<script src="{{cookiecutter.cdn}}pythons.js" type=module id="site" data-python="python{{cookiecutter.PYBUILD}}" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#<!--
 
 print("""
 Loading {{cookiecutter.title}} from {{cookiecutter.archive}}.apk
@@ -39,7 +57,12 @@ async def custom_site():
     # GameKit always ships a zip archive (.apk) so the same files run on
     # a static host and on itch.io. Upstream pygbag used tar.gz off itch.io.
     import zipfile
-    async with platform.fopen("{{cookiecutter.archive}}.apk", "rb") as archive:
+    while not platform.window.gamekitArchiveUrl and not platform.window.gamekitArchiveError:
+        await asyncio.sleep(.05)
+    if platform.window.gamekitArchiveError:
+        raise RuntimeError(platform.window.gamekitArchiveError)
+    archive_url = platform.window.gamekitArchiveUrl
+    async with platform.fopen(archive_url, "rb") as archive:
         with zipfile.ZipFile(archive) as zip_ref:
             zip_ref.extractall(appdir.as_posix())
 
@@ -295,7 +318,7 @@ function show_infobox() {
     <meta name="apple-mobile-web-app-capable" content="yes"/>
 
 
-    <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+    <link rel="icon" type="image/png" href="{{cookiecutter.icon}}" sizes="16x16">
 
     <style>
         #status {

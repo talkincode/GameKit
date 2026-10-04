@@ -29,11 +29,29 @@ export async function publishPlay(session: string, bundle: WebBundle): Promise<s
   const cache = await caches.open(CACHE);
   const prefix = `${location.origin}/play/${session}/`;
   const keys = await cache.keys();
-  await Promise.all(keys.map((key) => cache.delete(key)));
+  await Promise.all(
+    keys
+      .filter((key) => new URL(key.url).origin === location.origin && new URL(key.url).pathname.startsWith(new URL(prefix).pathname))
+      .map((key) => cache.delete(key)),
+  );
   await put(cache, `${prefix}index.html`, bundle.html, "text/html; charset=utf-8");
   await put(cache, `${prefix}${bundle.archiveName}.apk`, bytesBlob(bundle.apk), "application/octet-stream");
   await put(cache, `${prefix}favicon.png`, bytesBlob(bundle.favicon), "image/png");
   return `/play/${session}/index.html`;
+}
+
+export async function discardPlay(session: string): Promise<void> {
+  const cache = await caches.open(CACHE);
+  const prefix = new URL(`/play/${session}/`, location.origin);
+  const keys = await cache.keys();
+  await Promise.all(
+    keys
+      .filter((key) => {
+        const url = new URL(key.url);
+        return url.origin === prefix.origin && url.pathname.startsWith(prefix.pathname);
+      })
+      .map((key) => cache.delete(key)),
+  );
 }
 
 async function put(cache: Cache, url: string, body: BodyInit, type: string) {

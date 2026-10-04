@@ -96,8 +96,7 @@ export function tracebackTail(text: string, max = 2_000): string {
 export function problemsFromConsole(text: string): Problem[] {
   const marker = "Traceback (most recent call last):";
   const start = text.lastIndexOf(marker);
-  if (start < 0) return [];
-  const tail = text.slice(start + marker.length);
+  const tail = text.slice(start < 0 ? 0 : start + marker.length);
   const files = [...tail.matchAll(/File "([^"]+)", line (\d+)/g)];
   const errorLine = tail
     .split("\n")
