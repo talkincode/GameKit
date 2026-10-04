@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Project } from "../lib/project";
 import { useStudio } from "../studio/store";
+import { BrandMark } from "./BrandMark";
 import { text } from "./text";
 
 /**
@@ -54,7 +55,10 @@ export function ProjectsPanel() {
     <div className="modal-back" role="presentation">
       <section className="modal projects" data-testid="projects-panel" aria-label={text.project.title}>
         <header className="projects-head">
-          <h2>📁 {text.project.title}</h2>
+          <h2>
+            <BrandMark className="projects-mark" />
+            {text.project.title}
+          </h2>
           <input
             className="projects-search"
             type="search"
@@ -73,8 +77,8 @@ export function ProjectsPanel() {
           >
             ＋ {text.project.newProject}
           </button>
-          <label className="file-btn">
-            📂 {text.project.importZip}
+          <label className="file-btn projects-import">
+            {text.project.importZip}
             <input
               type="file"
               accept=".zip,application/zip"

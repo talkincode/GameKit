@@ -640,7 +640,18 @@ button:disabled { opacity: 0.45; cursor: default; }
 /* 我的项目：一层自己的面，不是菜单 */
 .modal.projects { width: min(920px, 100%); height: min(640px, 88vh); grid-template-rows: auto minmax(0, 1fr) auto; }
 .projects-head { display: flex; align-items: center; gap: 8px; }
-.projects-head h2 { margin: 0; font-size: 17px; letter-spacing: -0.03em; white-space: nowrap; }
+.projects-head h2 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+.projects-mark { width: 22px; height: 22px; flex: 0 0 auto; }
+.projects-mark rect { fill: var(--ink); }
+.projects-mark path { fill: var(--paper-2); }
 .projects-search {
   flex: 1;
   min-width: 120px;
@@ -651,18 +662,21 @@ button:disabled { opacity: 0.45; cursor: default; }
   padding: 0 10px;
 }
 .projects-head .run { min-height: 32px; white-space: nowrap; }
-.projects-head .file-btn {
+.projects-head .file-btn,
+.projects-import {
   border: 1px solid var(--line-strong);
-  background: var(--paper-2);
+  background: white;
   border-radius: 8px;
   min-height: 32px;
-  padding: 0 10px;
+  padding: 0 12px;
   font-size: 12px;
+  font-weight: 600;
   flex-direction: row;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
 }
+.projects-import:hover { border-color: var(--ink); background: var(--paper-2); }
 .projects-body {
   overflow: auto;
   display: grid;

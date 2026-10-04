@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { slugName } from "../lib/project";
 import { useStudio } from "../studio/store";
 import { AgentWorking } from "./AgentWorking";
+import { BrandMark } from "./BrandMark";
 import { text } from "./text";
 
 /**
@@ -22,10 +23,7 @@ export function Toolbar() {
   return (
     <header className="toolbar" ref={root}>
       <div className="brand">
-        <svg viewBox="0 0 32 32" aria-hidden="true">
-          <rect width="32" height="32" rx="6" />
-          <path d="M12 9.5v13l10-6.5-10-6.5z" />
-        </svg>
+        <BrandMark />
         <div>
           <strong>{text.brand.name}</strong>
           <span>{text.brand.tagline}</span>
