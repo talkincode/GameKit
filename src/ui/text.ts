@@ -51,6 +51,7 @@ export const text = {
     running: "游戏在跑",
     stopped: "停下了",
     failed: "这次没能启动",
+    runtimeError: "游戏遇到一个问题，先看一下「问题」和控制台吧。",
     needMain: "还没有 main.py。先去「看代码」新建一个文件吧。",
     play: "试玩我的作品",
     stop: "停下",
@@ -381,5 +382,6 @@ export const text = {
     itchHint: "自己上传的 HTML 项目 zip",
     embed: "嵌入包",
     embedHint: "同一个游戏，再加一个 iframe 页面",
+    buildFailed: "现在还不能导出，先修好「问题」里的报错。",
   },
 };

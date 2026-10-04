@@ -7,7 +7,7 @@ GameKit 没有自己实现 Pygame。预览和导出使用同一套 [pygbag 0.9.3
 | 问题 | 原因 | 方案 | 代价 |
 | --- | --- | --- | --- |
 | 浏览器里要跑 `import pygame` | 自己重写 pygame 会变成另一套 API | 使用 pygame-web / pygbag | 游戏循环必须对浏览器让出一次，见下文 |
-| 预览要加载任意项目文件 | 相对地址的 `.apk` 不能放在 blob iframe 里 | 页面 Service Worker 把本次构建放进 Cache，iframe 打开 `/play/<id>/` | 浏览器必须支持 Service Worker。第一次安装后如果没有接管页面，需要刷新再按 Run |
+| 预览要加载任意项目文件 | 相对地址的 `.apk` 不能放在 blob iframe 里 | 页面 Service Worker 缓存本次构建；隔离的 `srcdoc` iframe 通过 `postMessage` 接收当前构建的 `.apk` | 浏览器必须支持 Service Worker。第一次安装后如果没有接管页面，需要刷新再按 Run |
 | 导出后不依赖 GameKit | 成品必须能单独打开 | ZIP 里只有 `index.html`、`favicon.png` 和 `gamekit.apk` | 运行时脚本仍从 pygame-web CDN 加载。GameKit 下线不影响；pygame-web CDN 下线会影响。把整份 CPython/pygame WASM 打进每个 ZIP 大约几十 MB，而且要自己跟上游版本，所以没有内置 |
 | 桌面项目直接拷进来 | pygbag 不能在一个同步死循环里刷新页面 | 模板诊断 `await asyncio.sleep(0)`、`time.sleep` 和 `pygame.time.wait` | 这不是私有 API。同一份 async 循环也能在安装了 pygame 的桌面 Python 上运行。GameKit 不会在构建时偷偷改写用户源码 |
 | 音频格式 | 项目里生成的声音是 WAV（浏览器里合成，无需服务端） | 实测 pygame-web 运行时能 `pygame.mixer.Sound("assets/probe.wav")` 并读到正确时长（0.3 秒），所以 WAV 可用；OGG 仍是体积上更好的选择 | MP3/AIFF 仍给警告。声音要等孩子点一下画面才会响 |
@@ -31,11 +31,12 @@ await asyncio.sleep(0)
 
 ## 模板改动
 
-`runtime/player.tmpl` 来自 pygbag 0.9.3 的 `default.tmpl`（MIT，见 `runtime/LICENSE-pygbag.txt`），只改了三件事：
+`runtime/player.tmpl` 来自 pygbag 0.9.3 的 `default.tmpl`（MIT，见 `runtime/LICENSE-pygbag.txt`），只改了四件事：
 
 1. 所有主机都解压 zip `.apk`，不再按 itch.io 域名改用 tar.gz。这样 Web ZIP、静态目录和 itch.io 包是同一套文件。
 2. 只有预览构建（`gamekit_debug = 1`）才把 stdout、帧时间和输入发回编辑器。浏览器里的 `pygame.time.Clock` 不能被继承，所以预览用一个包装对象替换 `Clock`，内部仍调用原来的 `tick`。导出的游戏不替换 `Clock`，也不向父页面发这些消息。
 3. 画面铺满 iframe，调试控制台不盖住游戏。
+4. 预览放在 opaque origin 的 `srcdoc` iframe 中。父页面只向当前 iframe 发送本次构建的 `.apk` 字节，运行时在 iframe 内创建 Blob URL；游戏因此不依赖 iframe 读取 Service Worker 缓存，也不能访问工作室页面。
 
 ## 还没做
 
