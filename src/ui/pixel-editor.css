@@ -197,12 +197,3 @@
 .preview-asset { position: relative; }
 .pixel-edit-cta { position: absolute; right: 16px; bottom: 16px; }
 .asset-preview .ghost { margin-top: 4px; }
-
-/* .modal button resets every button in a dialog; the primary action keeps its colour. */
-.pixel-editor .run, .pixel-new .run, .pixel-note .run {
-  background: var(--pine);
-  color: var(--pine-ink);
-  font-weight: 600;
-}
-.pixel-editor .run:hover, .pixel-new .run:hover, .pixel-note .run:hover { background: #174f36; }
-.pixel-editor .run:disabled, .pixel-new .run:disabled, .pixel-note .run:disabled { background: var(--pine); }

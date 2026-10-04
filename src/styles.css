@@ -85,7 +85,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .account { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .account span { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.ghost, .stop, .menu button, .file-btn, .modal button {
+/* :where() keeps the dialog reset at zero weight, so .run / .ghost / .danger still win inside a .modal. */
+.ghost, .stop, .menu button, .file-btn, :where(.modal button) {
   border: 1px solid transparent;
   background: transparent;
   border-radius: 8px;
@@ -640,9 +641,28 @@ button:disabled { opacity: 0.45; cursor: default; }
 .modal.projects { width: min(920px, 100%); height: min(640px, 88vh); grid-template-rows: auto minmax(0, 1fr) auto; }
 .projects-head { display: flex; align-items: center; gap: 8px; }
 .projects-head h2 { margin: 0; font-size: 17px; letter-spacing: -0.03em; white-space: nowrap; }
-.projects-search { flex: 1; min-width: 120px; }
+.projects-search {
+  flex: 1;
+  min-width: 120px;
+  min-height: 32px;
+  border: 1px solid var(--line-strong);
+  background: white;
+  border-radius: 8px;
+  padding: 0 10px;
+}
 .projects-head .run { min-height: 32px; white-space: nowrap; }
-.projects-head .file-btn { border: 1px solid var(--line-strong); background: var(--paper-2); border-radius: 8px; min-height: 32px; padding: 0 10px; font-size: 12px; }
+.projects-head .file-btn {
+  border: 1px solid var(--line-strong);
+  background: var(--paper-2);
+  border-radius: 8px;
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
 .projects-body {
   overflow: auto;
   display: grid;
