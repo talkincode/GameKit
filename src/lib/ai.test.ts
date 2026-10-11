@@ -32,6 +32,7 @@ describe("requests to the model", () => {
     expect(system.content).toContain("binary files the child owns");
     expect(system.content).toContain("asset library is read-only");
     expect(system.content).toContain("assets/library.json");
+    expect(system.content).toContain("*.anim.json");
     expect(user.content).toContain("一个在太空里躲陨石的游戏");
   });
 
@@ -41,6 +42,7 @@ describe("requests to the model", () => {
     expect(user.content).toContain("太空小方块");
     expect(user.content).toContain("必须包含 main.py");
     expect(user.content).toContain("assets/library.json");
+    expect(user.content).toContain("*.anim.json");
   });
 
   it("carries the traceback into a repair request", () => {
@@ -110,6 +112,9 @@ describe("answers from the model", () => {
     expect(() =>
       readCandidateFiles('{"files":[{"path":"assets/library.json","content":"{}"}]}', project, "main.py"),
     ).toThrow(/library record/);
+    expect(() =>
+      readCandidateFiles('{"files":[{"path":"assets/hero.anim.json","content":"{}"}]}', project, "main.py"),
+    ).toThrow(/animation note/);
   });
 
   it("rejects an oversized file", () => {

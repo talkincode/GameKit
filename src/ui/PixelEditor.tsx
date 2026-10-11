@@ -1,26 +1,58 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
-import { type Pixels, type Rgba, TRANSPARENT, createPixels, parseHex, toHex } from "../lib/pixel/buffer";
+import {
+  DEFAULT_DURATION_MS,
+  animationSidecarPath,
+  framesFromDocument,
+  parseSpriteAnim,
+  playOrder,
+  pygameAnimDemo,
+  pygameAnimModule,
+  pygameAnimSnippet,
+  stepPlay,
+  type PlayCursor,
+} from "../lib/pixel/anim";
+import { type Pixels, type Rgba, TRANSPARENT, parseHex, toHex } from "../lib/pixel/buffer";
+import {
+  type FilmLimit,
+  type FilmSession,
+  type FilmTool,
+  addBlankFrame,
+  addLayer,
+  clearActiveLayer,
+  createFilm,
+  deleteFrame,
+  deleteLayer,
+  displayFrame,
+  duplicateFrame,
+  exportFilm,
+  filmCanRedo,
+  filmCanUndo,
+  filmDirty,
+  filmFromImage,
+  filmFromSaved,
+  filmMarkSaved,
+  filmPointerDown,
+  filmPointerMove,
+  filmPointerUp,
+  filmRedo,
+  filmUndo,
+  moveLayer,
+  replaceWithSheet,
+  selectFrame,
+  selectLayer,
+  setFps,
+  setFrameDuration,
+  setLayerVisible,
+  toggleStateFrame,
+} from "../lib/pixel/film";
 import { loadPixels } from "../lib/pixel/load";
 import { PALETTE } from "../lib/pixel/palette";
 import { encodePng } from "../lib/pixel/png";
 import { boardBudget, imagePath, startZoom, stepZoom } from "../lib/pixel/rules";
-import {
-  type Session,
-  type Tool,
-  clearAll,
-  createSession,
-  endStroke,
-  isDirty,
-  markSaved,
-  pointerDown,
-  pointerMove,
-  pointerUp,
-  redoStep,
-  undoStep,
-} from "../lib/pixel/session";
 import { uniquePath } from "../lib/project";
 import { type PixelSession, useStudio } from "../studio/store";
+import { PixelAnimPanel } from "./PixelAnimPanel";
 import { PixelSwatches } from "./PixelSwatches";
 import { text } from "./text";
 import "./pixel-editor.css";
@@ -28,7 +60,7 @@ import "./pixel-editor.css";
 type Loaded =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; session: Session };
+  | { status: "ready"; film: FilmSession; animProblem: string };
 
 /** The editor is mounted whenever a session is open; a new session is a fresh editor. */
 export function PixelEditor() {
@@ -45,20 +77,42 @@ function PixelEditorFor({ open }: { open: PixelSession }) {
     let cancel = false;
     if (open.source === "new") {
       const fill = open.background ? (parseHex(open.background) ?? TRANSPARENT) : TRANSPARENT;
-      setLoaded({ status: "ready", session: createSession(createPixels(open.width, open.height, fill)) });
+      setLoaded({ status: "ready", film: createFilm(open.width, open.height, fill), animProblem: "" });
       return;
     }
     void loadPixels(open.bytes).then((result) => {
       if (cancel) return;
-      if (result.ok) setLoaded({ status: "ready", session: createSession(result.pixels) });
-      else setLoaded({ status: "error", message: result.problem === "too-big" ? text.pixel.tooBig : text.pixel.unreadable });
+      if (!result.ok) {
+        setLoaded({ status: "error", message: result.problem === "too-big" ? text.pixel.tooBig : text.pixel.unreadable });
+        return;
+      }
+      const note = open.source === "file" ? open.animText : null;
+      if (!note) {
+        setLoaded({ status: "ready", film: filmFromImage(result.pixels), animProblem: "" });
+        return;
+      }
+      const parsed = parseSpriteAnim(note, open.path);
+      const frames = parsed.ok ? framesFromDocument(result.pixels, parsed.document) : null;
+      const film = frames
+        ? filmFromSaved(frames, {
+            durations: parsed.ok ? parsed.document.animation.frames.map((frame) => frame.durationMs) : [],
+            names: parsed.ok ? parsed.document.animation.frames.map((frame) => frame.name) : [],
+            states: parsed.ok ? (parsed.document.animation.states ?? {}) : {},
+          })
+        : null;
+      // A bad note does not change the file. The picture opens whole, and the child is told.
+      setLoaded({
+        status: "ready",
+        film: film ?? filmFromImage(result.pixels),
+        animProblem: film ? "" : text.pixel.anim.unread,
+      });
     });
     return () => {
       cancel = true;
     };
   }, [open]);
 
-  if (loaded.status === "ready") return <Workspace open={open} session={loaded.session} />;
+  if (loaded.status === "ready") return <Workspace open={open} film={loaded.film} animProblem={loaded.animProblem} />;
   return (
     <div className="modal-back" role="presentation">
       <div className="modal pixel-note" role="dialog" aria-modal="true" data-testid="pixel-editor-loading" aria-label={text.pixel.title}>
@@ -79,62 +133,149 @@ function colorName(color: Rgba): string {
   return text.pixel.colors[hex] ?? text.pixel.customName(hex);
 }
 
-type SavePrompt = null | "close" | "save-as";
+function limitText(reason: FilmLimit): string {
+  switch (reason) {
+    case "frames":
+      return text.pixel.anim.limitFrames;
+    case "pixels":
+      return text.pixel.anim.limitPixels;
+    case "layers":
+      return text.pixel.anim.limitLayers;
+    case "last-frame":
+      return text.pixel.anim.limitLastFrame;
+    case "last-layer":
+      return text.pixel.anim.limitLast;
+    case "fit":
+      return text.pixel.anim.sheetBad;
+    case "size":
+      return text.pixel.anim.sheetSize;
+    default:
+      return text.pixel.anim.sheetMany;
+  }
+}
 
-function Workspace({ open, session }: { open: PixelSession; session: Session }) {
+type SavePrompt = null | "close" | "save-as" | "sheet" | "demo";
+
+function Workspace({ open, film, animProblem }: { open: PixelSession; film: FilmSession; animProblem: string }) {
   const studio = useStudio();
-  const { width, height }: Pixels = session.pixels;
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
+  const sheetInputRef = useRef<HTMLInputElement>(null);
   const activePointer = useRef<number | null>(null);
   const busy = useRef(false);
-  const [, bump] = useReducer((count: number) => count + 1, 0);
-  const [tool, setTool] = useState<Tool>("pencil");
+  const playingRef = useRef(false);
+  const playFrameRef = useRef(0);
+  const onionRef = useRef(false);
+  const playRef = useRef<PlayCursor>({ order: [0], cursor: 0, into: 0 });
+  const [revision, bump] = useReducer((count: number) => count + 1, 0);
+  const [tool, setTool] = useState<FilmTool>("pencil");
   const [color, setColor] = useState<Rgba>(() => parseHex(PALETTE[0]) as Rgba);
   const [grid, setGrid] = useState(true);
+  const [onion, setOnion] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [playFrame, setPlayFrame] = useState(0);
   const [scale, setScale] = useState(() => {
     const box = boardBudget(window.innerWidth, window.innerHeight);
-    return startZoom(width, height, box.width, box.height);
+    return startZoom(film.width, film.height, box.width, box.height);
   });
   const [target, setTarget] = useState({ path: open.path, mode: open.source === "file" ? ("overwrite" as const) : ("create" as const) });
   const [prompt, setPrompt] = useState<SavePrompt>(null);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState("");
+  const [limit, setLimit] = useState("");
   const [savedPath, setSavedPath] = useState("");
+  const [exampleNote, setExampleNote] = useState("");
   const [saveAsName, setSaveAsName] = useState("");
+  const [sheet, setSheet] = useState<{ pixels: Pixels; frameWidth: string; frameHeight: string } | null>(null);
 
-  const image = useMemo(() => new ImageData(session.pixels.data, width, height), [session, width, height]);
-  const redraw = useCallback(() => {
+  playingRef.current = playing;
+  playFrameRef.current = playFrame;
+  onionRef.current = onion;
+
+  const paint = useCallback(() => {
+    const index = playingRef.current ? playFrameRef.current : film.index;
+    const shown = displayFrame(film, index, onionRef.current && !playingRef.current);
+    const image = new ImageData(new Uint8ClampedArray(shown.data), shown.width, shown.height);
     for (const ref of [canvasRef, previewRef]) ref.current?.getContext("2d")?.putImageData(image, 0, 0);
-  }, [image]);
-  useLayoutEffect(redraw);
+  }, [film]);
+  useLayoutEffect(paint, [paint, revision, playing, playFrame, onion, film.width, film.height]);
+
+  useEffect(() => {
+    const box = boardBudget(window.innerWidth, window.innerHeight);
+    setScale(startZoom(film.width, film.height, box.width, box.height));
+  }, [film.width, film.height]);
+
+  useEffect(() => {
+    if (!playing) return;
+    let last = performance.now();
+    let handle = 0;
+    const tick = (now: number) => {
+      const dt = Math.min(100, now - last);
+      last = now;
+      playRef.current = stepPlay(
+        playRef.current,
+        dt,
+        film.frames.map((frame) => frame.durationMs),
+      );
+      setPlayFrame(playRef.current.order[playRef.current.cursor] ?? 0);
+      handle = requestAnimationFrame(tick);
+    };
+    handle = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(handle);
+  }, [playing, film]);
 
   const paths = useMemo(() => studio.project?.files.map((file) => file.path) ?? [], [studio.project]);
-  const dirty = isDirty(session);
+  const dirty = filmDirty(film);
+  const sidePath = animationSidecarPath(target.path);
+  const animated =
+    film.frames.length > 1 ||
+    Object.keys(film.states).length > 0 ||
+    film.frames.some((frame) => frame.durationMs !== DEFAULT_DURATION_MS || !!frame.name || frame.layers.length > 1);
+  const onDisk = !dirty && !!sidePath && paths.includes(target.path) && paths.includes(sidePath);
+
+  const noteLimit = (result: true | FilmLimit) => {
+    setPlaying(false);
+    setLimit(result === true ? "" : limitText(result));
+    bump();
+  };
 
   const requestClose = () => {
     if (busy.current) return;
-    endStroke(session);
-    if (isDirty(session)) setPrompt("close");
+    filmPointerUp(film);
+    if (filmDirty(film)) setPrompt("close");
     else studio.closePixelEditor();
   };
 
-  /** Writes the picture. On any failure the canvas, the history and the dirty flag stay as they were. */
+  /** Writes the picture and, when it is an animation, the note. A failure leaves both unwritten. */
   const save = async (to: { path: string; mode: "create" | "overwrite" }): Promise<boolean> => {
     if (busy.current) return false;
-    endStroke(session);
+    setPlaying(false);
+    filmPointerUp(film);
+    const built = exportFilm(film, to.path);
+    if (!built) {
+      setProblem(text.pixel.failed["bad-anim"]);
+      return false;
+    }
+    const sidecarPath = animationSidecarPath(to.path);
+    const sidecarThere = to.mode === "overwrite" && !!sidecarPath && paths.includes(sidecarPath);
+    const writeNote = !!sidecarPath && (animated || sidecarThere || film.frames.length > 1);
     busy.current = true;
     setSaving(true);
     setProblem("");
-    const result = await studio.savePixelImage({ path: to.path, bytes: encodePng(session.pixels), mode: to.mode });
+    const result = await studio.savePixelImage({
+      path: to.path,
+      bytes: encodePng(built.sheet),
+      mode: to.mode,
+      sidecar: writeNote && sidecarPath ? { path: sidecarPath, text: built.json } : undefined,
+    });
     busy.current = false;
     setSaving(false);
     if (!result.ok) {
       setProblem(text.pixel.failed[result.reason]);
       return false;
     }
-    markSaved(session);
+    filmMarkSaved(film);
     setTarget({ path: result.path, mode: "overwrite" });
     setSavedPath(result.path);
     bump();
@@ -143,20 +284,21 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
 
   const doUndo = () => {
     if (busy.current) return;
-    if (undoStep(session)) {
-      redraw();
+    setPlaying(false);
+    if (filmUndo(film)) {
+      paint();
       bump();
     }
   };
   const doRedo = () => {
     if (busy.current) return;
-    if (redoStep(session)) {
-      redraw();
+    setPlaying(false);
+    if (filmRedo(film)) {
+      paint();
       bump();
     }
   };
 
-  // Keep the keyboard handler pointing at the newest closures without re-binding it.
   const latest = useRef({ doUndo, doRedo, requestClose, prompt });
   latest.current = { doUndo, doRedo, requestClose, prompt };
 
@@ -197,28 +339,27 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
 
   useEffect(() => {
     const onUnload = (event: BeforeUnloadEvent) => {
-      if (!isDirty(session)) return;
+      if (!filmDirty(film)) return;
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", onUnload);
     return () => window.removeEventListener("beforeunload", onUnload);
-  }, [session]);
+  }, [film]);
 
   const cellOf = (clientX: number, clientY: number): [number, number] => {
     const rect = (canvasRef.current as HTMLCanvasElement).getBoundingClientRect();
     return [
-      Math.floor(((clientX - rect.left) * width) / rect.width),
-      Math.floor(((clientY - rect.top) * height) / rect.height),
+      Math.floor(((clientX - rect.left) * film.width) / rect.width),
+      Math.floor(((clientY - rect.top) * film.height) / rect.height),
     ];
   };
 
   const onDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (busy.current) return;
+    if (busy.current || playingRef.current) return;
     if (activePointer.current !== null) {
-      // A second finger is ignored; a pointer that never reported its end is closed off.
       if (!event.isPrimary) return;
-      pointerUp(session);
+      filmPointerUp(film);
       activePointer.current = null;
     }
     if (event.pointerType === "mouse" && event.button !== 0) return;
@@ -230,12 +371,12 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
     }
     activePointer.current = event.pointerId;
     const [x, y] = cellOf(event.clientX, event.clientY);
-    const result = pointerDown(session, tool, x, y, color);
+    const result = filmPointerDown(film, tool, x, y, color);
     if (result.picked) {
       setColor(result.picked);
       setTool("pencil");
     }
-    redraw();
+    paint();
   };
 
   const onMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -244,20 +385,21 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
     const steps = typeof native.getCoalescedEvents === "function" ? native.getCoalescedEvents() : [];
     for (const step of steps.length ? steps : [native]) {
       const [x, y] = cellOf(step.clientX, step.clientY);
-      pointerMove(session, tool, x, y, color);
+      filmPointerMove(film, tool, x, y, color);
     }
-    redraw();
+    paint();
+    if (tool === "select") bump();
   };
 
   const onUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerId !== activePointer.current) return;
     activePointer.current = null;
-    pointerUp(session);
-    redraw();
+    filmPointerUp(film);
+    paint();
     bump();
   };
 
-  const toolButton = (id: Tool, label: string, hint: string, icon: string) => (
+  const toolButton = (id: FilmTool, label: string, hint: string, icon: string) => (
     <button
       type="button"
       className={`pixel-tool${tool === id ? " on" : ""}`}
@@ -265,7 +407,10 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
       aria-pressed={tool === id}
       title={hint}
       data-testid={`pixel-tool-${id}`}
-      onClick={() => setTool(id)}
+      onClick={() => {
+        setPlaying(false);
+        setTool(id);
+      }}
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d={icon} />
@@ -275,11 +420,34 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
   );
 
   const swatchValue = color[3] === 0 ? null : toHex(color);
-  const board = { width: width * scale, height: height * scale };
+  const board = { width: film.width * scale, height: film.height * scale };
   const cell = scale * Math.max(1, Math.round(8 / scale));
   const saveLabel = saving ? text.pixel.saving : text.pixel.save;
   const askName = saveAsName.trim() ? imagePath(saveAsName) : null;
   const askTaken = askName !== null && paths.includes(askName);
+  const hidden = film.frames[film.index]?.layers[film.layer]?.visible === false;
+  const shownFrame = playing ? playFrame : film.index;
+
+  const putExample = async (mainText?: string) => {
+    if (busy.current || !sidePath) return;
+    busy.current = true;
+    setSaving(true);
+    setProblem("");
+    const result = await studio.saveAnimExample({
+      moduleText: pygameAnimModule(),
+      mainText,
+    });
+    busy.current = false;
+    setSaving(false);
+    if (!result.ok) {
+      setProblem(text.pixel.failed[result.reason === "bad-path" ? "bad-path" : result.reason === "no-project" ? "no-project" : "write-failed"]);
+      return;
+    }
+    if (result.module === "wrote") setExampleNote(text.pixel.anim.moduleWrote);
+    else if (result.module === "kept") setExampleNote(text.pixel.anim.moduleKept);
+    else setExampleNote(text.pixel.anim.moduleSame);
+    if (mainText && result.main) setPrompt(null);
+  };
 
   return (
     <div className="modal-back" role="presentation">
@@ -295,7 +463,7 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
       >
         <header className="pixel-head">
           <h2 id="pixel-editor-title" data-testid="pixel-title">
-            {text.pixel.titleFor(target.path, width, height)}
+            {text.pixel.titleFor(target.path, film.width, film.height)}
           </h2>
           {dirty ? <span className="pixel-dirty">{text.pixel.dirty}</span> : null}
           <button type="button" onClick={requestClose} data-testid="pixel-close">
@@ -310,6 +478,7 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
               {toolButton("eraser", text.pixel.eraser, text.pixel.eraserHint, "M4 16l9-10 7 6-6 8H8zM9 20h11")}
               {toolButton("fill", text.pixel.fill, text.pixel.fillHint, "M5 12l7-7 7 7-7 7zM19 15c1 2 1.5 3 0 4s-3 0-2-4")}
               {toolButton("picker", text.pixel.picker, text.pixel.pickerHint, "M14 4l6 6-3 1-8 8H5v-4l8-8zM13 7l4 4")}
+              {toolButton("select", text.pixel.anim.select, text.pixel.anim.selectHint, "M5 5h14v14H5z")}
             </div>
             <div className="pixel-tool-row">
               <button
@@ -318,7 +487,7 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
                 title={`${text.pixel.undo} (Ctrl/⌘+Z)`}
                 aria-keyshortcuts="Control+Z Meta+Z"
                 data-testid="pixel-undo"
-                disabled={!session.history.done.length}
+                disabled={!filmCanUndo(film)}
                 onClick={doUndo}
               >
                 {text.pixel.undo}
@@ -329,7 +498,7 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
                 title={`${text.pixel.redo} (Ctrl/⌘+Shift+Z)`}
                 aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
                 data-testid="pixel-redo"
-                disabled={!session.history.undone.length}
+                disabled={!filmCanRedo(film)}
                 onClick={doRedo}
               >
                 {text.pixel.redo}
@@ -341,8 +510,9 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
                 data-testid="pixel-clear"
                 onClick={() => {
                   if (busy.current) return;
-                  if (clearAll(session)) {
-                    redraw();
+                  setPlaying(false);
+                  if (clearActiveLayer(film)) {
+                    paint();
                     bump();
                   }
                 }}
@@ -410,11 +580,11 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
             <figure className="pixel-preview" title={text.pixel.previewHint}>
               <figcaption>{text.pixel.preview}</figcaption>
               <div className="pixel-preview-box">
-                <div className="pixel-checker" style={{ width, height, "--cell": "8px" } as CSSProperties}>
+                <div className="pixel-checker" style={{ width: film.width, height: film.height, "--cell": "8px" } as CSSProperties}>
                   <canvas
                     ref={previewRef}
-                    width={width}
-                    height={height}
+                    width={film.width}
+                    height={film.height}
                     data-testid="pixel-preview"
                     aria-label={text.pixel.previewHint}
                     role="img"
@@ -436,20 +606,86 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
             >
               <canvas
                 ref={canvasRef}
-                width={width}
-                height={height}
+                width={film.width}
+                height={film.height}
                 role="img"
-                aria-label={text.pixel.canvasHint(width, height)}
+                aria-label={text.pixel.canvasHint(film.width, film.height)}
                 data-testid="pixel-canvas"
-                data-width={width}
-                data-height={height}
+                data-width={film.width}
+                data-height={film.height}
                 data-scale={scale}
+                data-frame={shownFrame}
                 style={board}
               />
               {grid && scale >= 4 ? <div className="pixel-grid" aria-hidden="true" data-testid="pixel-grid" /> : null}
+              {!playing && film.selection ? (
+                <div
+                  className="pixel-selection"
+                  data-testid="pixel-selection"
+                  style={{
+                    left: film.selection.x * scale,
+                    top: film.selection.y * scale,
+                    width: film.selection.w * scale,
+                    height: film.selection.h * scale,
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         </div>
+
+        <PixelAnimPanel
+          film={film}
+          revision={revision}
+          onion={onion}
+          playing={playing}
+          playFrame={playFrame}
+          onToggleOnion={() => setOnion((value) => !value)}
+          onTogglePlay={() => {
+            if (playing) {
+              setPlaying(false);
+              return;
+            }
+            const order = playOrder(film.frames.length, film.states, null);
+            playRef.current = { order, cursor: 0, into: 0 };
+            setPlayFrame(order[0] ?? 0);
+            setPlaying(true);
+          }}
+          onAddFrame={() => noteLimit(addBlankFrame(film))}
+          onCopyFrame={() => noteLimit(duplicateFrame(film))}
+          onDeleteFrame={() => noteLimit(deleteFrame(film))}
+          onSelectFrame={(index) => {
+            setPlaying(false);
+            selectFrame(film, index);
+            bump();
+          }}
+          onDuration={(ms) => {
+            const result = setFrameDuration(film, film.index, ms);
+            if (result === "size") {
+              setPlaying(false);
+              setLimit(text.pixel.anim.durationBad);
+              bump();
+              return;
+            }
+            noteLimit(result);
+          }}
+          onFps={(fps) => noteLimit(setFps(film, fps))}
+          onToggleState={(name) => noteLimit(toggleStateFrame(film, name))}
+          onAddLayer={() => noteLimit(addLayer(film))}
+          onDeleteLayer={() => noteLimit(deleteLayer(film))}
+          onMoveLayer={(direction) => {
+            if (moveLayer(film, direction) === true) noteLimit(true);
+          }}
+          onSelectLayer={(index) => {
+            selectLayer(film, index);
+            bump();
+          }}
+          onToggleLayer={(index, visible) => {
+            setLayerVisible(film, index, visible);
+            bump();
+          }}
+          onImport={() => sheetInputRef.current?.click()}
+        />
 
         <footer className="pixel-foot">
           <div className="pixel-status">
@@ -457,14 +693,48 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
               <p className="pixel-problem" role="alert" data-testid="pixel-problem">
                 {problem}
               </p>
-            ) : savedPath && !dirty ? (
+            ) : null}
+            {limit ? (
+              <p className="pixel-problem" role="status" data-testid="pixel-anim-limit">
+                {limit}
+              </p>
+            ) : null}
+            {animProblem ? (
+              <p role="status" data-testid="pixel-anim-problem">
+                {animProblem}
+              </p>
+            ) : null}
+            {hidden ? <p role="status">{text.pixel.anim.hiddenLayer}</p> : null}
+            {savedPath && !dirty ? (
               <p role="status" data-testid="pixel-saved">
                 <strong>{text.pixel.saved(savedPath)}</strong>
-                <code>{text.pixel.use(savedPath)}</code>
+                {!animated ? <code>{text.pixel.use(savedPath)}</code> : null}
+              </p>
+            ) : null}
+            {animated && sidePath ? (
+              <pre className="pixel-snippet" data-testid="pixel-anim-snippet">
+                {text.pixel.anim.snippet}
+                {"\n"}
+                {pygameAnimSnippet(target.path, sidePath)}
+              </pre>
+            ) : null}
+            {exampleNote ? (
+              <p role="status" data-testid="pixel-example-note">
+                {exampleNote}
               </p>
             ) : null}
           </div>
           <div className="modal-actions">
+            {onDisk ? (
+              <>
+                <button type="button" data-testid="pixel-put-module" disabled={saving} onClick={() => void putExample()}>
+                  {text.pixel.anim.putModule}
+                </button>
+                <button type="button" data-testid="pixel-try-play" disabled={saving} onClick={() => setPrompt("demo")}>
+                  {text.pixel.anim.tryPlay}
+                </button>
+              </>
+            ) : null}
             <button
               type="button"
               data-testid="pixel-save-as"
@@ -488,6 +758,33 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
             </button>
           </div>
         </footer>
+
+        <input
+          ref={sheetInputRef}
+          type="file"
+          accept="image/png,.png"
+          data-testid="pixel-sheet-file"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (!file) return;
+            void file.arrayBuffer().then(async (buffer) => {
+              const loaded = await loadPixels(new Uint8Array(buffer));
+              if (!loaded.ok) {
+                setProblem(loaded.problem === "too-big" ? text.pixel.tooBig : text.pixel.unreadable);
+                return;
+              }
+              const square = loaded.pixels.width % loaded.pixels.height === 0 ? loaded.pixels.height : loaded.pixels.width;
+              setSheet({
+                pixels: loaded.pixels,
+                frameWidth: String(Math.min(square, loaded.pixels.width, 256)),
+                frameHeight: String(Math.min(loaded.pixels.height, 256)),
+              });
+              setPrompt("sheet");
+            });
+          }}
+        />
 
         {prompt === "close" ? (
           <div className="pixel-ask" role="alertdialog" aria-modal="true" aria-labelledby="pixel-ask-title" data-testid="pixel-unsaved">
@@ -578,6 +875,91 @@ function Workspace({ open, session }: { open: PixelSession; session: Session }) 
               </button>
             </div>
           </form>
+        ) : null}
+
+        {prompt === "sheet" && sheet ? (
+          <form
+            className="pixel-ask"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pixel-ask-title"
+            data-testid="pixel-sheet-dialog"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const result = replaceWithSheet(film, sheet.pixels, Number(sheet.frameWidth), Number(sheet.frameHeight));
+              if (result !== true) {
+                setLimit(limitText(result));
+                return;
+              }
+              setPlaying(false);
+              setPrompt(null);
+              setSheet(null);
+              setLimit("");
+              bump();
+            }}
+          >
+            <h3 id="pixel-ask-title">{text.pixel.anim.importTitle}</h3>
+            <p>{text.pixel.anim.importCopy}</p>
+            <div className="pixel-size-inputs">
+              <label>
+                <span>{text.pixel.anim.frameWidth}</span>
+                <input
+                  inputMode="numeric"
+                  value={sheet.frameWidth}
+                  data-testid="pixel-sheet-width"
+                  onChange={(event) => setSheet({ ...sheet, frameWidth: event.target.value })}
+                />
+              </label>
+              <label>
+                <span>{text.pixel.anim.frameHeight}</span>
+                <input
+                  inputMode="numeric"
+                  value={sheet.frameHeight}
+                  data-testid="pixel-sheet-height"
+                  onChange={(event) => setSheet({ ...sheet, frameHeight: event.target.value })}
+                />
+              </label>
+            </div>
+            {limit ? (
+              <p className="pixel-problem" role="alert" data-testid="pixel-sheet-problem">
+                {limit}
+              </p>
+            ) : null}
+            <div className="modal-actions">
+              <button type="button" onClick={() => setPrompt(null)}>
+                {text.pixel.cancel}
+              </button>
+              <button className="run" type="submit" data-testid="pixel-sheet-confirm">
+                {text.pixel.anim.importConfirm}
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {prompt === "demo" && sidePath ? (
+          <div className="pixel-ask" role="alertdialog" aria-modal="true" aria-labelledby="pixel-ask-title" data-testid="pixel-try-dialog">
+            <h3 id="pixel-ask-title">{text.pixel.anim.tryTitle}</h3>
+            <p>{text.pixel.anim.tryCopy}</p>
+            {problem ? (
+              <p className="pixel-problem" role="alert">
+                {problem}
+              </p>
+            ) : null}
+            <div className="modal-actions">
+              <button type="button" onClick={() => setPrompt(null)}>
+                {text.pixel.cancel}
+              </button>
+              <button
+                type="button"
+                className="run"
+                data-testid="pixel-try-confirm"
+                disabled={saving}
+                onClick={() => void putExample(pygameAnimDemo(target.path, sidePath))}
+              >
+                {text.pixel.anim.tryConfirm}
+              </button>
+            </div>
+          </div>
         ) : null}
       </div>
     </div>

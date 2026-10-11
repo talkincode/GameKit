@@ -350,6 +350,29 @@ describe("OAuth 2.1 full authorization & MCP collaboration loop", () => {
     expect(pinText).toContain("素材库的版本记录");
     expect(pinText).not.toContain("已交给孩子确认");
 
+    const animReq = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: bearer,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 42,
+        method: "tools/call",
+        params: {
+          name: "propose_files",
+          arguments: { say: "改掉动画", files: [{ path: "assets/hero.anim.json", text: "{}" }] },
+        },
+      }),
+    });
+    const animRes = await worker.fetch(animReq as never, env, {} as never);
+    expect(animRes.status).toBe(200);
+    const animText = await animRes.text();
+    expect(animText).toContain("动画说明");
+    expect(animText).not.toContain("已交给孩子确认");
+
     // 11. Child's studio polls /api/collab/sync and receives the candidate
     const syncReq = new Request("http://localhost/api/collab/sync", {
       method: "POST",

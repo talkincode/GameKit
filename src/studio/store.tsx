@@ -63,7 +63,8 @@ import {
 } from "../lib/project";
 import { parseHex } from "../lib/pixel/buffer";
 import { canEditPixels, checkSize, imagePath } from "../lib/pixel/rules";
-import { planPixelSave, type PixelSaveFailure, type PixelSaveInput } from "../lib/pixel/save";
+import { animationSidecarPath } from "../lib/pixel/anim";
+import { planAnimExample, planPixelSave, type AnimExampleInput, type AnimExampleResult, type PixelSaveFailure, type PixelSaveInput } from "../lib/pixel/save";
 import { discardPlay, downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
 import { budgetFor, loadSettings, saveSettings, type Settings } from "../lib/settings";
 import { renderMusic, renderSfx } from "../lib/audio/render";
@@ -116,7 +117,7 @@ export type AssetDraft = {
 /** What the pixel editor was opened on. Bytes are copied in, so the editor owns its picture. */
 export type PixelOpen =
   | { source: "new"; path: string; width: number; height: number; background: string | null }
-  | { source: "file"; path: string; bytes: Uint8Array }
+  | { source: "file"; path: string; bytes: Uint8Array; animText: string | null }
   | { source: "draft"; path: string; bytes: Uint8Array };
 
 /** An open editor. `projectId` pins it to the project it was opened for; `id` makes each opening fresh. */
@@ -238,6 +239,8 @@ type StudioValue = {
    * changes in memory, so a failed write leaves everything (and the canvas) as it was.
    */
   savePixelImage: (input: PixelSaveInput) => Promise<PixelSaveResult>;
+  /** Puts the pygame helper in the project. Replaces main.py only when `mainText` is set. */
+  saveAnimExample: (input: AnimExampleInput) => Promise<AnimExampleResult>;
   soundKind: SoundKind;
   setSoundKind: (kind: SoundKind) => void;
   aiBusy: boolean;
@@ -637,9 +640,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const editPixelFile = useCallback(
     (filePath: string) => {
-      const file = projectRef.current?.files.find((item) => item.path === filePath);
+      const current = projectRef.current;
+      const file = current?.files.find((item) => item.path === filePath);
       if (!file?.bytes || !canEditPixels(file.path)) return false;
-      openPixelEditor({ source: "file", path: file.path, bytes: new Uint8Array(file.bytes) });
+      const sidecar = animationSidecarPath(file.path);
+      const note = sidecar ? current?.files.find((item) => item.path === sidecar) : undefined;
+      openPixelEditor({ source: "file", path: file.path, bytes: new Uint8Array(file.bytes), animText: note?.text ?? null });
       return true;
     },
     [openPixelEditor],
@@ -683,7 +689,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
       setUndoStack((stack) => [...stack, { projectId: base.id, files: base.files, design: base.design, trash: base.trash }].slice(-20));
       setProjects((current) =>
-        current.map((item) => (item.id === base.id ? upsertFile(item, { path: plan.path, bytes: input.bytes }) : item)),
+        current.map((item) => {
+          if (item.id !== base.id) return item;
+          const withPicture = upsertFile(item, { path: plan.path, bytes: input.bytes });
+          return input.sidecar ? upsertFile(withPicture, { path: input.sidecar.path, text: input.sidecar.text }) : withPicture;
+        }),
       );
       setPath(plan.path);
       if (session?.source === "draft") {
@@ -691,6 +701,47 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         setAssetDraft(null);
       }
       return { ok: true, path: plan.path };
+    },
+    [flushSave],
+  );
+
+  const saveAnimExample = useCallback(
+    async (input: AnimExampleInput): Promise<AnimExampleResult> => {
+      const session = pixelSessionRef.current;
+      const base = projectRef.current;
+      const plan = planAnimExample(base, session?.projectId ?? null, input);
+      if (!base || !plan.ok) return plan.ok ? { ok: false, reason: "no-project" } : plan;
+      if (!plan.changed) return { ok: true, changed: false, module: plan.module, main: plan.main };
+      flushSave();
+      const written = saveChain.current.then(() => saveProject(plan.next));
+      saveChain.current = written.then(
+        () => undefined,
+        () => undefined,
+      );
+      try {
+        await written;
+      } catch (error) {
+        console.warn("Saving the animation example failed:", error);
+        return { ok: false, reason: "write-failed" };
+      }
+      setUndoStack((stack) => [...stack, { projectId: base.id, files: base.files, design: base.design, trash: base.trash }].slice(-20));
+      setProjects((current) =>
+        current.map((item) => {
+          if (item.id !== base.id) return item;
+          let next = item;
+          if (plan.module === "wrote") {
+            const moduleFile = plan.next.files.find((file) => file.path === "sprite_anim.py");
+            if (moduleFile?.text) next = upsertFile(next, { path: moduleFile.path, text: moduleFile.text });
+          }
+          if (plan.main) {
+            const mainFile = plan.next.files.find((file) => file.path === "main.py");
+            if (mainFile?.text) next = upsertFile(next, { path: "main.py", text: mainFile.text });
+          }
+          return next;
+        }),
+      );
+      if (plan.main) setPath("main.py");
+      return { ok: true, changed: true, module: plan.module, main: plan.main };
     },
     [flushSave],
   );
@@ -1589,6 +1640,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       editDraftPixels,
       closePixelEditor,
       savePixelImage,
+      saveAnimExample,
     };
   }, [
     ready,
@@ -1646,6 +1698,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     editDraftPixels,
     closePixelEditor,
     savePixelImage,
+    saveAnimExample,
     aiBusy,
     notice,
     bottomTab,

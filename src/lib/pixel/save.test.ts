@@ -5,7 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Project } from "../project";
-import { planPixelSave } from "./save";
+import { buildSpriteDocument } from "./anim";
+import { createPixels } from "./buffer";
+import { planAnimExample, planPixelSave } from "./save";
 
 const OLD = new Uint8Array([1, 2, 3]);
 const NEW = new Uint8Array([9, 9, 9]);
@@ -91,6 +93,69 @@ describe("planPixelSave", () => {
       ok: false,
       reason: "no-project",
     });
+  });
+
+  it("writes the animation note with the picture, or writes neither when the note is bad", () => {
+    const built = buildSpriteDocument("assets/dog.png", [{ pixels: createPixels(2, 2), durationMs: 200 }], { idle: [0] });
+    expect(built).not.toBeNull();
+    if (!built) return;
+    const base = project();
+    const plan = planPixelSave(base, "p1", {
+      path: "assets/dog.png",
+      bytes: NEW,
+      mode: "create",
+      sidecar: { path: "assets/dog.anim.json", text: built.json },
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.next.files.find((file) => file.path === "assets/dog.anim.json")?.text).toBe(built.json);
+    expect(plan.next.files.find((file) => file.path === "assets/player.png")?.bytes).toEqual(OLD);
+    expect(base.files.map((file) => file.path)).toEqual(["main.py", "assets/player.png"]);
+
+    expect(
+      planPixelSave(project(), "p1", {
+        path: "assets/dog.png",
+        bytes: NEW,
+        mode: "create",
+        sidecar: { path: "assets/dog.anim.json", text: "{" },
+      }),
+    ).toEqual({ ok: false, reason: "bad-anim" });
+    expect(
+      planPixelSave(project(), "p1", {
+        path: "assets/dog.png",
+        bytes: NEW,
+        mode: "create",
+        sidecar: { path: "assets/other.anim.json", text: built.json },
+      }),
+    ).toEqual({ ok: false, reason: "bad-path" });
+    const taken = project();
+    taken.files.push({ path: "assets/dog.anim.json", text: "{\"keep\":true}\n" });
+    expect(
+      planPixelSave(taken, "p1", {
+        path: "assets/dog.png",
+        bytes: NEW,
+        mode: "create",
+        sidecar: { path: "assets/dog.anim.json", text: built.json },
+      }),
+    ).toEqual({ ok: false, reason: "taken" });
+    expect(taken.files.find((file) => file.path === "assets/dog.anim.json")?.text).toContain("keep");
+  });
+
+  it("does not replace a helper the child already changed, and will not write a main loop that cannot run", () => {
+    const base = project();
+    const added = planAnimExample(base, "p1", { moduleText: "import pygame\n" });
+    expect(added.ok && added.module).toBe("wrote");
+    const kept = planAnimExample(
+      { ...base, files: [...base.files, { path: "sprite_anim.py", text: "# mine\n" }] },
+      "p1",
+      { moduleText: "import pygame\n", mainText: "import asyncio\nawait asyncio.sleep(0)\n" },
+    );
+    expect(kept.ok).toBe(true);
+    if (!kept.ok) return;
+    expect(kept.module).toBe("kept");
+    expect(kept.main).toBe(true);
+    expect(kept.next.files.find((file) => file.path === "sprite_anim.py")?.text).toBe("# mine\n");
+    expect(planAnimExample(base, "p1", { moduleText: "x", mainText: "print(1)\n" })).toEqual({ ok: false, reason: "bad-path" });
   });
 
   it("does not touch the file when asked to overwrite a name that differs only by case", () => {
