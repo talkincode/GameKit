@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { unzipSync } from "fflate";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel } from "./nav";
 
 // Kenney CC0 精选：不登录、不调用 /api。打开素材库之后才加载。
 // 复制进项目的是文件字节；舞台和导出都用这一份，不访问 kenney.nl。
@@ -59,7 +60,7 @@ test("searching finds a Kenney tileset, and pygame plus the export use the copy"
   await page.frameLocator(`iframe[title="${text.brand.name}"]`).locator("#canvas").click({ position: { x: 10, y: 10 }, force: true });
   await expect(page.locator(".console")).toContainText("LIBRARY-OK (64, 64)", { timeout: 120_000 });
 
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   const [source] = await Promise.all([
     page.waitForEvent("download"),
     page.getByTestId("projects-panel").getByRole("button", { name: text.project.exportSource, exact: true }).first().click(),

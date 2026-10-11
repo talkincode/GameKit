@@ -39,34 +39,103 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 }
 
 .toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  height: 56px;
   padding: 0 12px;
   border-bottom: 1px solid var(--line-strong);
   position: relative;
   z-index: 10;
+  white-space: nowrap;
 }
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand svg { width: 28px; height: 28px; }
+.toolbar-side { display: flex; align-items: center; min-width: 0; }
+.toolbar-left { gap: 12px; }
+.toolbar-right { justify-content: flex-end; gap: 6px; }
+.toolbar-right > * { flex: none; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: none; }
+.brand svg { width: 28px; height: 28px; flex: none; }
 .brand rect { fill: var(--ink); }
 .brand path { fill: var(--paper-2); }
-.brand strong { display: block; font-size: 15px; letter-spacing: -0.03em; }
-.brand span { display: block; color: var(--muted); font-size: 11px; letter-spacing: 0; }
+.brand-copy { min-width: 0; }
+.brand-word { display: block; font-size: 15px; letter-spacing: -0.03em; }
+.brand-tagline {
+  display: block;
+  max-width: 11rem;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-slot { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.project-name-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 11rem;
+  min-width: 0;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  font-weight: 600;
+  overflow: hidden;
+}
+.project-name-btn:hover { background: rgba(28, 30, 26, 0.06); }
+.project-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.caret-icon, .more-icon { width: 14px; height: 14px; flex: none; }
+.caret-icon { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.more-icon { fill: currentColor; }
+.save { font-family: var(--mono); font-size: 11px; color: var(--muted); flex: none; }
+.save-error { color: var(--danger); }
 
-/* 做游戏 / 看代码 */
-.view-switch { display: flex; gap: 2px; padding: 2px; background: #e4dfd4; border-radius: 9px; }
+/* 做游戏 / 看代码 — the one control that sits in the middle */
+.view-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: #ddd7cb;
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1px rgba(28, 30, 26, 0.06);
+  flex: none;
+}
 .view-switch button {
   border: 0;
   background: transparent;
-  border-radius: 7px;
-  height: 32px;
-  padding: 0 14px;
-  font-weight: 500;
+  border-radius: 8px;
+  height: 34px;
+  padding: 0 16px;
+  font-weight: 600;
 }
-.view-switch button.on { background: var(--paper-2); box-shadow: 0 1px 2px rgba(28, 30, 26, 0.12); }
+.view-switch button.on { background: var(--ink); color: var(--paper-2); }
 
-.cluster { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.toolbar .ghost,
+.toolbar .icon-btn,
+.toolbar .account-btn {
+  height: 32px;
+  min-height: 32px;
+}
+.icon-btn {
+  width: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  background: rgba(246, 243, 236, 0.7);
+  border-radius: 8px;
+}
+.icon-btn:hover:not(:disabled) { border-color: var(--ink); }
+.toolbar .toolbar-primary {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
 .panel-toggles { display: flex; gap: 2px; padding: 2px; background: #e4dfd4; border-radius: 9px; }
 .panel-toggles button {
   border: 0;
@@ -79,11 +148,32 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 }
 .panel-toggles button.on { background: var(--paper-2); color: var(--ink); box-shadow: 0 1px 2px rgba(28, 30, 26, 0.12); }
 .undo-icon { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.ghost:has(.undo-icon) { display: inline-flex; align-items: center; gap: 6px; }
-.save { font-family: var(--mono); font-size: 11px; color: var(--muted); }
-.save-error { color: var(--danger); }
 .account { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
-.account span { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-name { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-checking { max-width: 7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 5px;
+  border: 1px solid var(--line-strong);
+  background: rgba(246, 243, 236, 0.7);
+  border-radius: 999px;
+  color: var(--ink);
+}
+.account-btn:hover { border-color: var(--ink); }
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper-2);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+}
 
 /* :where() keeps the dialog reset at zero weight, so .run / .ghost / .danger still win inside a .modal. */
 .ghost, .stop, .menu button, .file-btn, :where(.modal button) {
@@ -131,12 +221,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 kbd { font-family: var(--mono); font-size: 10px; opacity: 0.75; }
 button:disabled { opacity: 0.45; cursor: default; }
 
+.menu-anchor { position: relative; display: flex; align-items: center; }
 .menu {
   position: absolute;
-  top: 50px;
-  left: 232px;
   z-index: 20;
-  width: 296px;
+  width: min(280px, calc(100vw - 16px));
   padding: 8px;
   background: var(--paper-2);
   border: 1px solid var(--line-strong);
@@ -145,7 +234,8 @@ button:disabled { opacity: 0.45; cursor: default; }
   display: grid;
   gap: 4px;
 }
-.menu-export { left: 308px; }
+.menu-anchor > .menu { top: calc(100% + 6px); left: 0; }
+.menu-anchor.align-end > .menu { left: auto; right: 0; }
 .menu p, .menu-foot { margin: 4px 6px 8px; color: var(--muted); font-size: 12px; }
 .menu button, .file-btn {
   text-align: left;
@@ -155,6 +245,7 @@ button:disabled { opacity: 0.45; cursor: default; }
   flex-direction: column;
   align-items: flex-start;
 }
+.menu button.menu-row { flex-direction: row; align-items: center; gap: 8px; }
 .menu button:hover, .file-btn:hover { background: #eae5da; }
 .menu button.current { background: #e7efe9; }
 .menu button.danger { color: var(--danger); }
@@ -242,7 +333,15 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 /* 小助手在忙：头部一个 chip，面板底部一条状态（两处同一份动画） */
 .working { display: inline-flex; align-items: center; gap: 8px; color: var(--brass); font-size: 12px; }
-.working-header { padding: 0 10px; min-height: 30px; border: 1px solid #e6d5b8; background: #f6efe1; border-radius: 99px; }
+.working-header {
+  max-width: 9rem;
+  padding: 0 10px;
+  min-height: 30px;
+  border: 1px solid #e6d5b8;
+  background: #f6efe1;
+  border-radius: 99px;
+}
+.working-header .working-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .working-pane { padding: 8px 12px 2px; }
 .working .dots { display: inline-flex; gap: 3px; }
 .working .dots i,
@@ -568,14 +667,22 @@ button:disabled { opacity: 0.45; cursor: default; }
 .tabs {
   height: 34px;
   padding: 0 8px;
+  gap: 8px;
   justify-content: space-between;
   display: flex;
   align-items: center;
+  flex: none;
+  min-width: 0;
   border-bottom: 1px solid #2a2e33;
   color: #d9d3c7;
   font-family: var(--mono);
   font-size: 12px;
 }
+.tab-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabs .inline-ai { flex: none; }
+.tabs .panel-toggles { background: #2a2e33; flex: none; }
+.tabs .panel-toggles button { color: #d9d3c7; min-height: 22px; height: 22px; padding: 0 8px; }
+.tabs .panel-toggles button.on { background: #3d4a40; color: #f4f1ea; box-shadow: none; }
 .inline-ai button {
   border: 1px solid #33383f;
   background: #22262c;
@@ -709,7 +816,6 @@ button:disabled { opacity: 0.45; cursor: default; }
 .project-card.renaming form { display: grid; gap: 8px; }
 .project-card.renaming label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
 .project-card.renaming input { width: 100%; }
-.ghost.icon-only { width: 34px; padding: 0; display: grid; place-items: center; }
 .gear-icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
 .modal.settings { width: min(620px, 100%); max-height: min(560px, 88vh); grid-template-rows: auto minmax(0, 1fr); }
 .settings-body { overflow: auto; display: grid; gap: 16px; }
@@ -1082,10 +1188,21 @@ button:disabled { opacity: 0.45; cursor: default; }
   .library-body { grid-template-columns: 1fr; }
 }
 
+@media (max-width: 1099px) {
+  .brand-tagline { display: none; }
+}
+@media (max-width: 799px) {
+  .brand-copy { display: none; }
+  .account-name { display: none; }
+  .account-btn { padding-right: 5px; }
+  .collab-label { display: none; }
+  .working-header .working-label { display: none; }
+  .view-switch button { padding: 0 10px; }
+  .project-name-btn { max-width: 6.5rem; }
+}
+
 @media (max-width: 1000px) {
   .shell { height: auto; min-height: 100%; grid-template-rows: auto auto; }
-  .toolbar { flex-wrap: wrap; height: auto; padding: 8px; gap: 8px; }
-  .brand span { display: none; }
   .view-design .studio { grid-template-columns: minmax(0, 1fr); }
   .view-design .stage-pane { grid-area: auto; min-height: 52vh; }
   .view-design .pane { grid-area: auto; border-left: 0; border-top: 1px solid var(--line-strong); min-height: 320px; }
@@ -1094,5 +1211,4 @@ button:disabled { opacity: 0.45; cursor: default; }
   .view-code .sidebar { grid-area: auto; min-height: 200px; }
   .view-code .editor { grid-area: auto; min-height: 360px; }
   .view-code .bottom { grid-area: auto; min-height: 200px; }
-  .menu { left: 8px; width: min(320px, calc(100vw - 16px)); }
 }

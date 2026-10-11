@@ -4,6 +4,7 @@ import { strToU8, unzipSync, zipSync } from "fflate";
 import { createPixels } from "../../src/lib/pixel/buffer";
 import { encodePng } from "../../src/lib/pixel/png";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel } from "./nav";
 
 // 内置素材库：不登录、不调用 /api。包在打开素材库之后才加载。
 // 复制进项目的是文件字节；同名要先选，撤销能回到旧的那一份。
@@ -96,7 +97,7 @@ test("copying pins a file, a second copy does nothing, and undo removes it", asy
   expect(await storedFile(page, HERO)).toBe(first);
 
   await page.getByTestId("library-dialog").getByRole("button", { name: text.library.close }).click();
-  await page.getByRole("button", { name: text.header.undoShort, exact: true }).click();
+  await page.getByTestId("undo").click();
   await expect.poll(async () => storedFile(page, HERO)).toBeNull();
 });
 
@@ -109,7 +110,7 @@ test("a same-path file is kept or replaced, and undo puts the old bytes back", a
     }),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await page.getByTestId("projects-panel").locator('input[type="file"]').setInputFiles({
     name: "clash.zip",
     mimeType: "application/zip",
@@ -130,7 +131,7 @@ test("a same-path file is kept or replaced, and undo puts the old bytes back", a
   await expect.poll(async () => storedFile(page, HERO)).toBe(Buffer.from(libraryPng).toString("base64"));
 
   await page.getByTestId("library-dialog").getByRole("button", { name: text.library.close }).click();
-  await page.getByRole("button", { name: text.header.undoShort, exact: true }).click();
+  await page.getByTestId("undo").click();
   await expect.poll(async () => storedFile(page, HERO)).toBe(Buffer.from(old).toString("base64"));
 });
 
@@ -171,7 +172,7 @@ test("the copied picture runs in pygame and is inside the offline export", async
   await page.frameLocator(`iframe[title="${text.brand.name}"]`).locator("#canvas").click({ position: { x: 10, y: 10 }, force: true });
   await expect(page.locator(".console")).toContainText("LIBRARY-OK (32, 32)", { timeout: 120_000 });
 
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   const [source] = await Promise.all([
     page.waitForEvent("download"),
     page.getByTestId("projects-panel").getByRole("button", { name: text.project.exportSource, exact: true }).first().click(),

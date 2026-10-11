@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { text } from "../../src/ui/text";
+import { openSettings } from "./nav";
 
 // 设置：the assistant's memory budget follows the model unless the child picks a
 // number, and the choice survives a reload. Also the session itself: a project's
@@ -15,7 +16,7 @@ async function signIn(page: Page) {
 
 test("the memory budget is configurable, follows the model by default, and sticks", async ({ page }) => {
   await signIn(page);
-  await page.getByTestId("settings-open").click();
+  await openSettings(page);
   const panel = page.getByTestId("settings-panel");
   await expect(panel).toBeVisible();
 
@@ -30,7 +31,7 @@ test("the memory budget is configurable, follows the model by default, and stick
   await page.getByTestId("settings-close").click();
   await expect(panel).toHaveCount(0);
   await page.reload();
-  await page.getByTestId("settings-open").click();
+  await openSettings(page);
   await expect(page.getByTestId("settings-summary")).toContainText(text.settings.tokens(64_000));
 });
 

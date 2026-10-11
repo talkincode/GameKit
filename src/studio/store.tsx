@@ -91,7 +91,7 @@ import { text } from "../ui/text";
 
 export type RunState = "idle" | "starting" | "running" | "stopped" | "error";
 export type SaveState = "saved" | "saving" | "error";
-export type MenuId = "project" | "export" | null;
+export type MenuId = "project" | "export" | "more" | "account" | null;
 /** 做游戏 is the product; 看代码 is where the implementation lives. */
 export type ViewId = "design" | "code";
 /** Whose build the stage is showing. */

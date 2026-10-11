@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { unzipSync } from "fflate";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel, signOut } from "./nav";
 
 // 声音资产：the model picks numbers (stubbed at the network boundary), the browser
 // renders the samples, and the child hears exactly the file that will be stored.
@@ -117,7 +118,7 @@ test("an anonymous child cannot generate sound", async ({ page }) => {
     if (new URL(request.url()).pathname.startsWith("/api/")) apiCalls.push(request.url());
   });
   await signIn(page);
-  await page.getByRole("button", { name: text.account.signOut }).click();
+  await signOut(page);
   // Only what happens while anonymous counts; signing in may have asked the
   // Worker about the model earlier.
   const before = apiCalls.length;
@@ -269,7 +270,7 @@ test("an official sound plays in pygame and is inside the offline export", async
   await page.frameLocator(`iframe[title="${text.brand.name}"]`).locator("#canvas").click({ position: { x: 10, y: 10 }, force: true });
   await expect(page.locator(".console")).toContainText("SOUND-OK", { timeout: 120_000 });
 
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   const [source] = await Promise.all([
     page.waitForEvent("download"),
     page.getByTestId("projects-panel").getByRole("button", { name: text.project.exportSource, exact: true }).first().click(),

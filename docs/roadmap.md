@@ -106,16 +106,16 @@ Cloudflare Worker（gamekit.talkincode.net）
 
 - 我的项目（项目管理面板）
 
-顶栏「项目」打开一个独立面板：搜索、新建、导入 zip、卡片列表（名字、当前、更新时间、文件数、设计卡标题）、
+点顶栏里的项目名打开菜单：新建项目、从配方新建、导入 zip，或进入「我的项目」面板。面板里可以搜索、新建、导入 zip，卡片列出名字、当前、更新时间、文件数、设计卡标题，
 每张卡上可以改名/复制/导出源码/删除（删除就在卡内二次确认，不弹系统窗口），底部显示项目数与本机占用。
 切项目、新建、导入、删除都会关掉面板并开新的一局对话；没在打开的项目只能先打开再改。
 入口 `src/ui/ProjectsPanel.tsx`；面板只调 store 的动作，自己不碰存储。
 
 - 看代码视图：面板可收拢
 
-顶栏一组开关（文件栏 / 舞台 / 控制台）分别收放左侧文件栏、右侧舞台和底部控制台，选择存在本机；
-舞台只是收窄到 0，不会被卸载，所以收起来时正在跑的游戏不会重启。「撤销」是图标 + 两个字，完整说明在 tooltip。
-入口 `src/App.tsx`、`src/ui/Toolbar.tsx`（`--code-columns` / `--code-rows`）。
+编辑区标签栏上的开关（文件栏 / 舞台 / 控制台）分别收放左侧文件栏、右侧舞台和底部控制台，只在「看代码」里出现，选择存在本机；
+舞台只是收窄到 0，不会被卸载，所以收起来时正在跑的游戏不会重启。顶栏「撤销」是图标按钮，说明在 tooltip 和 aria-label 里；窄屏时收进「更多」。
+入口 `src/App.tsx`、`src/ui/CodePane.tsx`、`src/ui/Toolbar.tsx`（`--code-columns` / `--code-rows`）。
 
 - Agent 循环（小助手的一轮）
 
@@ -254,14 +254,14 @@ Worker 对每个 `/api/*` 请求校验 Access JWT（签名、aud、iss、过期�
 
 - 内置素材库（阶段 A，不登录可用）
 
-顶栏和「看代码」的素材区都能打开素材库。包的说明是版本化的 `asset-pack` manifest（稳定 id、版本、路径、媒体类型、像素尺寸、动画帧、瓦片网格和碰撞、中文标签、主题、预览、许可/作者/来源/署名、内容 hash），语义不靠文件名猜。现在有 GameKit 原创、CC0 的「森林冒险」和「森林声音」，再加上 Kenney CC0 精选：平台跳跃、迷宫地牢、太空射击、竞速、益智、界面、音效。每个主题只收协调的一小套，不整包搬入。来源和许可写在 [docs/asset-credits.md](asset-credits.md)。缩略图和包说明在打开素材库、地图新建或声音编辑器之后才加载，不进首屏脚本。
+顶栏（窄于 1100px 时在「更多」里）和「看代码」的素材区都能打开素材库。包的说明是版本化的 `asset-pack` manifest（稳定 id、版本、路径、媒体类型、像素尺寸、动画帧、瓦片网格和碰撞、中文标签、主题、预览、许可/作者/来源/署名、内容 hash），语义不靠文件名猜。现在有 GameKit 原创、CC0 的「森林冒险」和「森林声音」，再加上 Kenney CC0 精选：平台跳跃、迷宫地牢、太空射击、竞速、益智、界面、音效。每个主题只收协调的一小套，不整包搬入。来源和许可写在 [docs/asset-credits.md](asset-credits.md)。缩略图和包说明在打开素材库、地图新建或声音编辑器之后才加载，不进首屏脚本。
 右侧详情先给大预览和一句话说明。主按钮是「放进我的游戏」，仍是复制进项目：同名先问，可以撤销。常用操作最多两个直接放出来（带动画的打开动画编辑器，声音可以试听），其余在「更多」。代码用法、许可和署名默认折起来。带动画说明的角色可以「在动画编辑器里打开」：先按同样的规则复制进项目，再写下旁边的 `.anim.json`，然后打开动画编辑器。同名冲突时，保留原来的不会打开编辑器。
 复制进项目的是文件本身，记在 `assets/library/<包>/…`，版本写在 `assets/library.json`。运行和导出用的是这份副本，不访问素材库，也不访问 kenney.nl。同名、重复、更新和替换都会先说明，不会静默盖掉；盖掉之后可以撤销。加载示例是普通的 `pygame.image.load`。小助手和 WebMCP 可以检索目录、把某一份点名为候选；采用时才按同一套复制规则写入。它们不能在文件里直接写二进制，也不能盖掉已经不一样的那一份，也不能改孩子手写的 `assets/library.json`。
 入口 `src/ui/LibraryDialog.tsx`、`src/lib/assets/`、`public/asset-packs/`。还没做：孩子自己跨项目的图片。动画编辑器已在阶段 B 交付，地图编辑器已在阶段 C 交付。官方音效和孩子收录的声音已在阶段 D 放进同一套清单。配方和检索已在阶段 E 交付。平台跳跃、迷宫和卡通射击的说明里提到了可以用的 Kenney 包，检查仍只看原来的源码和舞台标记。
 
 - 游戏配方与分步挑战（阶段 E，不登录可用）
 
-顶栏「配方」列出五份能玩的 pygame：平台跳跃、接球、迷宫、卡通射击、贪吃蛇。每一份带代码、一张 PNG、设计卡、`README.txt` 里的知识点和 `recipe.json` 里的挑战说明。做成新项目永远是另一个 id，不改当前作品。
+项目菜单里的「从配方新建」列出五份能玩的 pygame：平台跳跃、接球、迷宫、卡通射击、贪吃蛇。每一份带代码、一张 PNG、设计卡、`README.txt` 里的知识点和 `recipe.json` 里的挑战说明。做成新项目永远是另一个 id，不改当前作品。
 每个配方有一步挑战。先给目标和提示，讲原因，孩子要求时才把写好的那一行改动做成候选。检查只看源码和舞台打出的标记（例如 `RECIPE-JUMP`），不请模型判断对错。采用才写入，撤销能回到改之前。
 四条路都在：自己写代码、看完整例子、做这一步、请小助手（登录后的对话，或挑战里那一版候选）。
 入口 `src/ui/RecipesDialog.tsx`、`src/lib/recipes/`。模板没有改。
@@ -438,7 +438,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 | 一级功能 | 状态 | 风险级别 | Happy Path E2E | 失败路径 | 权限角色覆盖 | 失败恢复/回滚 | 证据（测试路径/用例） |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 本地项目管理 | 已有 | 高（作品丢失） | ✅（新建、改名、删除、恢复、搜索、刷新后仍在） | ❌ 缺口（IndexedDB 写失败时的界面提示） | 不适用 | ✅（删除先确认再进回收站，可恢复；项目面板删除二次确认；采用后可撤销；换项目取消失败中的一轮） | `tests/e2e/projects.spec.ts`（3 条）、`tests/e2e/files.spec.ts`（4 条）、`tests/e2e/agent.spec.ts`：`a round that is still running cannot write into another project`、`tests/e2e/issue-regressions.spec.ts`（换项目不串撤销、待写入先落盘、批量上传不丢文件）、`tests/e2e/dialog-buttons.spec.ts`（弹层主按钮不会被重置样式吞掉）、单元 `src/lib/project.test.ts` |
-| 代码编辑 | 已有 | 低 | ✅（在「与代码」视图里看到项目内容；三块面板可收拢） | 不适用 | 不适用 | 不适用（持久化见上一行） | `tests/e2e/agent.spec.ts`：`an idea becomes a candidate, and the child adopts it`；`tests/e2e/layout.spec.ts` |
+| 代码编辑 | 已有 | 低 | ✅（在「与代码」视图里看到项目内容；三块面板可收拢） | 不适用 | 不适用 | 不适用（持久化见上一行） | `tests/e2e/agent.spec.ts`：`an idea becomes a candidate, and the child adopts it`；`tests/e2e/layout.spec.ts`；`tests/e2e/toolbar.spec.ts`（顶栏在 1280 / 1024 / 768 不换行，功能仍可达） |
 | 浏览器内运行 | 已有 | 中 | ✅（候选版本在舞台上跑起来，循环能拿到「在跑」证据） | ❌ 缺口（出错行定位） | 不适用 | 不适用（不改持久状态） | `tests/e2e/agent.spec.ts` 的每一条都要经过运行阶段；`src/lib/export.test.ts`（打包与模板）；`tests/e2e/issue-regressions.spec.ts`（停止/换项目取消启动中的预览、预览在独立来源的 iframe 里）、`src/lib/session.test.ts`（多标签页不清掉彼此的预览缓存）。画面本身与真实帧率仍需人工看 |
 | 诊断与报错 | 已有 | 中 | ✅（小助手靠静态检查发现 time.sleep 并修好） | ✅ 单元 | 不适用 | 不适用（只读） | `src/lib/diagnostics.test.ts`（含没有 Traceback 抬头的语法错误）；`tests/e2e/agent.spec.ts`：`a candidate the checks reject is repaired before the child sees it`；`tests/e2e/issue-regressions.spec.ts`：`export build errors are reported in the Problems panel` |
 | 本机日志与小助手错误详情 | 已有 | 中（看不懂失败、密钥进日志） | ✅（匿名打开「日志」，没有 `/api/` 请求；授权用户一轮结束后日志里有这一条） | ✅（上游 429：孩子看到「太忙」，点「查看详情」能看到 `requestId` 和状态码；页面和复制内容不含密钥） | ✅ 匿名可看日志 / 授权用户才会打到小助手 | ✅（清空前再问一次；失败不改作品，坏答案仍不写入） | `tests/e2e/logs.spec.ts`；`worker/index.test.ts`：`classifies a rate limit…`、`gives a refused sign-in a request id…`；`src/lib/log/journal.test.ts`；`src/lib/agent.test.ts`：`fails loudly when the model answer is unusable` |

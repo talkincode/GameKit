@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel } from "./nav";
 
 // 弹层里的按钮：「保存到项目」「新建项目」是主按钮，要有底色；「生成」「✕」要有边框。
 // 回归：`.modal button` 的重置曾经压过 `.run` / `.ghost`，主按钮变成浅色字落在浅色底上，看不见。
@@ -17,7 +18,7 @@ async function signIn(page: Page) {
 
 test("the projects panel keeps its primary button visible and its close button outlined", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   const panel = page.getByTestId("projects-panel");
   await expect(panel).toBeVisible();
 

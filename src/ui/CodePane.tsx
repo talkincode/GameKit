@@ -28,7 +28,8 @@ export function CodePane() {
   return (
     <section className="editor">
       <div className="tabs">
-        <span>{studio.path || text.code.files}</span>
+        <PanelToggles />
+        <span className="tab-path">{studio.path || text.code.files}</span>
         <div className="inline-ai">
           {file && isMapDocument(file.path) ? (
             <button type="button" data-testid="map-edit-code" onClick={() => studio.editMapFile(file.path)}>
@@ -93,6 +94,35 @@ export function CodePane() {
         <p className="empty pad">{text.code.binary}</p>
       )}
     </section>
+  );
+}
+
+/** 看代码 才有的面板开关，放在编辑区标签栏，不占顶栏。 */
+function PanelToggles() {
+  const studio = useStudio();
+  return (
+    <div className="panel-toggles" role="group" aria-label={text.header.panels}>
+      {(
+        [
+          ["side", text.header.panelFiles],
+          ["stage", text.header.panelStage],
+          ["bottom", text.header.panelConsole],
+        ] as const
+      ).map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={studio.panels[id]}
+          title={label}
+          aria-label={label}
+          data-testid={`panel-${id}`}
+          className={studio.panels[id] ? "on" : ""}
+          onClick={() => studio.togglePanel(id)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 

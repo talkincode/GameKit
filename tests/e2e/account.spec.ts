@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { text } from "../../src/ui/text";
+import { signOut } from "./nav";
 
 // Sign-in, authorization and the AI gate, end to end against the real Worker.
 // Roles: anonymous, allowed account, signed in but not on the allowlist.
@@ -113,7 +114,8 @@ test("a lost session asks the child to sign in again and keeps the work", async 
 test("sign-out returns to the anonymous studio", async ({ page }) => {
   await openStudio(page);
   await signIn(page, ALLOWED);
-  await page.getByRole("button", { name: text.account.signOut }).click();
+  await expect(page.getByRole("button", { name: text.account.signOut })).toHaveCount(0);
+  await signOut(page);
   await expect(page.locator(".notice")).toContainText(text.account.notes["signed-out"]);
   await expect(page.getByRole("button", { name: text.account.signIn, exact: true })).toBeVisible();
 

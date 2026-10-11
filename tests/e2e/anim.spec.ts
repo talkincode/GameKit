@@ -4,6 +4,7 @@ import { unzipSync } from "fflate";
 import { createPixels, type Pixels } from "../../src/lib/pixel/buffer";
 import { encodePng } from "../../src/lib/pixel/png";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel } from "./nav";
 
 // 精灵与动画：不登录。多帧画完保存，重新打开后帧序、时长和透明通道还在；
 // 源码包里是 PNG + JSON；舞台上的 pygame 打出同一组时长和像素。
@@ -231,7 +232,7 @@ test("anonymous: frames are saved, reopened, exported, and played by pygame", as
   await expect(page.locator(".console")).toContainText("ANIM-OK 2 200,80", { timeout: 120_000 });
   await expect(page.locator(".console")).toContainText("ANIM-PIXEL 239 125 87 255");
 
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   const [source] = await Promise.all([
     page.waitForEvent("download"),
     page.getByTestId("projects-panel").getByRole("button", { name: text.project.exportSource, exact: true }).first().click(),
@@ -251,7 +252,7 @@ test("anonymous: frames are saved, reopened, exported, and played by pygame", as
   expect(moduleText).not.toContain("import gamekit");
   await page.keyboard.press("Escape");
 
-  await page.getByRole("button", { name: text.header.undoShort, exact: true }).click();
+  await page.getByTestId("undo").click();
   await expect.poll(async () => (await fileOf(page, "main.py"))?.text ?? "").not.toContain("ANIM-OK");
   await expect.poll(async () => fileOf(page, "sprite_anim.py")).toBeNull();
   expect((await fileOf(page, NOTE))?.text).toContain('"durationMs": 200');
