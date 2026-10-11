@@ -100,6 +100,9 @@ export function ProjectsPanel() {
             ✕
           </button>
         </header>
+        <p className="projects-note" data-testid="export-source-hint">
+          {text.project.exportSourceHint}
+        </p>
 
         <div className="projects-body">
           {shown.map((project) => (

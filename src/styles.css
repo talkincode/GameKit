@@ -677,6 +677,7 @@ button:disabled { opacity: 0.45; cursor: default; }
   white-space: nowrap;
 }
 .projects-import:hover { border-color: var(--ink); background: var(--paper-2); }
+.projects-note { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
 .projects-body {
   overflow: auto;
   display: grid;

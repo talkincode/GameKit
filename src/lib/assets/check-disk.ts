@@ -68,3 +68,9 @@ export async function checkAssetPacks(root: string): Promise<PackIssue[]> {
   }
   return issues;
 }
+
+/** Non-null when `pnpm build` must stop. The Vite plugin passes this to `this.error`. */
+export function packGateFailure(issues: PackIssue[]): string | null {
+  if (!issues.length) return null;
+  return issues.map((issue) => `${issue.code}: ${issue.message}`).join("\n");
+}

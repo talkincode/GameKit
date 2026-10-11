@@ -159,7 +159,7 @@ export function Toolbar() {
 
       {studio.menu === "export" ? (
         <div className="menu menu-export">
-          <p>{text.export.copy}</p>
+          <p data-testid="export-offline-note">{text.export.copy}</p>
           <button type="button" onClick={() => studio.exportKind("web")}>
             {text.export.web}
             <small>{text.export.webHint}</small>
