@@ -181,7 +181,8 @@ describe("a round of the agent loop", () => {
   it("fails loudly when the model answer is unusable", async () => {
     const h = harness({ answers: [DESIGN, "this is not json"] });
     const outcome = await turn(h);
-    expect(outcome).toMatchObject({ kind: "failed" });
+    expect(outcome).toMatchObject({ kind: "failed", failure: { code: "parse" } });
+    if (outcome.kind === "failed") expect(outcome.failure.detail).not.toContain("this is not json");
     expect(h.steps().at(-1)).toMatchObject({ key: "build", status: "failed" });
     // The child's step list never carries model prose; only our own facts.
     expect(h.steps().at(-1)?.detail).toBeUndefined();

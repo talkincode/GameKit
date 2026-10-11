@@ -7,6 +7,7 @@
  * through `AgentEffects`, so the whole loop runs in unit tests without a browser,
  * a model, or a pygame runtime.
  */
+import { failureFromUnknown, makeFailure, type PublicFailure } from "../../shared/assistant-error";
 import type { CatalogHit } from "../../shared/catalog";
 import {
   buildMessages,
@@ -46,13 +47,15 @@ export type RunOutcome =
   | { kind: "quiet" }
   | { kind: "cancelled" };
 
+export type ModelReply = string | { text: string; requestId?: string };
+
 export type AgentTurnOutcome =
   /** A candidate is ready to play. `unverified` says automatic checks saw no game. */
-  | { kind: "ready"; unverified?: "quiet" | "unavailable" }
+  | { kind: "ready"; unverified?: "quiet" | "unavailable"; requestId?: string }
   /** Candidate still has a blocking problem after the repair budget. */
-  | { kind: "blocked"; reason: "static" | "runtime" | "limit"; detail?: string }
-  | { kind: "failed"; message: string }
-  | { kind: "cancelled" };
+  | { kind: "blocked"; reason: "static" | "runtime" | "limit"; detail?: string; requestId?: string }
+  | { kind: "failed"; message: string; failure: PublicFailure }
+  | { kind: "cancelled"; requestId?: string };
 
 export type FileDiff = { path: string; rows: DiffRow[] };
 
@@ -73,7 +76,7 @@ export type AgentTurnInput = { id: string; request: string; images?: ChatImage[]
 
 export type AgentEffects = {
   /** One model call. Throws when the call or the answer is unusable. */
-  model: (messages: ChatMessage[]) => Promise<string>;
+  model: (messages: ChatMessage[]) => Promise<ModelReply>;
   diagnose: (project: Project) => Problem[];
   run: (candidate: Project, turn: AgentTurnInput) => Promise<RunOutcome>;
   /** True once the child cancelled, or the project changed underneath. */
@@ -139,6 +142,18 @@ export async function runAgentTurn(
     fx.emit({ kind: "step", step: { key, kind, status, detail } });
   };
   const finish = () => emitStep("finish", "finish", "done");
+  let requestId: string | undefined;
+  const ask = async (messages: ChatMessage[]): Promise<string> => {
+    const reply = await fx.model(messages);
+    const text = typeof reply === "string" ? reply : reply.text;
+    const id = typeof reply === "string" ? undefined : reply.requestId;
+    if (id) requestId = id;
+    return text;
+  };
+  const fail = (error: unknown): AgentTurnOutcome => {
+    const failure = failureFromUnknown(error, requestId);
+    return { kind: "failed", message: failure.message, failure };
+  };
 
   emitStep("hear", "hear", "done", input.request.trim());
 
@@ -147,17 +162,16 @@ export async function runAgentTurn(
   let design: DesignCard;
   let say = "";
   try {
-    const answer = readDesign(await fx.model(designMessages({ request: input.request, base, images: input.images })));
+    const answer = readDesign(await ask(designMessages({ request: input.request, base, images: input.images })));
     design = answer.card;
     say = answer.say;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The model call failed.";
     emitStep("design", "design", "failed");
-    return { kind: "failed", message };
+    return fail(error);
   }
   emitStep("design", "design", "done", design.title);
   fx.emit({ kind: "design", design, say });
-  if (fx.cancelled()) return { kind: "cancelled" };
+  if (fx.cancelled()) return { kind: "cancelled", requestId };
 
   const takeFiles = async (raw: string, onto: Project): Promise<{ project: Project; say: string }> => {
     const built = readCandidateFiles(raw, onto, "main.py", input.catalog ?? []);
@@ -174,26 +188,26 @@ export async function runAgentTurn(
   let candidate: Project;
   try {
     const built = await takeFiles(
-      await fx.model(buildMessages({ request: input.request, design, base, catalog: input.catalog })),
+      await ask(buildMessages({ request: input.request, design, base, catalog: input.catalog })),
       base,
     );
     candidate = built.project;
     say = built.say || say;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The model call failed.";
     emitStep("build", "build", "failed");
-    return { kind: "failed", message };
+    return fail(error);
   }
   if (!candidate.files.some((file) => file.path === "main.py" && file.text?.trim())) {
     emitStep("build", "build", "failed");
-    return { kind: "failed", message: "The candidate has no main.py." };
+    const failure = makeFailure("parse", "The candidate has no main.py.", requestId ?? "");
+    return { kind: "failed", message: failure.message, failure };
   }
   emitStep("build", "build", "done");
   fx.emit({ kind: "candidate", candidate: { project: candidate, design, say, repairs: 0, diff: candidateDiff(base, candidate) } });
 
   // 3. Check and repair until the child gets something playable, or we run out.
   for (let repairs = 0; repairs <= MAX_REPAIRS; repairs += 1) {
-    if (fx.cancelled()) return { kind: "cancelled" };
+    if (fx.cancelled()) return { kind: "cancelled", requestId };
 
     const found = blocking(fx.diagnose(candidate));
     if (found.length) {
@@ -201,16 +215,15 @@ export async function runAgentTurn(
       if (repairs === MAX_REPAIRS) {
         emitStep(`repair-${repairs}`, "repair", "failed", detail);
         emitStep("give-up", "stop", "failed", detail);
-        return { kind: "blocked", reason: "static", detail };
+        return { kind: "blocked", reason: "static", detail, requestId };
       }
       emitStep(`repair-${repairs + 1}`, "repair", "active", detail);
       try {
-        const fixed = await fx.model(repairMessages({ request: input.request, design, files: candidate.files, problems: found, consoleTail: "" }));
+        const fixed = await ask(repairMessages({ request: input.request, design, files: candidate.files, problems: found, consoleTail: "" }));
         candidate = (await takeFiles(fixed, candidate)).project;
       } catch (error) {
-        const message = error instanceof Error ? error.message : "The model call failed.";
         emitStep(`repair-${repairs + 1}`, "repair", "failed", detail);
-        return { kind: "failed", message };
+        return fail(error);
       }
       emitStep(`repair-${repairs + 1}`, "repair", "done", detail);
       fx.emit({ kind: "candidate", candidate: { project: candidate, design, say, repairs: repairs + 1, diff: candidateDiff(base, candidate) } });
@@ -219,29 +232,28 @@ export async function runAgentTurn(
 
     emitStep("check", "check", "active");
     const outcome = await fx.run(candidate, input);
-    if (outcome.kind === "cancelled") return { kind: "cancelled" };
+    if (outcome.kind === "cancelled") return { kind: "cancelled", requestId };
     if (outcome.kind === "running") {
       emitStep("check", "check", "done");
       finish();
-      return { kind: "ready" };
+      return { kind: "ready", requestId };
     }
     if (outcome.kind === "error") {
       if (repairs === MAX_REPAIRS) {
         const detail = outcome.detail.slice(0, 200);
         emitStep(`repair-${repairs}`, "repair", "failed", detail);
         emitStep("give-up", "stop", "failed", detail);
-        return { kind: "blocked", reason: "runtime", detail };
+        return { kind: "blocked", reason: "runtime", detail, requestId };
       }
       emitStep(`repair-${repairs + 1}`, "repair", "active");
       try {
-        const fixed = await fx.model(
+        const fixed = await ask(
           repairMessages({ request: input.request, design, files: candidate.files, problems: [], consoleTail: outcome.detail }),
         );
         candidate = (await takeFiles(fixed, candidate)).project;
       } catch (error) {
-        const message = error instanceof Error ? error.message : "The model call failed.";
         emitStep(`repair-${repairs + 1}`, "repair", "failed");
-        return { kind: "failed", message };
+        return fail(error);
       }
       emitStep(`repair-${repairs + 1}`, "repair", "done");
       fx.emit({ kind: "candidate", candidate: { project: candidate, design, say, repairs: repairs + 1, diff: candidateDiff(base, candidate) } });
@@ -252,9 +264,9 @@ export async function runAgentTurn(
     // guessing. Nothing here is proof of a code problem, so no repair.
     emitStep("check", "check", "done");
     finish();
-    return { kind: "ready", unverified: outcome.kind };
+    return { kind: "ready", unverified: outcome.kind, requestId };
   }
 
   emitStep("give-up", "stop", "failed");
-  return { kind: "blocked", reason: "limit" };
+  return { kind: "blocked", reason: "limit", requestId };
 }

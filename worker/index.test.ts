@@ -219,7 +219,81 @@ describe("ai gateway", () => {
     modelReply = () => new Response("invalid key server-secret", { status: 401 });
     const response = await call("/api/ai", { token: await jwt(), init: completion });
     expect(response.status).toBe(502);
-    expect(await response.text()).not.toContain("server-secret");
+    const body = await response.json();
+    expect(body).toMatchObject({ code: "upstream_failed", category: "upstream" });
+    expect(body.requestId).toMatch(/^gk_/);
+    expect(JSON.stringify(body)).not.toContain("server-secret");
+  });
+
+  it("classifies a rate limit, a timeout, an empty answer, and a non-JSON body", async () => {
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((line?: unknown) => {
+      lines.push(String(line));
+    });
+    try {
+      modelReply = () => new Response("slow down server-secret", { status: 429, headers: { "retry-after": "9" } });
+      const limited = await call("/api/ai", { token: await jwt(), init: completion });
+      expect(limited.status).toBe(429);
+      const limitedBody = await limited.json();
+      expect(limitedBody).toMatchObject({
+        category: "rate_limit",
+        message: "小助手太忙了，稍后再试。",
+      });
+      expect(limitedBody.detail).toContain("HTTP 429");
+      expect(limitedBody.detail).toContain("retry-after 9s");
+      expect(JSON.stringify(limitedBody)).not.toContain("server-secret");
+      const logged = lines
+        .map((line) => {
+          try {
+            return JSON.parse(line) as { source?: string; requestId?: string };
+          } catch {
+            return null;
+          }
+        })
+        .find((line) => line?.source === "gamekit.ai" && line.requestId === limitedBody.requestId);
+      expect(logged).toMatchObject({ ok: false, code: "rate_limit", op: "complete" });
+      expect(JSON.stringify(logged)).not.toContain("server-secret");
+      expect(JSON.stringify(logged)).not.toContain("hi");
+
+      modelReply = () => {
+        throw new DOMException("Bearer server-secret https://model.example.com/v1", "TimeoutError");
+      };
+      const timed = await call("/api/ai", { token: await jwt(), init: completion });
+      expect(timed.status).toBe(504);
+      const timedBody = await timed.json();
+      expect(timedBody.category).toBe("timeout");
+      expect(JSON.stringify(timedBody)).not.toContain("server-secret");
+      expect(JSON.stringify(timedBody)).not.toContain("model.example.com");
+
+      modelReply = () => Response.json({ choices: [{ message: { content: "  " } }] });
+      const empty = await call("/api/ai", { token: await jwt(), init: completion });
+      expect((await empty.json()).category).toBe("empty");
+
+      modelReply = () => new Response("<html>server-secret</html>", { status: 200, headers: { "Content-Type": "text/html" } });
+      const parsed = await call("/api/ai", { token: await jwt(), init: completion });
+      const parsedBody = await parsed.json();
+      expect(parsedBody.category).toBe("parse");
+      expect(JSON.stringify(parsedBody)).not.toContain("server-secret");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("reads text when the model returns content parts, and stamps a request id", async () => {
+    modelReply = () => Response.json({ choices: [{ message: { content: [{ type: "text", text: '{"say":"好"}' }] } }], usage: { prompt_tokens: 3, completion_tokens: 1 } });
+    const response = await call("/api/ai", { token: await jwt(), init: completion });
+    const body = await response.json();
+    expect(body.text).toBe('{"say":"好"}');
+    expect(body.requestId).toMatch(/^gk_/);
+    expect(response.headers.get("x-request-id")).toBe(body.requestId);
+  });
+
+  it("gives a refused sign-in a request id and a kid sentence", async () => {
+    const response = await call("/api/ai", { init: completion });
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body).toMatchObject({ code: "sign_in_required", category: "sign_in", message: "请登录后使用。" });
+    expect(body.requestId).toMatch(/^gk_/);
   });
 
   it("refuses when the model is not configured", async () => {
@@ -235,7 +309,9 @@ describe("ai gateway", () => {
       init: { method: "POST", body: JSON.stringify({ op: "image", kind: "sprite", prompt: "小狐狸", variation: 2 }) },
     });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ image: "AAAA", mediaType: "image/png" });
+    const drawn = await response.json();
+    expect(drawn).toMatchObject({ image: "AAAA", mediaType: "image/png" });
+    expect(drawn.requestId).toMatch(/^gk_/);
 
     expect(imageCalls).toHaveLength(1);
     expect(imageCalls[0].url).toBe(GEMINI_URL);

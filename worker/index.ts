@@ -1,4 +1,6 @@
-import { complete, image, modelInfo, readImageRequest, readMessages, readSoundRequest, sound } from "./ai";
+import { workerRequestId } from "../shared/assistant-error";
+import { complete, image, modelInfo, readImageRequest, readMessages, readSoundRequest, sound, type ChatAnswer } from "./ai";
+import { describeAssistantError, writeAiLog } from "./assistant-log";
 import { collabRoute } from "./collab-routes";
 import type { GameKitEnv } from "./env";
 import { HttpError, errorResponse, json, redirect } from "./http";
@@ -34,11 +36,14 @@ const defaultHandler: ExportedHandler<GameKitEnv> = {
 
       if (!url.pathname.startsWith("/api/")) return json({ error: "Not found.", code: "not_found" }, 404);
 
+      // Assistant posts mint a requestId before the gate, so a refusal is still look-up-able.
+      // handleAi runs the same identity check; this is not an anonymous route.
+      if (url.pathname === "/api/ai" && request.method === "POST") return await handleAi(request, env);
+
       const identity = await requireIdentity(request, env);
       if (url.pathname === "/api/me" && request.method === "GET") return json({ email: identity.email });
       // What the model can take; the app sizes the assistant's memory with it.
       if (url.pathname === "/api/ai" && request.method === "GET") return json(modelInfo(env));
-      if (url.pathname === "/api/ai" && request.method === "POST") return await ai(request, env);
       return json({ error: "Not found.", code: "not_found" }, 404);
     } catch (error) {
       return errorResponse(error);
@@ -55,23 +60,91 @@ export default {
   },
 } satisfies ExportedHandler<GameKitEnv>;
 
-async function ai(request: Request, env: GameKitEnv): Promise<Response> {
-  let body: unknown;
+/**
+ * Every assistant POST gets a requestId before the identity gate, so a refused
+ * sign-in is still something an adult can look up. The log line is written here,
+ * once, for both success and failure.
+ */
+async function handleAi(request: Request, env: GameKitEnv): Promise<Response> {
+  const requestId = workerRequestId();
+  const started = Date.now();
+  let op = "unknown";
   try {
-    body = await request.json();
-  } catch {
-    throw new HttpError(400, "bad_request", "The request body must be JSON.");
+    await requireIdentity(request, env);
+    const result = await runAi(request, env);
+    op = result.op;
+    writeAiLog({
+      source: "gamekit.ai",
+      requestId,
+      op,
+      ok: true,
+      httpStatus: 200,
+      ms: Date.now() - started,
+      promptTokens: result.usage?.promptTokens,
+      completionTokens: result.usage?.completionTokens,
+    });
+    return json({ ...result.payload, requestId }, 200, { "x-request-id": requestId });
+  } catch (error) {
+    if (error instanceof HttpError && error.op) op = error.op;
+    const described = describeAssistantError(error, requestId);
+    writeAiLog({
+      source: "gamekit.ai",
+      requestId,
+      op,
+      ok: false,
+      code: described.category,
+      httpStatus: described.status,
+      ms: Date.now() - started,
+      detail: described.detail,
+    });
+    return json(described.body, described.status, { "x-request-id": requestId });
   }
-  if (!body || typeof body !== "object") throw new HttpError(400, "bad_request", "The request body must be an object.");
-  const record = body as { op?: unknown; messages?: unknown; kind?: unknown; prompt?: unknown; variation?: unknown };
-  if (record.op === "complete") {
-    const answer = await complete(env, readMessages(record.messages));
-    return json({ text: answer.text, usage: answer.usage });
+}
+
+async function runAi(
+  request: Request,
+  env: GameKitEnv,
+): Promise<{ op: string; payload: Record<string, unknown>; usage?: ChatAnswer["usage"] }> {
+  let op = "unknown";
+  try {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      throw new HttpError(400, "bad_request", "The request body must be JSON.", {
+        assistantCode: "bad_request",
+        detail: "request body was not JSON",
+      });
+    }
+    if (!body || typeof body !== "object") {
+      throw new HttpError(400, "bad_request", "The request body must be an object.", {
+        assistantCode: "bad_request",
+        detail: "request body was not an object",
+      });
+    }
+    const record = body as { op?: unknown; messages?: unknown; kind?: unknown; prompt?: unknown; variation?: unknown };
+    op = typeof record.op === "string" ? record.op.slice(0, 32) : "unknown";
+    if (record.op === "complete") {
+      const answer = await complete(env, readMessages(record.messages));
+      return { op, payload: { text: answer.text, usage: answer.usage }, usage: answer.usage };
+    }
+    if (record.op === "image") {
+      const drawn = await image(env, readImageRequest(record));
+      return { op, payload: drawn };
+    }
+    // Sound: the model picks a patch or a few bars; the browser renders the samples.
+    if (record.op === "sound") {
+      const answer = await sound(env, readSoundRequest(record));
+      return { op, payload: { text: answer.text }, usage: answer.usage };
+    }
+    throw new HttpError(400, "bad_request", "Unknown AI operation.", {
+      assistantCode: "bad_request",
+      detail: "unknown AI operation",
+    });
+  } catch (error) {
+    if (error instanceof HttpError) error.op = op;
+    throw error;
   }
-  if (record.op === "image") return json(await image(env, readImageRequest(record)));
-  // Sound: the model picks a patch or a few bars; the browser renders the samples.
-  if (record.op === "sound") return json({ text: (await sound(env, readSoundRequest(record))).text });
-  throw new HttpError(400, "bad_request", "Unknown AI operation.");
 }
 
 const LOGIN_RESULT: Record<number, string> = { 401: "failed", 403: "denied", 503: "unavailable" };

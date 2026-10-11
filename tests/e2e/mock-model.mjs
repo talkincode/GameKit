@@ -97,6 +97,12 @@ createServer(async (request, response) => {
       response.writeHead(401).end("bad key");
       return;
     }
+    // A rate-limit from the provider. The body repeats the key so a leak is visible.
+    if (mode === "rate") {
+      response.writeHead(429, { "Content-Type": "text/plain", "retry-after": "3" });
+      response.end("slow down e2e-key");
+      return;
+    }
     const { messages } = JSON.parse(body);
     const content = replyFor(messages);
     response.writeHead(200, { "Content-Type": "application/json" });

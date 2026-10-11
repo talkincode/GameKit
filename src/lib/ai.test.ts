@@ -96,6 +96,17 @@ describe("answers from the model", () => {
     expect(() => readDesign('{"say":"好呀"}')).toThrow(/game/);
   });
 
+  it("reports a JSON parse position without quoting the model text", () => {
+    const secret = "sk-secretkeyvalue";
+    const raw = `{ "say": ${secret} }`;
+    expect(() => parseModelJson(raw)).toThrow(/JSON parse failed at character 0/);
+    try {
+      parseModelJson(raw);
+    } catch (error) {
+      expect(error instanceof Error ? error.message : "").not.toContain(secret);
+    }
+  });
+
   it("parses fenced JSON and rejects paths outside the project", () => {
     const parsed = parseModelJson('```json\n{"say":"ok","files":[{"path":"main.py","content":"x"}]}\n```');
     expect(parsed).toMatchObject({ say: "ok" });

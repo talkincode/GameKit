@@ -6,6 +6,9 @@ const STORE = "projects";
 const SESSION_STORE = "sessions";
 /** Sounds the child kept from the editor, separate from any one project. */
 const SOUND_STORE = "sounds";
+/** One ring of local diagnostic rows (src/lib/log/journal.ts). */
+const LOG_STORE = "logs";
+const JOURNAL_ID = "journal";
 
 /**
  * Schema rule: object stores and indexes need a version bump (plus a migration in
@@ -14,8 +17,9 @@ const SOUND_STORE = "sounds";
  * (src/lib/design.ts) and `trash` (src/lib/project.ts) were added that way.
  * Version 2 added the `sessions` store for agent conversations.
  * Version 3 added the `sounds` store for editor sounds kept on this computer.
+ * Version 4 added the `logs` store for the on-device diagnostic journal.
  */
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export type StoredKeptSound = {
   id: string;
@@ -32,6 +36,7 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(SESSION_STORE)) db.createObjectStore(SESSION_STORE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(SOUND_STORE)) db.createObjectStore(SOUND_STORE, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(LOG_STORE)) db.createObjectStore(LOG_STORE, { keyPath: "id" });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -122,5 +127,23 @@ export async function saveKeptSound(row: StoredKeptSound): Promise<void> {
 export async function removeKeptSound(id: string): Promise<void> {
   const db = await openDb();
   await requestToPromise(db.transaction(SOUND_STORE, "readwrite").objectStore(SOUND_STORE).delete(id));
+  db.close();
+}
+
+/** The on-device log ring. One row, newest first. Missing store is created by version 4. */
+export async function loadJournal(): Promise<unknown[]> {
+  const db = await openDb();
+  const row = await requestToPromise(
+    db.transaction(LOG_STORE).objectStore(LOG_STORE).get(JOURNAL_ID) as IDBRequest<{ id: string; entries?: unknown } | undefined>,
+  );
+  db.close();
+  return Array.isArray(row?.entries) ? row.entries : [];
+}
+
+export async function saveJournal(entries: unknown[]): Promise<void> {
+  const db = await openDb();
+  await requestToPromise(
+    db.transaction(LOG_STORE, "readwrite").objectStore(LOG_STORE).put({ id: JOURNAL_ID, entries }),
+  );
   db.close();
 }

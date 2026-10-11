@@ -30,8 +30,10 @@ import {
   type AgentTurnInput,
   type AgentTurnOutcome,
   type CandidateResult,
+  type ModelReply,
   type RunOutcome,
 } from "../lib/agent";
+import { failureFromUnknown, localRequestId, makeFailure, type PublicFailure } from "../../shared/assistant-error";
 import { GatewayError } from "../lib/adk/model";
 import { forgetAllRunners, forgetProjectRunner, projectHasSession, projectRunner } from "../lib/adk/runner";
 import { loadLibrary } from "../lib/assets/catalog";
@@ -83,6 +85,7 @@ import { prepareAsset } from "../lib/sprite";
 import { createBlankProject, createStarterProject } from "../lib/starter";
 import { applyLibraryCopy, type LibraryCopyRequest, type LibraryCopyResult } from "../lib/assets/copy";
 import { librarySpriteNote } from "../lib/assets/sprite-note";
+import { aiCallSummary, appendLog, hydrateLogs, logFailure, requestIdFrom } from "../lib/log/journal";
 import { deleteStoredProject, loadProjects, saveProject } from "../lib/storage";
 import { text } from "../ui/text";
 
@@ -320,7 +323,10 @@ type StudioValue = {
   soundLibraryVersion: number;
   aiBusy: boolean;
   notice: string;
+  noticeFailure: PublicFailure | null;
   dismissNotice: () => void;
+  logsOpen: boolean;
+  setLogsOpen: (open: boolean) => void;
   bottomTab: "console" | "problems" | "debug";
   setBottomTab: (tab: "console" | "problems" | "debug") => void;
   updateText: (path: string, text: string) => void;
@@ -400,6 +406,19 @@ function toAdkParts(content: unknown): { text?: string; inlineData?: { mimeType:
   return parts.length ? parts : [{ text: "" }];
 }
 
+type ApiProblem = "sign-in" | "denied" | "unavailable" | "offline" | "error";
+
+/**
+ * A model call only starts after the studio thought the child was signed in.
+ * A 401 is a lost session, so the sentence is the expired one. The category
+ * and request id stay, for 查看详情.
+ */
+function forKnownSession(problem: ApiProblem, failure: PublicFailure): PublicFailure {
+  if (problem === "sign-in") return { ...failure, message: text.account.notes.expired };
+  if (problem === "denied") return { ...failure, message: text.account.notes.denied };
+  return failure;
+}
+
 /** Folds one agent event into the round it belongs to. */
 function applyEvent(turn: Turn, event: AgentEvent): Turn {
   if (event.kind === "step") return { ...turn, steps: foldStep(turn.steps, event.step) };
@@ -425,6 +444,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [selection, setSelection] = useState("");
   const [menu, setMenu] = useState<MenuId>(null);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** Does the assistant already have a conversation about this project? */
   const [remembers, setRemembers] = useState(false);
@@ -449,7 +469,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [mapNewOpen, setMapNewOpen] = useState(false);
   const [mapSession, setMapSession] = useState<MapSession | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [notice, setNoticeText] = useState("");
+  const [noticeFailure, setNoticeFailure] = useState<PublicFailure | null>(null);
+  const setNotice = useCallback((value: string) => {
+    setNoticeText(value);
+    setNoticeFailure(null);
+  }, []);
+  const setFailureNotice = useCallback((failure: PublicFailure) => {
+    setNoticeText(failure.message);
+    setNoticeFailure(failure);
+  }, []);
   const [bottomTab, setBottomTab] = useState<"console" | "problems" | "debug">("console");
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
   const [runtimeProblems, setRuntimeProblems] = useState<Problem[]>([]);
@@ -471,6 +500,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const previewGeneration = useRef(0);
   const previewActive = useRef(false);
   const runtimeError = useRef(false);
+  const runtimeLogged = useRef(false);
   const activePlaySession = useRef<string | null>(null);
   const previewArchive = useRef<Uint8Array | null>(null);
   const consoleRef = useRef("");
@@ -519,6 +549,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    void hydrateLogs();
+  }, []);
+
+  useEffect(() => {
     const result = takeLoginResult();
     if (result) setSignInHint(result === "ok");
     if (result && result !== "ok") setNotice(text.account.notes[result]);
@@ -547,25 +581,34 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    * notice, for callers that report the failure themselves.
    */
   /** Tells the child what went wrong with an AI call, and updates who-is-signed-in. */
-  const noteApiProblem = useCallback((problem: ApiOutcome<unknown>["ok"] extends never ? never : "sign-in" | "denied" | "unavailable" | "offline" | "error", message: string) => {
+  const noteApiProblem = useCallback((problem: ApiProblem, message: string, failure?: PublicFailure) => {
     if (problem === "sign-in" || problem === "denied") {
       const note = problem === "denied" ? "denied" : "expired";
       setSignInHint(false);
       setAccount({ kind: "anonymous", note });
-      setNotice(text.account.notes[note]);
+      const shown = failure ? forKnownSession(problem, failure) : undefined;
+      if (shown) setFailureNotice(shown);
+      else setNotice(text.account.notes[note]);
       return;
     }
     if (problem === "offline") {
-      setNotice(text.account.offline);
+      if (failure) setFailureNotice(failure);
+      else setNotice(text.account.offline);
       return;
     }
     if (problem === "unavailable") {
-      setNotice(text.account.unavailable);
+      if (failure) setFailureNotice(failure);
+      else setNotice(text.account.unavailable);
+      return;
+    }
+    if (failure) {
+      console.warn("AI request failed:", failure.code, failure.requestId, failure.detail);
+      setFailureNotice(failure);
       return;
     }
     console.warn("AI request failed:", message);
     setNotice(text.ai.failed);
-  }, []);
+  }, [setFailureNotice, setNotice]);
 
   const callAi = useCallback(async <T,>(body: unknown, quiet = false): Promise<T | null> => {
     const outcome: ApiOutcome<T> = await callApi<T>("/api/ai", {
@@ -573,12 +616,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (outcome.ok) return outcome.value;
+    const summary = aiCallSummary(body);
+    if (outcome.ok) {
+      appendLog({
+        area: "assistant",
+        ok: true,
+        code: "ok",
+        message: text.pane.loggedDone,
+        detail: summary,
+        requestId: requestIdFrom(outcome.value) || localRequestId(),
+        summary,
+      });
+      return outcome.value;
+    }
+    const failure = forKnownSession(outcome.problem === "error" ? "error" : outcome.problem, outcome.failure);
+    logFailure("assistant", failure, summary);
     if (quiet && outcome.problem === "error") {
-      console.warn("AI request failed:", outcome.message);
+      console.warn("AI request failed:", failure.detail);
       return null;
     }
-    noteApiProblem(outcome.problem === "error" ? "error" : outcome.problem, outcome.message);
+    noteApiProblem(outcome.problem === "error" ? "error" : outcome.problem, failure.message, failure);
     return null;
   }, [noteApiProblem]);
 
@@ -992,6 +1049,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     previewGeneration.current += 1;
     previewActive.current = false;
     runtimeError.current = false;
+    runtimeLogged.current = false;
     const session = activePlaySession.current;
     activePlaySession.current = null;
     previewArchive.current = null;
@@ -1011,6 +1069,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     const generation = ++previewGeneration.current;
     previewActive.current = false;
     runtimeError.current = false;
+    runtimeLogged.current = false;
     previewArchive.current = null;
     if (!target.files.some((file) => file.path === "main.py" && file.text?.trim())) {
       throw new Error(text.stage.needMain);
@@ -1057,7 +1116,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (generation !== previewGeneration.current) return;
       setRunState("error");
       setStatusNote(text.stage.failed);
-      setNotice(error instanceof Error ? error.message : text.stage.failed);
+      const detail = error instanceof Error ? error.message : text.stage.failed;
+      const failure = makeFailure("preview", detail, "");
+      const shown = detail === text.stage.needMain ? { ...failure, message: text.stage.needMain } : failure;
+      logFailure("preview", shown, "试玩");
+      setFailureNotice(shown);
       setBottomTab("console");
     }
   }, [runProject]);
@@ -1089,19 +1152,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setConsoleText(next);
       const found = problemsFromConsole(next);
       if (found.length) {
+        const first = !runtimeError.current;
         runtimeError.current = true;
         setRuntimeProblems(found);
         setRunState("error");
         setStatusNote(text.stage.runtimeError);
         setBottomTab("problems");
-        settleRun({ kind: "error", detail: tracebackTail(next) });
+        const tail = tracebackTail(next);
+        if (first && !runtimeLogged.current) {
+          runtimeLogged.current = true;
+          const failure = makeFailure("preview", tail, "");
+          logFailure("preview", { ...failure, message: text.stage.runtimeError }, "试玩");
+        }
+        settleRun({ kind: "error", detail: tail });
       }
     },
     [settleRun],
   );
 
   const callModel = useCallback(
-    async (messages: ChatMessage[]): Promise<string> => {
+    async (messages: ChatMessage[]): Promise<ModelReply> => {
       // One ADK run per step: ADK owns the project's conversation and its token
       // budget, the gateway owns the key and the model call.
       const base = projectRef.current;
@@ -1116,12 +1186,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       try {
         return await runner.run(stepParts);
       } catch (error) {
-        if (error instanceof GatewayError) {
-          noteApiProblem(error.problem === "failed" ? "error" : error.problem, error.problem);
-          throw error;
-        }
-        console.warn("Model call failed:", error);
-        throw new Error("The model did not answer.");
+        const raw = failureFromUnknown(error);
+        const problem = raw.code === "sign_in" ? "sign-in" : raw.code === "not_allowed" ? "denied" : raw.code === "not_configured" ? "unavailable" : raw.code === "network" ? "offline" : "error";
+        const failure = forKnownSession(problem, raw);
+        noteApiProblem(problem, failure.message, failure);
+        throw new GatewayError(failure);
       }
     },
     [noteApiProblem],
@@ -1182,11 +1251,27 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           },
         });
       } catch (error) {
-        outcome = { kind: "failed", message: error instanceof Error ? error.message : "The model call failed." };
+        const failure = failureFromUnknown(error);
+        outcome = { kind: "failed", message: failure.message, failure };
       }
       patch((item) => ({ ...item, outcome }));
-      if (outcome.kind === "failed") console.warn("Agent round failed:", outcome.message);
-      if (outcome.kind === "ready" && viewRef.current === "code") setNotice(text.pane.doneNotice);
+      if (outcome.kind === "failed") {
+        console.warn("Agent round failed:", outcome.failure.code, outcome.failure.requestId, outcome.failure.detail);
+        logFailure("assistant", outcome.failure, fresh.request);
+        setFailureNotice(outcome.failure);
+      } else {
+        const requestId = outcome.requestId || localRequestId();
+        appendLog({
+          area: "assistant",
+          ok: outcome.kind !== "blocked",
+          code: outcome.kind === "blocked" ? "blocked" : "ok",
+          message: outcome.kind === "cancelled" ? text.pane.cancelled : outcome.kind === "blocked" ? text.pane.blocked : text.pane.loggedDone,
+          detail: outcome.kind === "blocked" ? outcome.detail || outcome.reason : outcome.kind === "ready" && outcome.unverified ? outcome.unverified : outcome.kind,
+          requestId,
+          summary: fresh.request,
+        });
+        if (outcome.kind === "ready" && viewRef.current === "code") setNotice(text.pane.doneNotice);
+      }
       if (turnRef.current?.id === turnId) turnRef.current = null;
       setTurnBusy(false);
     },
@@ -1276,13 +1361,30 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setView("design");
     setAiBusy(true);
     try {
-      const answer = readSay(
-        await callModel(explainMessages({ path, source: file.text ?? "", selection })),
-      );
+      const reply = await callModel(explainMessages({ path, source: file.text ?? "", selection }));
+      const raw = typeof reply === "string" ? reply : reply.text;
+      const requestId = typeof reply === "string" ? "" : reply.requestId || "";
+      const answer = readSay(raw);
+      appendLog({
+        area: "assistant",
+        ok: true,
+        code: "ok",
+        message: text.pane.loggedDone,
+        detail: "explain",
+        requestId: requestId || localRequestId(),
+        summary: path,
+      });
       setTurns((list) => list.map((item) => (item.id === turnId ? { ...item, answer } : item)));
     } catch (error) {
-      console.warn("Explain failed:", error);
-      setTurns((list) => list.map((item) => (item.id === turnId ? { ...item, answer: text.ai.failed } : item)));
+      const failure = failureFromUnknown(error);
+      console.warn("Explain failed:", failure.code, failure.requestId, failure.detail);
+      logFailure("assistant", failure, path);
+      setFailureNotice(failure);
+      setTurns((list) =>
+        list.map((item) =>
+          item.id === turnId ? { ...item, answer: failure.message, outcome: { kind: "failed", message: failure.message, failure } } : item,
+        ),
+      );
     } finally {
       setAiBusy(false);
     }
@@ -1661,7 +1763,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       soundLibraryVersion,
       aiBusy,
       notice,
+      noticeFailure,
       dismissNotice: () => setNotice(""),
+      logsOpen,
+      setLogsOpen,
       bottomTab,
       setBottomTab,
       updateText,
@@ -1864,8 +1969,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           if (kind === "itch") downloadBytes(`${slug}-itch.zip`, itchZip(bundle), "application/zip");
           if (kind === "embed") downloadBytes(`${slug}-embed.zip`, embedZip(bundle), "application/zip");
         } catch (error) {
-          console.warn("Export build failed:", error);
-          setNotice(text.export.buildFailed);
+          const detail = error instanceof Error ? error.message : "export failed";
+          console.warn("Export build failed:", detail);
+          const failure = makeFailure("export", detail, "");
+          logFailure("export", failure, kind);
+          setFailureNotice(failure);
           setBottomTab("problems");
         } finally {
           setMenu(null);
@@ -1918,13 +2026,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         setNotice("");
         try {
           const payload = await callAi<{ text?: string }>({ op: "sound", kind: soundKind, prompt: promptText });
-          if (!payload?.text) throw new Error("Sound generation failed.");
+          if (!payload) return;
+          if (!payload.text) throw new Error("Sound generation failed.");
           // The model chose numbers; we render the samples here, deterministically.
           const spec = readSoundSpec(payload.text, soundKind, soundKind === "sfx" ? "sound" : "music");
           setSoundRecipe({ token: variation.current, spec });
         } catch (error) {
-          console.warn("Sound generation failed:", error);
-          setNotice(text.ai.soundFailed);
+          const failure = makeFailure("empty", error instanceof Error ? error.message : "sound failed", "");
+          console.warn("Sound generation failed:", failure.detail);
+          logFailure("assistant", { ...failure, message: text.ai.soundFailed }, promptText);
+          setFailureNotice({ ...failure, message: text.ai.soundFailed });
         } finally {
           setAiBusy(false);
         }
@@ -1963,8 +2074,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             note: target.cut && prepared.cut < 0.05 ? text.assets.backgroundKept : undefined,
           });
         } catch (error) {
-          console.warn("Image generation failed:", error);
-          setNotice(text.ai.imageFailed);
+          const failure = makeFailure("empty", error instanceof Error ? error.message : "image failed", "");
+          console.warn("Image generation failed:", failure.detail);
+          logFailure("assistant", { ...failure, message: text.ai.imageFailed }, promptText);
+          setFailureNotice({ ...failure, message: text.ai.imageFailed });
         } finally {
           setAiBusy(false);
         }
@@ -2105,6 +2218,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     startCollab,
     stopCollab,
     projectsOpen,
+    logsOpen,
+    noticeFailure,
     view,
     panels,
     turns,

@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { BottomPanel } from "./ui/BottomPanel";
 import { CodePane } from "./ui/CodePane";
 import { DesignerPane } from "./ui/DesignerPane";
+import { LogPanel } from "./ui/LogPanel";
 import { Overlays } from "./ui/Overlays";
+import { ErrorDetail } from "./ui/ErrorDetail";
 import { ProjectsPanel } from "./ui/ProjectsPanel";
 import { SettingsPanel } from "./ui/SettingsPanel";
 import { Sidebar } from "./ui/Sidebar";
@@ -85,10 +87,16 @@ function Shell() {
       <Overlays />
       <ProjectsPanel />
       <SettingsPanel />
+      <LogPanel />
       {studio.notice ? (
-        <button className="notice" type="button" data-testid="notice" onClick={studio.dismissNotice}>
-          {studio.notice}
-        </button>
+        <div className="notice" data-testid="notice" role="status" onClick={studio.dismissNotice}>
+          <span>{studio.notice}</span>
+          {studio.noticeFailure ? (
+            <span onClick={(event) => event.stopPropagation()}>
+              <ErrorDetail failure={studio.noticeFailure} testId="notice-error-detail" />
+            </span>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

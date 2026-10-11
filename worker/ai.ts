@@ -1,5 +1,67 @@
+import { categoryForUpstream, type AssistantCode } from "../shared/assistant-error";
 import type { GameKitEnv } from "./env";
 import { HttpError } from "./http";
+
+/** Wall clock for one upstream model call. Cleared when the fetch settles. */
+const UPSTREAM_MS = 45_000;
+
+function isTimeout(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: string }).name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+function upstreamHttp(category: AssistantCode, detail: string): HttpError {
+  const status = category === "timeout" ? 504 : category === "rate_limit" ? 429 : 502;
+  return new HttpError(status, "upstream_failed", detail, { assistantCode: category, detail });
+}
+
+/**
+ * Fetches the model. A hang becomes `timeout`; a dropped connection becomes
+ * `upstream`. The provider's error text is never copied into the detail.
+ */
+async function fetchUpstream(url: string, init: RequestInit, what: "text" | "image"): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("timeout", "TimeoutError")), UPSTREAM_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (isTimeout(error)) throw upstreamHttp("timeout", `${what} model timed out`);
+    throw upstreamHttp("upstream", `${what} model network error`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function rejectUpstream(response: Response, what: "text" | "image"): void {
+  const category = categoryForUpstream(response.status);
+  const retry = response.headers.get("retry-after") ?? "";
+  const extra = /^\d{1,5}$/.test(retry) ? `, retry-after ${retry}s` : "";
+  throw upstreamHttp(category, `${what} model HTTP ${response.status}${extra}`);
+}
+
+async function readUpstreamJson(response: Response, what: "text" | "image"): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    throw upstreamHttp("parse", `${what} model body was not JSON`);
+  }
+}
+
+/** Some compatible APIs return content as a list of parts instead of a string. */
+function readModelContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) => {
+      if (typeof part === "string") return part;
+      if (part && typeof part === "object" && typeof (part as { text?: unknown }).text === "string") {
+        return (part as { text: string }).text;
+      }
+      return "";
+    })
+    .join("");
+}
 
 /**
  * AI gateway. Callers must already have passed the identity gate.
@@ -182,30 +244,36 @@ export async function complete(env: GameKitEnv, messages: ChatMessage[]): Promis
   const base = env.OPENAI_API_URL?.trim().replace(/\/+$/, "") ?? "";
   const key = env.OPENAI_API_KEY?.trim() ?? "";
   const model = env.OPENAI_MODEL?.trim() ?? "";
-  if (!base || !key || !model) throw new HttpError(503, "not_configured", "The text model is not configured.");
-
-  const response = await fetch(`${base}/chat/completions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: MAX_TOKENS,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-    }),
-  });
-  if (!response.ok) {
-    // The provider's body may echo request details; keep only the status.
-    throw new HttpError(502, "upstream_failed", `The text model returned HTTP ${response.status}.`);
+  if (!base || !key || !model) {
+    throw new HttpError(503, "not_configured", "The text model is not configured.", {
+      assistantCode: "not_configured",
+      detail: "text model is not configured",
+    });
   }
-  const body = (await response.json()) as {
+
+  const response = await fetchUpstream(
+    `${base}/chat/completions`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: MAX_TOKENS,
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+      }),
+    },
+    "text",
+  );
+  if (!response.ok) rejectUpstream(response, "text");
+  const body = (await readUpstreamJson(response, "text")) as {
     choices?: { message?: { content?: unknown } }[];
     usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
   };
-  const text = body.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text.trim()) {
-    throw new HttpError(502, "upstream_failed", "The text model returned an empty response.");
+  const text = readModelContent(body.choices?.[0]?.message?.content);
+  if (!text.trim()) {
+    throw upstreamHttp("empty", "text model returned an empty response");
   }
   // Usage travels back: ADK measures a project session against its token budget with it.
   const promptTokens = Number(body.usage?.prompt_tokens ?? 0);
@@ -221,31 +289,37 @@ export async function complete(env: GameKitEnv, messages: ChatMessage[]): Promis
 
 export async function image(env: GameKitEnv, request: ImageRequest): Promise<{ image: string; mediaType: string }> {
   const key = env.GEMINI_APIKEY?.trim() ?? "";
-  if (!key) throw new HttpError(503, "not_configured", "The image model is not configured for this deployment.");
+  if (!key) {
+    throw new HttpError(503, "not_configured", "The image model is not configured for this deployment.", {
+      assistantCode: "not_configured",
+      detail: "image model is not configured",
+    });
+  }
   const model = env.GEMINI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
   // One model call improves the child's words; then one draws them.
   const subject = await subjectInEnglish(env, request.subject);
-  const response = await fetch(GEMINI_INTERACTIONS, {
-    method: "POST",
-    headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      input: imagePromptFor(request.kind, subject),
-      generation_config: {
-        temperature: 1,
-        top_p: 0.95,
-        max_output_tokens: 65_536,
-        thinking_level: "minimal",
-        image_config: { image_size: IMAGE_SIZES[request.kind] },
-      },
-      response_modalities: ["image"],
-    }),
-  });
-  if (!response.ok) {
-    // The provider's body may echo the request or our key; keep only the status.
-    throw new HttpError(502, "upstream_failed", `The image model returned HTTP ${response.status}.`);
-  }
-  return readInteractionImage(await response.json());
+  const response = await fetchUpstream(
+    GEMINI_INTERACTIONS,
+    {
+      method: "POST",
+      headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        input: imagePromptFor(request.kind, subject),
+        generation_config: {
+          temperature: 1,
+          top_p: 0.95,
+          max_output_tokens: 65_536,
+          thinking_level: "minimal",
+          image_config: { image_size: IMAGE_SIZES[request.kind] },
+        },
+        response_modalities: ["image"],
+      }),
+    },
+    "image",
+  );
+  if (!response.ok) rejectUpstream(response, "image");
+  return readInteractionImage(await readUpstreamJson(response, "image"));
 }
 
 /**
@@ -267,7 +341,7 @@ export function readInteractionImage(payload: unknown): { image: string; mediaTy
       }
     }
   }
-  throw new HttpError(502, "upstream_failed", "The image model returned no image.");
+  throw upstreamHttp("empty", "image model returned no image");
 }
 
 export type SoundRequest = { kind: "sfx" | "music"; prompt: string };
