@@ -189,3 +189,77 @@ test("the copied picture runs in pygame and is inside the offline export", async
   const inner = unzipSync(outer["gamekit.apk"]);
   expect(Buffer.from(inner[`assets/${HERO}`]).equals(Buffer.from(libraryPng))).toBe(true);
 });
+
+test("sound cards show names, filters are unique, and the player has a duration", async ({ page }) => {
+  const hits: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/")) hits.push(request.url());
+  });
+  await page.goto("/");
+  await openLibrary(page);
+  const overlapped = await page.locator(".library-card").evaluateAll((nodes) => {
+    const boxes = nodes.map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom };
+    });
+    let count = 0;
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        const a = boxes[i];
+        const b = boxes[j];
+        if (a.x < b.right - 1 && b.x < a.right - 1 && a.y < b.bottom - 1 && b.y < a.bottom - 1) count += 1;
+      }
+    }
+    return count;
+  });
+  expect(overlapped).toBe(0);
+  await page.getByTestId("library-category-sfx").click();
+
+  const cards = await page.locator(".library-card").evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const name = node.querySelector(".library-name");
+      const pack = node.querySelector(".library-pack");
+      const card = node.getBoundingClientRect();
+      const box = name?.getBoundingClientRect();
+      return {
+        name: name?.textContent?.trim() ?? "",
+        pack: pack?.textContent?.trim() ?? "",
+        inside: !!box && box.height > 8 && box.top >= card.top - 1 && box.bottom <= card.bottom + 1,
+      };
+    }),
+  );
+  expect(cards.length).toBeGreaterThan(10);
+  expect(cards.every((card) => card.name.length > 0 && card.pack.length > 0 && card.inside)).toBe(true);
+
+  await page.getByTestId("library-filters-more").click();
+  const labels = await page.locator(".library-filters button").evaluateAll((buttons) =>
+    buttons.map((button) => button.textContent?.trim() ?? "").filter((label) => label && !["全部", "更多", "收起"].includes(label)),
+  );
+  expect(new Set(labels).size).toBe(labels.length);
+  for (const label of ["音效", "角色", "界面", "地形", "益智", "平台跳跃", "迷宫地牢", "音乐", "图块", "特效", "道具"]) {
+    expect(labels.filter((item) => item === label)).toEqual([label]);
+  }
+
+  await expect(page.getByTestId("library-audio-duration")).toContainText("秒");
+  await expect.poll(async () => page.getByTestId("library-preview").evaluate((el: HTMLAudioElement) => el.duration)).toBeGreaterThan(0);
+  await expect(page.getByTestId("library-preview")).toHaveAttribute("src", /\.wav$/);
+  await expect(page.getByTestId("library-preview")).toHaveAttribute("data-preview", "original");
+
+  await page.getByTestId("library-asset-sfx-boom").click();
+  await expect.poll(async () => page.getByTestId("library-preview").evaluate((el: HTMLAudioElement) => el.currentSrc)).toContain("boom.ogg");
+  await expect.poll(async () => page.getByTestId("library-preview").evaluate((el: HTMLAudioElement) => el.duration)).toBeGreaterThan(0.5);
+  await expect(page.getByTestId("library-audio-duration")).toContainText("秒");
+  await expect(page.getByTestId("library-audio-unsupported")).toHaveCount(0);
+  await expect.poll(async () => page.getByTestId("library-preview").evaluate((el: HTMLAudioElement) => el.currentTime)).toBeGreaterThan(0);
+
+  await page.getByTestId("library-asset-sfx-laser").click();
+  await expect.poll(async () => page.getByTestId("library-preview").evaluate((el: HTMLAudioElement) => el.currentSrc)).toContain("laser.ogg");
+  await expect.poll(async () => page.getByTestId("library-preview").evaluate((el: HTMLAudioElement) => el.duration)).toBeGreaterThan(0.5);
+
+  await page.getByTestId("library-filter-all").click();
+  await page.getByTestId("library-theme-平台跳跃").click();
+  await expect(page.getByTestId("library-asset-platform-walker")).toBeVisible();
+  await expect(page.getByTestId("library-asset-sfx-boom")).toHaveCount(0);
+  await expect(page.getByTestId("library-asset-hero")).toHaveCount(0);
+  expect(hits).toEqual([]);
+});

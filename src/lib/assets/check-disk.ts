@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { oggPreviewWavPath } from "./preview-audio";
 import { catalogIndexSchema } from "./schema";
 import { validateAssetPack, type PackIssue } from "./validate";
 
@@ -60,6 +61,13 @@ export async function checkAssetPacks(root: string): Promise<PackIssue[]> {
           files[asset.path] = readFileSync(join(dir, asset.path));
         } catch {
           // validateAssetPack reports the missing file.
+        }
+        const preview = oggPreviewWavPath(asset.path);
+        if (!preview) continue;
+        try {
+          files[preview] = readFileSync(join(dir, preview));
+        } catch {
+          // validateAssetPack reports the missing WAV preview.
         }
       }
     }

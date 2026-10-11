@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { KEPT_PACK_ID, loadKeptPack } from "../lib/audio/kept";
 import { clearCatalogCache, loadAssetBytes, loadLibrary, packAssetUrl } from "../lib/assets/catalog";
 import {
@@ -10,8 +11,12 @@ import {
   type LibraryExample,
   type LibraryPlan,
 } from "../lib/assets/copy";
-import { filterAssets, relatedAssets } from "../lib/assets/filter";
+import { assetDisplayName } from "../lib/assets/display";
+import { filterAssets, libraryFilterGroups, relatedAssets } from "../lib/assets/filter";
+import { oggPreviewWavPath } from "../lib/assets/preview-audio";
 import type { AssetCategory, AssetPack, CatalogAsset } from "../lib/assets/schema";
+import { soundMark, type SoundMark } from "../lib/assets/sound-mark";
+import { LibraryPlayer } from "./LibraryPlayer";
 import { pygameDemoMain, pygameSnippet, type SnippetAsset } from "../lib/assets/snippet";
 import { useStudio } from "../studio/store";
 import { text } from "./text";
@@ -61,6 +66,9 @@ export function LibraryDialog() {
   const [localFiles, setLocalFiles] = useState<Record<string, Uint8Array>>({});
   const [removeKept, setRemoveKept] = useState(false);
   const [keptUrl, setKeptUrl] = useState("");
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const playerRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -90,6 +98,8 @@ export function LibraryDialog() {
     setMainPreview(null);
     setStatus("");
     setCopied(false);
+    setPlaying(false);
+    playerRef.current?.pause();
   }, [open]);
 
   useEffect(() => {
@@ -108,9 +118,12 @@ export function LibraryDialog() {
   }, [open, mainPreview, pending, studio]);
 
   const rows = useMemo(() => packs.flatMap((pack) => pack.assets.map((asset) => ({ pack, asset }))), [packs]);
-  const themes = [...new Set(rows.map((row) => row.asset.theme))];
-  const categories = [...new Set(rows.map((row) => row.asset.category))];
-  const tags = [...new Set(rows.flatMap((row) => row.asset.tags))];
+  const groups = libraryFilterGroups(
+    rows.map((row) => row.asset),
+    text.library.categories,
+  );
+  const pinnedTag = !tagsOpen && tag !== "all" && groups.moreTags.includes(tag) ? [tag] : [];
+  const visibleTags = tagsOpen ? [...groups.tags, ...groups.moreTags] : [...groups.tags, ...pinnedTag];
   const shown = filterAssets(
     rows.map((row) => row.asset),
     { text: query, category, theme, tag },
@@ -272,32 +285,69 @@ export function LibraryDialog() {
         </header>
         <p>{text.library.copy}</p>
         <div className="library-filters">
-          <button
-            type="button"
-            className={category === "all" && theme === "all" && tag === "all" ? "on" : ""}
-            onClick={() => {
-              setCategory("all");
-              setTheme("all");
-              setTag("all");
-            }}
-          >
-            {text.library.all}
-          </button>
-          {categories.map((item) => (
-            <button key={item} type="button" className={category === item ? "on" : ""} data-testid={`library-category-${item}`} onClick={() => setCategory(item)}>
-              {text.library.categories[item]}
+          <div className="library-filter-row" role="group" aria-label={text.library.groups.category} data-testid="library-filter-category">
+            <span className="library-filter-label">{text.library.groups.category}</span>
+            <button
+              type="button"
+              className={category === "all" && theme === "all" && tag === "all" ? "on" : ""}
+              data-testid="library-filter-all"
+              onClick={() => {
+                setCategory("all");
+                setTheme("all");
+                setTag("all");
+              }}
+            >
+              {text.library.all}
             </button>
-          ))}
-          {themes.map((item) => (
-            <button key={item} type="button" className={theme === item ? "on" : ""} onClick={() => setTheme(theme === item ? "all" : item)}>
-              {item}
-            </button>
-          ))}
-          {tags.map((item) => (
-            <button key={item} type="button" className={tag === item ? "on" : ""} onClick={() => setTag(tag === item ? "all" : item)}>
-              {item}
-            </button>
-          ))}
+            {groups.categories.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={category === item.id ? "on" : ""}
+                data-testid={`library-category-${item.id}`}
+                onClick={() => setCategory(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          {groups.themes.length ? (
+            <div className="library-filter-row" role="group" aria-label={text.library.groups.theme} data-testid="library-filter-theme">
+              <span className="library-filter-label">{text.library.groups.theme}</span>
+              {groups.themes.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={theme === item ? "on" : ""}
+                  data-testid={`library-theme-${item}`}
+                  onClick={() => setTheme(theme === item ? "all" : item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {groups.tags.length || groups.moreTags.length ? (
+            <div className="library-filter-row" role="group" aria-label={text.library.groups.tag} data-testid="library-filter-tag">
+              <span className="library-filter-label">{text.library.groups.tag}</span>
+              {visibleTags.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={tag === item ? "on" : ""}
+                  data-testid={`library-tag-${item}`}
+                  onClick={() => setTag(tag === item ? "all" : item)}
+                >
+                  {item}
+                </button>
+              ))}
+              {groups.moreTags.length ? (
+                <button type="button" data-testid="library-filters-more" onClick={() => setTagsOpen((open) => !open)}>
+                  {tagsOpen ? text.library.less : text.library.more}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         {loading ? <p>{text.library.loading}</p> : null}
         {error ? (
@@ -316,37 +366,69 @@ export function LibraryDialog() {
         ) : null}
         <div className="library-body">
           <div className="library-grid">
-            {visible.map((row) => (
-              <button
-                key={`${row.pack.id}/${row.asset.id}`}
-                type="button"
-                className={selected?.asset.id === row.asset.id ? "library-card on" : "library-card"}
-                data-testid={`library-asset-${row.asset.id}`}
-                onClick={() => {
-                  setSelectedId(row.asset.id);
-                  setPending(null);
-                  setMainPreview(null);
-                  setCopied(false);
-                }}
-              >
-                {row.asset.mediaType.startsWith("audio/") ? (
-                  <span className="library-audio">{text.library.audio}</span>
-                ) : (
-                  <img src={packAssetUrl(row.pack.id, row.asset.preview)} alt="" width={64} height={64} loading="lazy" decoding="async" />
-                )}
-                <span>{row.asset.title}</span>
-              </button>
-            ))}
+            {visible.map((row) => {
+              const name = assetDisplayName(row.asset) || row.asset.id;
+              const audio = row.asset.mediaType.startsWith("audio/");
+              const same = selected?.asset.id === row.asset.id;
+              return (
+                <button
+                  key={`${row.pack.id}/${row.asset.id}`}
+                  type="button"
+                  className={["library-card", same ? "on" : "", audio && same && playing ? "is-playing" : ""].filter(Boolean).join(" ")}
+                  data-testid={`library-asset-${row.asset.id}`}
+                  aria-label={audio ? `${name}，${row.pack.title}` : name}
+                  onClick={() => {
+                    // Commit the new <audio src> before play(), so the click is still a user gesture.
+                    flushSync(() => {
+                      setSelectedId(row.asset.id);
+                      setPending(null);
+                      setMainPreview(null);
+                      setCopied(false);
+                    });
+                    const el = playerRef.current;
+                    if (!audio || !el) return;
+                    el.currentTime = 0;
+                    void el.play().catch(() => {});
+                  }}
+                >
+                  <span className="library-card-body">
+                    {audio ? (
+                      <>
+                        <span className="library-audio" aria-hidden="true">
+                          <SoundGlyph mark={soundMark(row.asset.tags)} />
+                        </span>
+                        <span className="library-pack">{row.pack.title}</span>
+                      </>
+                    ) : (
+                      <img src={packAssetUrl(row.pack.id, row.asset.preview)} alt="" width={64} height={64} loading="lazy" decoding="async" />
+                    )}
+                    <span className="library-name" data-testid={`library-asset-name-${row.asset.id}`}>
+                      {name}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
             {!loading && !visible.length ? <p className="library-empty">{text.library.empty}</p> : null}
           </div>
           {selected ? (
             <div className="library-detail" data-testid="library-detail">
               {selected.asset.mediaType.startsWith("audio/") ? (
-                <audio controls src={selected.pack.id === KEPT_PACK_ID ? keptUrl : audioPreview} data-testid="library-preview" />
+                <LibraryPlayer
+                  sourceUrl={selected.pack.id === KEPT_PACK_ID ? keptUrl : audioPreview}
+                  fallbackUrl={
+                    selected.asset.mediaType === "audio/ogg"
+                      ? packAssetUrl(selected.pack.id, oggPreviewWavPath(selected.asset.path) ?? selected.asset.path)
+                      : null
+                  }
+                  mediaType={selected.asset.mediaType}
+                  playerRef={playerRef}
+                  onPlayState={setPlaying}
+                />
               ) : (
-                <img className="preview" src={packAssetUrl(selected.pack.id, selected.asset.preview)} alt={selected.asset.title} data-testid="library-preview" />
+                <img className="preview" src={packAssetUrl(selected.pack.id, selected.asset.preview)} alt={assetDisplayName(selected.asset)} data-testid="library-preview" />
               )}
-              <h3>{selected.asset.title}</h3>
+              <h3>{assetDisplayName(selected.asset) || selected.asset.id}</h3>
               <p data-testid="library-size">
                 {selected.asset.width && selected.asset.height ? text.library.size(selected.asset.width, selected.asset.height) : ""}
                 {selected.asset.mediaType.startsWith("audio/") ? text.library.audio : ""}
@@ -374,7 +456,7 @@ export function LibraryDialog() {
                         setQuery("");
                       }}
                     >
-                      {asset.title}
+                      {assetDisplayName(asset)}
                     </button>
                   ))}
                 </p>
@@ -522,4 +604,85 @@ export function LibraryDialog() {
       </section>
     </div>
   );
+}
+
+function SoundGlyph({ mark }: { mark: SoundMark }) {
+  const common = { viewBox: "0 0 28 28", "aria-hidden": true as const };
+  switch (mark) {
+    case "jump":
+      return (
+        <svg {...common}>
+          <path d="M4 22c5-14 15-14 20 0" fill="none" stroke="currentColor" strokeWidth="2" />
+          <circle cx="20" cy="8" r="2" fill="currentColor" />
+        </svg>
+      );
+    case "coin":
+      return (
+        <svg {...common}>
+          <circle cx="14" cy="14" r="8" fill="none" stroke="currentColor" strokeWidth="2" />
+          <path d="M14 9v10M11 12h5a2 2 0 0 1 0 4h-4" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    case "laser":
+      return (
+        <svg {...common}>
+          <path d="M4 20 L22 6" stroke="currentColor" strokeWidth="2" />
+          <path d="M16 6h6v6" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    case "boom":
+      return (
+        <svg {...common}>
+          <path d="M14 4l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    case "click":
+      return (
+        <svg {...common}>
+          <rect x="6" y="8" width="16" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+          <path d="M11 14h6" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    case "step":
+      return (
+        <svg {...common}>
+          <path d="M8 20c2-6 4-8 6-8s4 2 6 8" fill="none" stroke="currentColor" strokeWidth="2" />
+          <circle cx="14" cy="8" r="2" fill="currentColor" />
+        </svg>
+      );
+    case "door":
+      return (
+        <svg {...common}>
+          <path d="M8 6h10v16H8z" fill="none" stroke="currentColor" strokeWidth="2" />
+          <circle cx="15" cy="14" r="1" fill="currentColor" />
+        </svg>
+      );
+    case "hit":
+      return (
+        <svg {...common}>
+          <path d="M6 16l6-8 4 5 6-7" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    case "music":
+      return (
+        <svg {...common}>
+          <path d="M10 20V8l10-2v12" fill="none" stroke="currentColor" strokeWidth="2" />
+          <circle cx="8" cy="20" r="2" fill="currentColor" />
+          <circle cx="18" cy="18" r="2" fill="currentColor" />
+        </svg>
+      );
+    case "power":
+      return (
+        <svg {...common}>
+          <path d="M14 5v8" stroke="currentColor" strokeWidth="2" />
+          <path d="M9 9a6 6 0 1 0 10 0" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...common}>
+          <path d="M6 14h2l2-5 3 10 2-5h3" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+  }
 }

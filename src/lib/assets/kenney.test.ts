@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { inspectAudio } from "../audio/format";
 import { framesFromDocument, parseSpriteAnim } from "../pixel/anim";
 import { decodePng } from "../pixel/png";
+import { assetDisplayName } from "./display";
 import { checkAssetPacks } from "./check-disk";
 import type { AssetPack } from "./schema";
 import { librarySpriteNote } from "./sprite-note";
@@ -49,6 +50,8 @@ describe("Kenney CC0 packs", () => {
         expect(asset.source).toMatch(/^https:\/\/kenney\.nl\//);
         expect(asset.attribution.length).toBeGreaterThan(0);
         expect(asset.tags.some((tag) => /[\u4e00-\u9fff]/.test(tag))).toBe(true);
+        expect(assetDisplayName(asset).length).toBeGreaterThan(0);
+        expect(/[\u4e00-\u9fff]/.test(assetDisplayName(asset))).toBe(true);
         const bytes = new Uint8Array(readFileSync(join(root, id, asset.path)));
         if (asset.mediaType === "audio/ogg") expect(inspectAudio(asset.path, bytes)?.ok).toBe(true);
       }
