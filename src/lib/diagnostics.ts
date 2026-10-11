@@ -1,3 +1,4 @@
+import { audioProblemMessage, inspectAudio } from "./audio/format";
 import type { Project } from "./project";
 
 export type Problem = {
@@ -65,20 +66,14 @@ export function diagnoseProject(project: Project): Problem[] {
   }
 
   for (const file of project.files) {
-    const ext = file.path.split(".").pop()?.toLowerCase();
-    if (ext && ["wav", "mp3", "aiff"].includes(ext)) {
-      problems.push({
-        id: `audio-${file.path}`,
-        severity: "warning",
-        path: file.path,
-        // WAV loads in the browser runtime (verified with a probe); MP3/AIFF may
-        // not decode. OGG is still the safest choice for a web build.
-        message:
-          ext === "wav"
-            ? "WAV loads in the browser runtime too. Sound only starts after someone taps the game once."
-            : "The browser runtime decodes OGG Vorbis and WAV. This format may stay silent on the web, but still plays on desktop Pygame.",
-      });
-    }
+    const verdict = inspectAudio(file.path, file.bytes);
+    if (!verdict || verdict.ok) continue;
+    problems.push({
+      id: `audio-${file.path}`,
+      severity: "warning",
+      path: file.path,
+      message: audioProblemMessage(verdict),
+    });
   }
 
   return problems;

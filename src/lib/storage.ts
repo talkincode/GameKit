@@ -4,6 +4,8 @@ const DB_NAME = "gamekit";
 const STORE = "projects";
 /** One agent conversation per project (src/lib/adk/session.ts). */
 const SESSION_STORE = "sessions";
+/** Sounds the child kept from the editor, separate from any one project. */
+const SOUND_STORE = "sounds";
 
 /**
  * Schema rule: object stores and indexes need a version bump (plus a migration in
@@ -11,8 +13,16 @@ const SESSION_STORE = "sessions";
  * not: old records simply lack it, and `fromStored` tolerates that. `design`
  * (src/lib/design.ts) and `trash` (src/lib/project.ts) were added that way.
  * Version 2 added the `sessions` store for agent conversations.
+ * Version 3 added the `sounds` store for editor sounds kept on this computer.
  */
-const DB_VERSION = 2;
+const DB_VERSION = 3;
+
+export type StoredKeptSound = {
+  id: string;
+  createdAt: number;
+  bytes: Uint8Array;
+  asset: unknown;
+};
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -21,6 +31,7 @@ function openDb(): Promise<IDBDatabase> {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(SESSION_STORE)) db.createObjectStore(SESSION_STORE, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(SOUND_STORE)) db.createObjectStore(SOUND_STORE, { keyPath: "id" });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -91,5 +102,25 @@ export async function saveSession(row: { id: string }): Promise<void> {
 export async function removeSession(id: string): Promise<void> {
   const db = await openDb();
   await requestToPromise(db.transaction(SESSION_STORE, "readwrite").objectStore(SESSION_STORE).delete(id));
+  db.close();
+}
+
+/** Editor sounds kept on this computer. Missing store on an old database is created by version 3. */
+export async function loadKeptSounds(): Promise<StoredKeptSound[]> {
+  const db = await openDb();
+  const rows = await requestToPromise(db.transaction(SOUND_STORE).objectStore(SOUND_STORE).getAll() as IDBRequest<StoredKeptSound[]>);
+  db.close();
+  return rows.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function saveKeptSound(row: StoredKeptSound): Promise<void> {
+  const db = await openDb();
+  await requestToPromise(db.transaction(SOUND_STORE, "readwrite").objectStore(SOUND_STORE).put(row));
+  db.close();
+}
+
+export async function removeKeptSound(id: string): Promise<void> {
+  const db = await openDb();
+  await requestToPromise(db.transaction(SOUND_STORE, "readwrite").objectStore(SOUND_STORE).delete(id));
   db.close();
 }

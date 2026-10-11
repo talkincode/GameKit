@@ -1,3 +1,4 @@
+import { inspectAudio } from "../audio/format";
 import { sha256Hex } from "./hash";
 import { assetPackSchema, type AssetPack, type CatalogAsset } from "./schema";
 
@@ -18,7 +19,8 @@ export type PackIssueCode =
   | "collision"
   | "preview"
   | "tag-language"
-  | "title-language";
+  | "title-language"
+  | "audio-format";
 
 export type PackIssue = { code: PackIssueCode; message: string; path?: string };
 
@@ -123,6 +125,11 @@ export async function validateAssetPack(
       issues.push({ code: "missing-file", path: asset.path, message: `Missing file ${asset.path}.` });
     } else if ((await sha256Hex(bytes)) !== asset.sha256) {
       issues.push({ code: "hash-mismatch", path: asset.path, message: `Hash does not match ${asset.path}.` });
+    } else if (asset.mediaType === "audio/wav" || asset.mediaType === "audio/ogg") {
+      const verdict = inspectAudio(asset.path, bytes);
+      if (!verdict?.ok) {
+        issues.push({ code: "audio-format", path: asset.path, message: `${asset.id} is not audio the browser runtime can play.` });
+      }
     }
 
     checkAnimation(asset, issues);

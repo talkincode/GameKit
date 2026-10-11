@@ -52,6 +52,8 @@ export type LibraryAssetCopy = {
   author: string;
   frameWidth: number;
   frameHeight: number;
+  media: "image" | "audio";
+  loop: boolean;
 };
 
 export type LibraryChoice = "add" | "keep" | "save-as" | "replace";
@@ -115,6 +117,8 @@ export function libraryCopyFrom(pack: AssetPack, asset: CatalogAsset, bytes: Uin
     author: asset.author,
     frameWidth: asset.animation?.frameWidth ?? asset.width ?? 0,
     frameHeight: asset.animation?.frameHeight ?? asset.height ?? 0,
+    media: asset.mediaType.startsWith("audio/") ? "audio" : "image",
+    loop: asset.category === "music",
   };
 }
 

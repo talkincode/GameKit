@@ -70,9 +70,9 @@ import { cleanMapName, createMap, isMapSlug } from "../lib/map/model";
 import { planMapExample, planMapSave, type MapExampleInput, type MapExampleResult, type MapSaveFailure, type MapSaveInput } from "../lib/map/save";
 import { discardPlay, downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
 import { budgetFor, loadSettings, saveSettings, type Settings } from "../lib/settings";
-import { renderMusic, renderSfx } from "../lib/audio/render";
-import { readSoundSpec } from "../lib/audio/spec";
-import { pcmToWav } from "../lib/audio/wav";
+import { forgetKeptSound as forgetKeptRecord, keepSound as keepSoundRecord } from "../lib/audio/kept";
+import { planSoundSave, type SoundSaveInput, type SoundSaveResult } from "../lib/audio/save";
+import { readSoundSpec, type SoundSpec } from "../lib/audio/spec";
 import { prepareAsset } from "../lib/sprite";
 import { createBlankProject, createStarterProject } from "../lib/starter";
 import { applyLibraryCopy, type LibraryCopyRequest, type LibraryCopyResult } from "../lib/assets/copy";
@@ -277,6 +277,16 @@ type StudioValue = {
   saveMapExample: (input: MapExampleInput) => Promise<MapExampleResult>;
   soundKind: SoundKind;
   setSoundKind: (kind: SoundKind) => void;
+  /** Set when the model picks numbers. The editor renders this spec itself. */
+  soundRecipe: { token: number; spec: SoundSpec } | null;
+  clearSoundRecipe: () => void;
+  /** Writes the previewed WAV. Replaces main.py only when mainText is set. */
+  saveSound: (input: SoundSaveInput) => Promise<SoundSaveResult>;
+  keepSound: (input: { bytes: Uint8Array; title: string; kind: SoundKind; tags: string[] }) => Promise<
+    { ok: true } | { ok: false; reason: "bad-audio" | "write-failed" }
+  >;
+  forgetKeptSound: (id: string) => Promise<void>;
+  soundLibraryVersion: number;
   aiBusy: boolean;
   notice: string;
   dismissNotice: () => void;
@@ -398,6 +408,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [assetOpen, setAssetOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [soundKind, setSoundKind] = useState<SoundKind>("sfx");
+  const [soundRecipe, setSoundRecipe] = useState<{ token: number; spec: SoundSpec } | null>(null);
+  const [soundLibraryVersion, setSoundLibraryVersion] = useState(0);
   const [pixelNewOpen, setPixelNewOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [pixelSession, setPixelSession] = useState<PixelSession | null>(null);
@@ -831,6 +843,45 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const closeMapEditor = useCallback(() => {
     setMapSession(null);
+  }, []);
+
+  const saveSound = useCallback(
+    async (input: SoundSaveInput): Promise<SoundSaveResult> => {
+      const base = projectRef.current;
+      if (!base) return { ok: false, reason: "no-project" };
+      const plan = planSoundSave(base, input);
+      if (!plan.ok) return plan;
+      if (!plan.changed) return { ok: true, path: plan.path, changed: false };
+      flushSave();
+      const written = saveChain.current.then(() => saveProject(plan.next));
+      saveChain.current = written.then(
+        () => undefined,
+        () => undefined,
+      );
+      try {
+        await written;
+      } catch (error) {
+        console.warn("Saving the sound failed:", error);
+        return { ok: false, reason: "write-failed" };
+      }
+      setUndoStack((stack) => [...stack, { projectId: base.id, files: base.files, design: base.design, trash: base.trash }].slice(-20));
+      if (projectRef.current?.id === plan.next.id) projectRef.current = plan.next;
+      setProjects((current) => current.map((item) => (item.id === plan.next.id ? plan.next : item)));
+      setPath(input.mainText !== undefined ? "main.py" : plan.path);
+      return { ok: true, path: plan.path, changed: true };
+    },
+    [flushSave],
+  );
+
+  const keepSound = useCallback(async (input: { bytes: Uint8Array; title: string; kind: SoundKind; tags: string[] }) => {
+    const outcome = await keepSoundRecord(input);
+    if (outcome.ok) setSoundLibraryVersion((version) => version + 1);
+    return outcome.ok ? { ok: true as const } : { ok: false as const, reason: outcome.reason };
+  }, []);
+
+  const forgetKeptSound = useCallback(async (id: string) => {
+    await forgetKeptRecord(id);
+    setSoundLibraryVersion((version) => version + 1);
   }, []);
 
   const saveMap = useCallback(
@@ -1415,6 +1466,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSoundOpen,
       soundKind,
       setSoundKind,
+      soundRecipe,
+      clearSoundRecipe: () => setSoundRecipe(null),
+      saveSound,
+      keepSound,
+      forgetKeptSound,
+      soundLibraryVersion,
       aiBusy,
       notice,
       dismissNotice: () => setNotice(""),
@@ -1677,16 +1734,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           if (!payload?.text) throw new Error("Sound generation failed.");
           // The model chose numbers; we render the samples here, deterministically.
           const spec = readSoundSpec(payload.text, soundKind, soundKind === "sfx" ? "sound" : "music");
-          const pcm = spec.kind === "sfx" ? renderSfx(spec) : renderMusic(spec);
-          const bytes = pcmToWav(pcm);
-          setAssetDraft({
-            bytes,
-            mediaType: "audio/wav",
-            suggested: `assets/${spec.name}.wav`,
-            width: 0,
-            height: 0,
-            sound: { kind: soundKind, say: spec.say, seconds: pcm.samples.length / pcm.sampleRate },
-          });
+          setSoundRecipe({ token: variation.current, spec });
         } catch (error) {
           console.warn("Sound generation failed:", error);
           setNotice(text.ai.soundFailed);
@@ -1840,6 +1888,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     assetOpen,
     soundOpen,
     soundKind,
+    soundRecipe,
+    soundLibraryVersion,
+    saveSound,
+    keepSound,
+    forgetKeptSound,
     pixelNewOpen,
     libraryOpen,
     pixelSession,

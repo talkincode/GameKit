@@ -11,7 +11,7 @@ GameKit 没有自己实现 Pygame。预览和导出使用同一套 [pygbag 0.9.3
 | 导出后不依赖 GameKit | 成品必须能单独打开 | ZIP 里只有 `index.html`、`favicon.png` 和 `gamekit.apk` | 运行时脚本仍从 pygame-web CDN 加载。GameKit 下线不影响；pygame-web CDN 下线会影响。把整份 CPython/pygame WASM 打进每个 ZIP 大约几十 MB，而且要自己跟上游版本，所以没有内置 |
 | 桌面项目直接拷进来 | pygbag 不能在一个同步死循环里刷新页面 | 模板诊断 `await asyncio.sleep(0)`、`time.sleep` 和 `pygame.time.wait` | 这不是私有 API。同一份 async 循环也能在安装了 pygame 的桌面 Python 上运行。GameKit 不会在构建时偷偷改写用户源码 |
 | 音频格式 | 项目里生成的声音是 WAV（浏览器里合成，无需服务端） | 实测 pygame-web 运行时能 `pygame.mixer.Sound("assets/probe.wav")` 并读到正确时长（0.3 秒），所以 WAV 可用；OGG 仍是体积上更好的选择 | MP3/AIFF 仍给警告。声音要等孩子点一下画面才会响 |
-| 音频 | 浏览器需要用户手势，且 pygame-web 支持的是 OGG Vorbis | 示例把 `mixer.init()` 放在第一次跳跃；WAV/MP3 只给出警告 | 打开预览后要点一下画面，声音才会响。桌面 WAV 文件不会被自动转码 |
+| 音频 | 浏览器需要用户手势。pygame-web 能播 8/16-bit PCM WAV 和 OGG Vorbis | 声音编辑器存 WAV；OGG 要过文件头检查才当能播。MP3、AIFF、坏 WAV、Opus 在问题里说明 | 打开预览后要点一下画面，声音才会响。桌面文件不会被自动转码 |
 | 停止游戏 | WASM 进程活在 iframe 里 | Stop 把 iframe 设为 `about:blank`，重新 Run 使用新的会话 | 没有进程级调试器，也不能在任意行暂停 |
 | 离开页面 | pygbag 运行时在 `can_close` 为假时会注册 `window.onbeforeunload`（`pythons.js`: `if (!vm.config.can_close)`），浏览器就会弹「Leave site? Changes you made may not be saved.」 | 构建时渲染 `can_close = 1`（`src/lib/build.ts`），预览与导出都不再出现这个弹窗 | 游戏自己不再拦住关闭页面。游戏里没有未保存的数据，工作室的保存由 store 负责，所以这是想要的 |
 | AI | 不能让模型自己改项目、构建或发布 | Worker 只提供补全和生图两个接口，只对授权用户开放（见 [ai-rules.md](ai-rules.md)）。产品逻辑在编辑器里，生成结果要先看 diff 再接受 | 系统提示词仍在浏览器里拼装，授权用户可以改写它；还没有按人配额 |
@@ -34,6 +34,10 @@ await asyncio.sleep(0)
 内置素材放在站点的 `public/asset-packs/`，打开素材库才请求说明文件和缩略图，不打进页面脚本。复制进项目的是文件字节，路径像 `assets/library/forest-adventure/characters/hero.png`，用普通 `pygame.image.load`。`assets/library.json` 只记下复制时的包版本、hash 和许可来源，游戏不要读它。
 
 预览和导出都打包项目里的这份副本（和别的 `assets/` 文件一样）。成品不请求素材库目录，也不请求 GameKit 站点。素材库以后升级，不会改掉已经复制进项目、或已经导出的那一份。模板本身没有为素材库改过。
+
+## 声音
+
+声音编辑器把参数合成成 16-bit 单声道 22.05 kHz WAV。试听播放的字节和保存进 `assets/` 的字节是同一份，所以导出的游戏不调用生成接口。pygame-web 能播这种 PCM WAV，也能播通过文件头检查的 OGG Vorbis。MP3、AIFF、坏掉的 WAV、以及 Ogg 里的 Opus 会在问题面板里说明，不会假装能播。官方音效在素材库里，复制进项目之后和别的 `assets/` 文件一样打包。播放用普通 `pygame.mixer.Sound`。模板没有为声音改过。声音要等孩子点一下画面才会响。
 
 ## 精灵动画
 

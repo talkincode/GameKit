@@ -1,0 +1,140 @@
+{
+  "format": "gamekit.asset-pack",
+  "formatVersion": 1,
+  "id": "forest-sounds",
+  "version": "1.0.0",
+  "title": "森林声音",
+  "theme": "森林冒险",
+  "summary": "跳跃、轻跳、金币、碰到蘑菇，和一段可以循环的走路音乐。和森林的角色、金币、蘑菇用同一套标签连在一起。改参数就能做出另一种，不用重新画图。",
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "CC0 1.0 Universal",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+  },
+  "author": "GameKit",
+  "source": "https://github.com/talkincode/GameKit",
+  "attribution": "这些声音由 GameKit 用参数合成，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的，也不是调用生成接口做的。",
+  "assets": [
+    {
+      "id": "jump-sfx",
+      "version": "1.0.0",
+      "title": "跳跃",
+      "path": "sounds/jump.wav",
+      "mediaType": "audio/wav",
+      "tags": [
+        "音效",
+        "跳跃",
+        "角色"
+      ],
+      "theme": "森林冒险",
+      "category": "sfx",
+      "preview": "sounds/jump.wav",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "这些声音由 GameKit 用参数合成，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的，也不是调用生成接口做的。",
+      "sha256": "86c53bb89599dfdc7ae13cacd2d6dc0811e5e4c57de6e6ea8b07c442bc37f8bd"
+    },
+    {
+      "id": "jump-soft",
+      "version": "1.0.0",
+      "title": "轻跳",
+      "path": "sounds/jump-soft.wav",
+      "mediaType": "audio/wav",
+      "tags": [
+        "音效",
+        "跳跃",
+        "角色",
+        "变体"
+      ],
+      "theme": "森林冒险",
+      "category": "sfx",
+      "preview": "sounds/jump-soft.wav",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "这些声音由 GameKit 用参数合成，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的，也不是调用生成接口做的。",
+      "sha256": "90d5e223acc4f35c4cb7e1b403e5406687f09bcc3ed3525c6157356073ed0124"
+    },
+    {
+      "id": "coin-sfx",
+      "version": "1.0.0",
+      "title": "金币声",
+      "path": "sounds/coin.wav",
+      "mediaType": "audio/wav",
+      "tags": [
+        "音效",
+        "金币",
+        "道具"
+      ],
+      "theme": "森林冒险",
+      "category": "sfx",
+      "preview": "sounds/coin.wav",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "这些声音由 GameKit 用参数合成，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的，也不是调用生成接口做的。",
+      "sha256": "8bd3c7a9ee7ac7069dde9e7f6a23e82c8659995ec82020bf9ba4c5453f80796f"
+    },
+    {
+      "id": "bump-sfx",
+      "version": "1.0.0",
+      "title": "碰到蘑菇",
+      "path": "sounds/bump.wav",
+      "mediaType": "audio/wav",
+      "tags": [
+        "音效",
+        "撞击",
+        "蘑菇"
+      ],
+      "theme": "森林冒险",
+      "category": "sfx",
+      "preview": "sounds/bump.wav",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "这些声音由 GameKit 用参数合成，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的，也不是调用生成接口做的。",
+      "sha256": "3eb5e1dd1152529ed7cd7054582e0f5701d40ec441e98d5603d5bfc471409eb5"
+    },
+    {
+      "id": "walk-music",
+      "version": "1.0.0",
+      "title": "走路音乐",
+      "path": "sounds/walk.wav",
+      "mediaType": "audio/wav",
+      "tags": [
+        "音乐",
+        "森林",
+        "循环"
+      ],
+      "theme": "森林冒险",
+      "category": "music",
+      "preview": "sounds/walk.wav",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "这些声音由 GameKit 用参数合成，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的，也不是调用生成接口做的。",
+      "sha256": "57e88b1634d720e891835872cbb41e9f3a9b2efe0f83414601e2cc8345d6fe65"
+    }
+  ]
+}

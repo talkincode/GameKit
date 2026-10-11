@@ -15,7 +15,7 @@ const httpsUrl = z.string().regex(/^https:\/\/\S+$/);
 const relativePath = z.string().regex(/^[a-z0-9][a-z0-9/_-]*\.[a-z0-9]+$/);
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/);
 
-export const ASSET_CATEGORIES = ["character", "terrain", "prop", "ui", "effect", "tileset"] as const;
+export const ASSET_CATEGORIES = ["character", "terrain", "prop", "ui", "effect", "tileset", "sfx", "music"] as const;
 export const MEDIA_TYPES = ["image/png", "audio/ogg", "audio/wav", "application/json"] as const;
 
 export const licenseSchema = z.object({

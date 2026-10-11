@@ -13,6 +13,18 @@
       "source": "https://github.com/talkincode/GameKit",
       "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
       "assetCount": 7
+    },
+    {
+      "id": "forest-sounds",
+      "version": "1.0.0",
+      "title": "森林声音",
+      "theme": "森林冒险",
+      "summary": "跳跃、轻跳、金币、碰到蘑菇，和一段可以循环的走路音乐。和森林的角色、金币、蘑菇用同一套标签连在一起。改参数就能做出另一种，不用重新画图。",
+      "license": "CC0-1.0",
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "这些声音由 GameKit 用参数合成，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的，也不是调用生成接口做的。",
+      "assetCount": 5
     }
   ]
 }

@@ -304,23 +304,26 @@ export async function buildForestPack(): Promise<{ manifest: AssetPack; files: R
   return { manifest, files };
 }
 
-export function catalogIndexFor(pack: AssetPack): CatalogIndex {
+/** One catalog index for every pack that ships under public/asset-packs. */
+export function catalogIndex(packs: AssetPack[]): CatalogIndex {
   return catalogIndexSchema.parse({
     format: "gamekit.asset-catalog",
     formatVersion: 1,
-    packs: [
-      {
-        id: pack.id,
-        version: pack.version,
-        title: pack.title,
-        theme: pack.theme,
-        summary: pack.summary,
-        license: pack.license.spdx,
-        author: pack.author,
-        source: pack.source,
-        attribution: pack.attribution,
-        assetCount: pack.assets.length,
-      },
-    ],
+    packs: packs.map((pack) => ({
+      id: pack.id,
+      version: pack.version,
+      title: pack.title,
+      theme: pack.theme,
+      summary: pack.summary,
+      license: pack.license.spdx,
+      author: pack.author,
+      source: pack.source,
+      attribution: pack.attribution,
+      assetCount: pack.assets.length,
+    })),
   });
+}
+
+export function catalogIndexFor(pack: AssetPack): CatalogIndex {
+  return catalogIndex([pack]);
 }
