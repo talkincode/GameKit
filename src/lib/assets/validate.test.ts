@@ -1,8 +1,10 @@
-import { readFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkAssetPacks } from "./check-disk";
+import { checkAssetPacks, packGateFailure } from "./check-disk";
 import { buildForestPack, catalogIndex } from "./forest";
+import type { AssetPack } from "./schema";
 import { buildSoundPack } from "./sounds";
 import { validateAssetPack } from "./validate";
 
@@ -95,5 +97,41 @@ describe("forest adventure pack", () => {
     const checked = await validateAssetPack(manifest, files);
     expect(checked.ok).toBe(false);
     if (!checked.ok) expect(checked.issues.map((issue) => issue.code)).toContain("audio-format");
+  });
+});
+
+describe("asset pack build gate", () => {
+  async function isolated(mutate: (manifest: AssetPack) => void): Promise<ReturnType<typeof checkAssetPacks>> {
+    const root = mkdtempSync(join(tmpdir(), "gamekit-packs-"));
+    try {
+      cpSync(join(process.cwd(), "public", "asset-packs", "forest-adventure"), join(root, "forest-adventure"), { recursive: true });
+      const manifest = JSON.parse(readFileSync(join(root, "forest-adventure", "manifest.json"), "utf8")) as AssetPack;
+      writeFileSync(join(root, "index.json"), `${JSON.stringify(catalogIndex([manifest]), null, 2)}\n`);
+      mutate(manifest);
+      writeFileSync(join(root, "forest-adventure", "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+      return await checkAssetPacks(root);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it("a broken license or a bad hash stops the pack gate", async () => {
+    expect(packGateFailure([])).toBeNull();
+
+    const provenance = await isolated((manifest) => {
+      manifest.assets[0].author = "   ";
+      manifest.assets[1].license = { spdx: "", name: "CC0", url: "https://creativecommons.org/publicdomain/zero/1.0/legalcode" };
+      manifest.assets[2].source = "";
+      manifest.attribution = "";
+    });
+    expect(provenance.length).toBeGreaterThan(0);
+    expect(provenance.every((issue) => issue.code === "provenance" || issue.code === "schema")).toBe(true);
+    expect(packGateFailure(provenance)).toContain("provenance");
+
+    const hashed = await isolated((manifest) => {
+      manifest.assets[0].sha256 = "ab".repeat(32);
+    });
+    expect(hashed.map((issue) => issue.code)).toContain("hash-mismatch");
+    expect(packGateFailure(hashed)).toContain("hash-mismatch");
   });
 });

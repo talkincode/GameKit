@@ -42,7 +42,10 @@ const EMBED_HTML = `<!doctype html>
 const EMBED_README = `GameKit embed package
 
 Host these files together. index.html is the game.
-It loads pygame-ce from the pygame-web runtime and does not call GameKit.
+The game files are inside gamekit.apk. They do not call GameKit or the asset catalog.
+index.html still loads pygame-ce from https://pygame-web.github.io/cdn/0.9.3/.
+That runtime is the one online piece. Without it, the web package does not start.
+A source zip of the same project runs on desktop Python + pygame-ce with no network.
 
 <iframe src="./index.html" allow="autoplay; fullscreen; gamepad"></iframe>
 `;

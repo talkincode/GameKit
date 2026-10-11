@@ -275,7 +275,7 @@ Worker 对每个 `/api/*` 请求校验 Access JWT（签名、aud、iss、过期�
 
 - 导出
 
-网页 zip、静态目录 zip、itch.io zip、嵌入 zip、源码 zip；导出包不依赖 GameKit 站点。入口 `src/lib/export.ts`。
+网页 zip、静态目录 zip、itch.io zip、嵌入 zip、源码 zip。源码包不联网。网页包的游戏文件都在包里，不请求 GameKit，也不请求素材库；打开网页仍要加载 pygame-web 的运行时，导出菜单写了这一句。入口 `src/lib/export.ts`。见 [runtime.md](runtime.md) 的「离线导出」。
 
 - 部署
 
@@ -296,9 +296,24 @@ Worker 对每个 `/api/*` 请求校验 Access JWT（签名、aud、iss、过期�
 | D. 音效与音乐编辑 | 已交付 | 预设、包络和波形、裁剪、音量、循环、音乐的节奏和声部。官方音效与收录的声音走同一套清单。导出的 WAV 离线可播。见上「音效编辑器」 |
 | E. 游戏配方与分步挑战 | 已交付 | 五份可玩 pygame 配方、一步挑战用源码和舞台标记判断，新建项目不覆盖旧的。见上「游戏配方与分步挑战」 |
 | F. AI / WebMCP 资源检索 | 已交付 | 检索只读；提议产生候选；拒绝或冲突不改作品；采用后可撤销。见上「素材检索与提议」 |
-| G. 离线与发布验证 | 未做 | 在阶段 A 的导出契约之上，补发布演练和断网运行已缓存游戏 |
+| G. 离线与发布验证 | 已交付 | 配方、素材库副本、动画、地图和声音导出的源码包与网页包，hash 和项目里的副本一致，不请求站点和素材目录。网页运行时仍要 pygame-web，导出提示和 [runtime.md](runtime.md) 写明了。素材包的 schema、hash、许可和来源在 `pnpm build` 时检查，违规中止构建。见下「L0 验收」 |
 
-阶段 A–F 是 L0 的创作核心，已经交付。阶段 G（离线与发布验证）还没做。验收矩阵里的人工体验仍要产品验收：孩子不登录、不生图，从配方或素材包完成一局。云同步和 PWA 仍在目标里，没有从路线图删掉。
+阶段 A–G 是 L0 里可以机器复现的部分，已经交付。人工体验仍要产品/孩子试用，没有勾成完成。云同步和 PWA（断网打开工作室、缓存 pygbag 运行时）仍在目标里，没有从路线图删掉，也不是阶段 G 偷偷做掉的。
+
+## L0 验收（Issue #14）
+
+对照 [Issue #14](https://github.com/talkincode/GameKit/issues/14) 的验收清单。勾上的项都有可复现的测试。人工体验不勾。
+
+- [x] **资源库**：匿名搜索、预览许可和来源、复制进项目、pygame 运行、源码包和网页包里都有这份文件，加入时没有 `/api/`。证据：`tests/e2e/library.spec.ts` 的 `an anonymous child can browse the library without loading it up front`、`the copied picture runs in pygame and is inside the offline export`；`tests/e2e/kenney.spec.ts` 的 `searching finds a Kenney tileset, and pygame plus the export use the copy`；`tests/e2e/offline.spec.ts` 的 `a recipe project with library, animation, map, and sound exports offline`。
+- [x] **冲突与版本**：同名先问再保留或替换，重复复制不写第二份，删除进回收站可恢复，撤销能回到旧字节。素材库升到新版本时，已经导出的 zip 和项目里钉住的 hash 不变；选「保留」也不改。证据：`tests/e2e/library.spec.ts` 的 `copying pins a file, a second copy does nothing, and undo removes it`、`a same-path file is kept or replaced, and undo puts the old bytes back`、`trashing a copied picture can be restored from the trash`；`src/lib/assets/copy.test.ts` 的 `treats a newer pinned version as an update, and a hand-edited file as a conflict`；`src/lib/offline.test.ts` 的 `a newer catalog does not change an exported zip or a pinned copy`。
+- [x] **完整性/版权**：每个 manifest 过 schema，文件 hash 必须对上，许可、作者、来源、署名不能空。违规时 `packGateFailure` 非空，`vite.config.ts` 的 `gamekit-asset-pack-gate` 在 `pnpm build` 里 `this.error`，CI 的构建步骤因此失败。证据：`src/lib/assets/validate.test.ts` 的 `blocks an empty license, author, source, or attribution`、`blocks a hash that does not match the file`、`a broken license or a bad hash stops the pack gate`；`src/lib/assets/kenney.test.ts` 的 `ships one pack for each theme and passes the ship gate`。CI：`.github/workflows/ci.yml` 的 `pnpm build`。
+- [x] **动画**：多帧保存后再打开，PNG 和 JSON 的像素、时长、透明通道可比对，源码包里两份都在，pygame 打出 `ANIM-OK`。坏说明和失败写入不改作品。证据：`tests/e2e/anim.spec.ts` 的 `anonymous: frames are saved, reopened, exported, and played by pygame`、`a bad animation note and a failed write leave the picture untouched`。离线包里的动画文件见 `tests/e2e/offline.spec.ts`。
+- [x] **地图**：画关、碰撞、出生点保存后能还原，地图包导入一致，源码包里有 JSON/CSV/PNG，pygame 打出 `MAP-OK`。非法地图和失败写入不改原文件。证据：`tests/e2e/map.spec.ts` 的 `anonymous: a painted map is saved, reopened, exported, and played by pygame`、`a bad map file and a failed write leave the project untouched`。
+- [x] **声音**：试听和保存是同一份 WAV，官方音效进素材库后 pygame 打出 `SOUND-OK`，源码包和网页包里是这份文件。坏格式在问题里说明。证据：`tests/e2e/sounds.spec.ts` 的 `a preset is heard and saved as the same wav, without asking the model`、`an official sound plays in pygame and is inside the offline export`、`an mp3 is diagnosed, and a kept sound shows up in the library`。
+- [x] **配方教程**：从完整配方新建项目，舞台打出 `RECIPE-OK`，旧项目还在。挑战在改之前失败，采用后通过，撤销后再失败。证据：`tests/e2e/recipes.spec.ts` 的 `an anonymous child starts a recipe without covering the old project, and the step is checked from the stage`；`src/lib/recipes/recipes.test.ts`。
+- [x] **AI / WebMCP**：页面检索不调用 `/api/`。提议只产生候选，丢掉或冲突不改作品，采用后可撤销。没有令牌的 MCP 检索被拒绝。匿名、授权、已登录未授权都有用例。证据：`tests/e2e/recipes.spec.ts` 的 `proposing a catalog picture stays a candidate, and a different file is not replaced`、`an allowed account proposes a picture without writing the project first`、`a signed-in child who is not allowed can still start a recipe, and a tokenless search is refused`；`tests/e2e/collab.spec.ts`；`worker/mcp.test.ts` 的 `refuses search_assets without a token`。
+- [x] **回归**：预览、源码 zip、网页 zip、像素、动画、地图、声音、配方、导入、撤销、项目保存、AI/WebMCP 权限都有 E2E。CI 跑 `pnpm test`、`pnpm typecheck`、`pnpm build`、`pnpm test:e2e`（`.github/workflows/ci.yml`）。证据见上表，以及 `tests/e2e/pixel.spec.ts`、`tests/e2e/agent.spec.ts`、`tests/e2e/account.spec.ts`、`tests/e2e/projects.spec.ts`、`tests/e2e/files.spec.ts`、`src/lib/offline.test.ts` 的 `a recipe with a library copy, animation, map, and sound exports without the catalog`。
+- [ ] **人工体验**：需产品/孩子试用验收，这次没有勾成完成。要看一个不登录、不生图的孩子，能否从素材包或配方开始玩完一局，并自己找到素材、改角色动画、摆地图、看懂 Python。机器测试不能代替这一条。
 
 ## 非目标（铁律）
 
@@ -404,7 +419,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 
 - 离线可用可验证
 
-断网状态下能打开页面、打开项目、运行已缓存运行时的游戏。
+导出的源码包可以断网玩（阶段 G）。网页包仍要 pygame-web 运行时，导出菜单写明了。断网打开工作室页面、打开项目、跑已缓存的 pygbag 运行时，仍是下面的 PWA 项，还没做。
 
 ## 验收矩阵（业务能力覆盖矩阵）
 
@@ -428,7 +443,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 | AI 讲解（只读） | 已有 | 低 | ✅（讲讲这段 → 对话面板里出现回答，项目不变） | ✅ 单元（模型没答好时显示「没想好」） | ✅ 匿名时不可用 / 授权可用 | 不适用（不写入） | `tests/e2e/account.spec.ts`：`allowed account: 讲讲这段 reads code and never rewrites the project`；`src/lib/ai.test.ts`：`asks for an explanation without allowing new files` |
 | 声音生成 | 已有 | 中（消耗额度、噪音扰人） | ✅（音效与音乐生成 → 试听 → 保存到项目 → 撤销） | ✅ 单元（参数越界全部夹紧、非 JSON 拒绝、确定性渲染、循环长度与首尾无爆音、WAV 头） | ✅ 匿名不可用 / 授权可用 | ✅（接受前不写入，保存后可撤销） | `tests/e2e/sounds.spec.ts`（3 条）、`src/lib/audio/render.test.ts`（10 条） |
 | AI 素材生成 | 已有 | 高（消耗额度、儿童内容） | ✅（生成 → 预览 → 放进项目 → 撤销） | ✅ 单元（未配置拒绝、上游失败不回显密钥、无图 502；去背景/裁剪/缩放像素级断言） | ✅ 匿名不可用 / 授权可用 | ✅（接受前不写入，接受后可撤销） | `tests/e2e/assets.spec.ts`（3 条）、`worker/index.test.ts`：`draws with Gemini…`、`tells the model what a sprite must not contain…`、`refuses to draw when the Gemini key is not configured`；`src/lib/sprite.test.ts` |
-| 导入与导出 | 已有 | 中 | ❌ 缺口 | ❌ 缺口 | 不适用 | 不适用（导入总是新建项目） | `src/lib/export.test.ts` |
+| 导入与导出 | 已有 | 中 | ✅（配方项目加上素材库副本、动画、地图、声音后，导出源码 zip 和网页 zip；文件在包里且 hash 与钉住的副本一致；不请求 GameKit 或素材目录。导入 zip 仍总是新建项目） | ✅（许可/来源为空或 hash 不符时构建中止。网页包断网打不开是已知限制，导出菜单写明了，没有假装离线能开） | 不适用 | ✅（素材库升级不改已导出的 zip，也不改项目里钉住的那一份；选保留后 zip 字节不变） | `tests/e2e/offline.spec.ts`：`a recipe project with library, animation, map, and sound exports offline`；`src/lib/offline.test.ts`；`src/lib/assets/validate.test.ts`：`a broken license or a bad hash stops the pack gate`；`src/lib/export.test.ts`。导入一份坏 zip 时的界面提示仍缺 |
 | 部署 | 已有 | 高（线上不可用） | ❌ 缺口 | ✅（单元、类型、构建、E2E 任一失败则不部署） | 不适用 | ❌ 缺口 | `.github/workflows/ci.yml` |
 | 登录与授权 | 已有（Access 应用已创建） | 高（权限） | ✅（本地替身登录） | ✅（错误签名/aud/iss/过期、配置缺失、本地替身出现在非 localhost） | ✅ 匿名 / 授权 / 已登录未授权 | 不适用（不改作品） | `tests/e2e/account.spec.ts`：`anonymous: …`、`signed in but not allowed: …`、`sign-out returns to the anonymous studio`；`worker/index.test.ts`：`identity gate`、`sign-in routes`。真实 Access + GitHub 登录 ❌ 待上线后人工验证 |
 | 云端同步 | 未实现 | 高（作品丢失、权限） | ❌ 缺口 | ❌ 缺口 | ❌ 缺口 | ❌ 缺口 | 无 |
