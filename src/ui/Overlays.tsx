@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useStudio } from "../studio/store";
 import { LibraryDialog } from "./LibraryDialog";
+import { ChallengeDialog, RecipesDialog } from "./RecipesDialog";
 import { PixelEditor } from "./PixelEditor";
 import { PixelNewDialog } from "./PixelNewDialog";
 import { MapEditor } from "./MapEditor";
@@ -19,6 +20,8 @@ export function Overlays() {
       {studio.pixelNewOpen ? <PixelNewDialog /> : null}
       {studio.mapNewOpen ? <MapNewDialog /> : null}
       <LibraryDialog />
+      <RecipesDialog />
+      <ChallengeDialog />
       <PixelEditor />
       <MapEditor />
     </>

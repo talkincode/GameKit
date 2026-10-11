@@ -29,6 +29,10 @@ await asyncio.sleep(0)
 
 文件可以是多个，例如 `from game.player import Player`。资源用普通路径，例如 `assets/player.png`，相对项目根目录。
 
+## 配方
+
+配方是项目里的普通文件：`main.py`、一张 PNG、`README.txt`、`recipe.json`。`recipe.json` 只给工作室认出这是哪一份配方，游戏不要读它。预览和导出把这些文件和其他项目文件一起打包。舞台上的 `print("RECIPE-OK", ...)` 是给检查看的普通输出。模板没有为配方改过。
+
 ## 素材库
 
 内置素材放在站点的 `public/asset-packs/`，打开素材库才请求说明文件和缩略图，不打进页面脚本。复制进项目的是文件字节，路径像 `assets/library/forest-adventure/characters/hero.png`，用普通 `pygame.image.load`。`assets/library.json` 只记下复制时的包版本、hash 和许可来源，游戏不要读它。

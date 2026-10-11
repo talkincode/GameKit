@@ -7,12 +7,14 @@
  * through `AgentEffects`, so the whole loop runs in unit tests without a browser,
  * a model, or a pygame runtime.
  */
+import type { CatalogHit } from "../../shared/catalog";
 import {
   buildMessages,
   designMessages,
   readCandidateFiles,
   readDesign,
   repairMessages,
+  type AssetIntent,
   type ChatImage,
   type ChatMessage,
   type TextChange,
@@ -67,7 +69,7 @@ export type AgentEvent =
   | { kind: "design"; design: DesignCard; say: string }
   | { kind: "candidate"; candidate: CandidateResult };
 
-export type AgentTurnInput = { id: string; request: string; images?: ChatImage[] };
+export type AgentTurnInput = { id: string; request: string; images?: ChatImage[]; catalog?: CatalogHit[] };
 
 export type AgentEffects = {
   /** One model call. Throws when the call or the answer is unusable. */
@@ -77,6 +79,11 @@ export type AgentEffects = {
   /** True once the child cancelled, or the project changed underneath. */
   cancelled: () => boolean;
   emit: (event: AgentEvent) => void;
+  /**
+   * Copies named catalog assets onto a candidate. Refusing leaves the child's
+   * project untouched, because this return value is only the candidate.
+   */
+  attachAssets?: (project: Project, assets: AssetIntent[]) => Promise<Project>;
 };
 
 function applyChanges(project: Project, files: TextChange[]): Project {
@@ -152,12 +159,25 @@ export async function runAgentTurn(
   fx.emit({ kind: "design", design, say });
   if (fx.cancelled()) return { kind: "cancelled" };
 
+  const takeFiles = async (raw: string, onto: Project): Promise<{ project: Project; say: string }> => {
+    const built = readCandidateFiles(raw, onto, "main.py", input.catalog ?? []);
+    let project = applyChanges(onto, built.files);
+    if (built.assets.length) {
+      if (!fx.attachAssets) throw new Error("The model named a library asset, but this round cannot copy one.");
+      project = await fx.attachAssets(project, built.assets);
+    }
+    return { project, say: built.say };
+  };
+
   // 2. Build: one candidate version of the whole game.
   emitStep("build", "build", "active");
   let candidate: Project;
   try {
-    const built = readCandidateFiles(await fx.model(buildMessages({ request: input.request, design, base })), base, "main.py");
-    candidate = applyChanges(base, built.files);
+    const built = await takeFiles(
+      await fx.model(buildMessages({ request: input.request, design, base, catalog: input.catalog })),
+      base,
+    );
+    candidate = built.project;
     say = built.say || say;
   } catch (error) {
     const message = error instanceof Error ? error.message : "The model call failed.";
@@ -186,7 +206,7 @@ export async function runAgentTurn(
       emitStep(`repair-${repairs + 1}`, "repair", "active", detail);
       try {
         const fixed = await fx.model(repairMessages({ request: input.request, design, files: candidate.files, problems: found, consoleTail: "" }));
-        candidate = applyChanges(candidate, readCandidateFiles(fixed, candidate, "main.py").files);
+        candidate = (await takeFiles(fixed, candidate)).project;
       } catch (error) {
         const message = error instanceof Error ? error.message : "The model call failed.";
         emitStep(`repair-${repairs + 1}`, "repair", "failed", detail);
@@ -217,7 +237,7 @@ export async function runAgentTurn(
         const fixed = await fx.model(
           repairMessages({ request: input.request, design, files: candidate.files, problems: [], consoleTail: outcome.detail }),
         );
-        candidate = applyChanges(candidate, readCandidateFiles(fixed, candidate, "main.py").files);
+        candidate = (await takeFiles(fixed, candidate)).project;
       } catch (error) {
         const message = error instanceof Error ? error.message : "The model call failed.";
         emitStep(`repair-${repairs + 1}`, "repair", "failed");

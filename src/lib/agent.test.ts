@@ -6,7 +6,8 @@
 import { describe, expect, it } from "vitest";
 import { MAX_REPAIRS, candidateDiff, foldStep, runAgentTurn, type AgentEffects, type AgentEvent, type AgentStep, type RunOutcome } from "./agent";
 import { diagnoseProject } from "./diagnostics";
-import type { Project } from "./project";
+import { upsertFile, type Project } from "./project";
+import type { CatalogHit } from "../../shared/catalog";
 
 const GOOD_MAIN = `import asyncio
 import pygame
@@ -215,6 +216,69 @@ describe("a round of the agent loop", () => {
   it("stops when the preview reports that it was cancelled", async () => {
     const h = harness({ answers: [DESIGN, filesAnswer(GOOD_MAIN)], run: () => ({ kind: "cancelled" }) });
     expect(await turn(h)).toEqual({ kind: "cancelled" });
+  });
+
+  it("copies a named catalog asset onto the candidate and not the project", async () => {
+    const catalog: CatalogHit[] = [
+      {
+        packId: "forest-adventure",
+        assetId: "coin",
+        title: "金币",
+        path: "props/coin.png",
+        mediaType: "image/png",
+        category: "prop",
+        theme: "森林",
+        tags: ["金币"],
+        license: "CC0-1.0",
+        author: "GameKit",
+        source: "https://github.com/talkincode/GameKit",
+        attribution: "测试",
+      },
+    ];
+    const answer = JSON.stringify({
+      say: "用金币",
+      files: [{ path: "main.py", content: GOOD_MAIN }],
+      assets: [{ packId: "forest-adventure", assetId: "coin" }],
+    });
+    const h = harness({ answers: [DESIGN, answer] });
+    h.fx.attachAssets = async (project) =>
+      upsertFile(project, { path: "assets/library/forest-adventure/props/coin.png", bytes: new Uint8Array([7]) });
+    const outcome = await runAgentTurn({ id: "t1", request: "加一个金币", catalog }, base, h.fx);
+    expect(outcome).toEqual({ kind: "ready" });
+    expect(h.prompts[1]).toContain("金币");
+    expect(h.candidate()?.project.files.some((file) => file.path.endsWith("coin.png"))).toBe(true);
+    expect(base.files).toEqual([{ path: "main.py", text: "print('hi')\n" }]);
+  });
+
+  it("drops the round when copying an asset would overwrite the child's file", async () => {
+    const catalog: CatalogHit[] = [
+      {
+        packId: "forest-adventure",
+        assetId: "coin",
+        title: "金币",
+        path: "props/coin.png",
+        mediaType: "image/png",
+        category: "prop",
+        theme: "森林",
+        tags: ["金币"],
+        license: "CC0-1.0",
+        author: "GameKit",
+        source: "https://github.com/talkincode/GameKit",
+        attribution: "测试",
+      },
+    ];
+    const answer = JSON.stringify({
+      say: "用金币",
+      files: [{ path: "main.py", content: GOOD_MAIN }],
+      assets: [{ packId: "forest-adventure", assetId: "coin" }],
+    });
+    const h = harness({ answers: [DESIGN, answer] });
+    h.fx.attachAssets = async () => {
+      throw new Error("Refusing to overwrite a library file the child already has.");
+    };
+    const outcome = await runAgentTurn({ id: "t1", request: "加一个金币", catalog }, base, h.fx);
+    expect(outcome.kind).toBe("failed");
+    expect(base.files).toEqual([{ path: "main.py", text: "print('hi')\n" }]);
   });
 });
 

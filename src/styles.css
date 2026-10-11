@@ -873,6 +873,15 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 .library-choice { display: grid; gap: 8px; }
 .library-empty { grid-column: 1 / -1; color: var(--muted); }
+.modal.recipes, .modal.challenge { width: min(760px, 100%); max-height: min(720px, 92vh); overflow: auto; }
+.recipe-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.recipe-list li { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; background: white; }
+.recipe-list h3 { margin: 0; }
+.recipe-paths { display: flex; gap: 8px; flex-wrap: wrap; }
+.kid-error, .kid-technical { margin: 8px 12px; font-size: 13px; }
+.kid-error p, .kid-technical p { margin: 4px 0 0; }
+.challenge [data-ok="false"] { color: var(--danger, #9a3b2f); }
+.challenge [data-ok="true"] { color: var(--pine); }
 
 @media (max-width: 1000px) {
   .library-body { grid-template-columns: 1fr; }

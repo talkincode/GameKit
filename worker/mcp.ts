@@ -10,8 +10,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { DurableObject } from "cloudflare:workers";
 import { z } from "zod";
+import { findHit, libraryAssetPath, searchCatalog } from "../shared/catalog";
+import { studioTool } from "../shared/tools";
 import type { CollabSession, CollabState } from "./collab";
 import type { GameKitEnv } from "./env";
+import { officialCatalog } from "./official-catalog";
 
 /** One collaboration session per person, so a token only needs the email. */
 export function collabName(email: string): string {
@@ -35,9 +38,81 @@ export function createGameKitMcpServer(env: GameKitEnv, email: string): McpServe
     return state;
   }
 
+  const search = studioTool("search_assets");
+  server.tool(
+    search.name,
+    search.description,
+    { query: z.string().describe("words to look for, such as a Chinese title or a tag; empty lists the first assets") },
+    async ({ query }) => {
+      const hits = searchCatalog(officialCatalog(), query, 8);
+      if (!hits.length) {
+        return { content: [{ type: "text", text: "素材目录里没有找到这个。换一个词试试。" }] };
+      }
+      const lines = hits.map(
+        (hit) => `${hit.packId}/${hit.assetId} ${hit.title}（${hit.category}）${hit.tags.join("、")} → ${libraryAssetPath(hit)}`,
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: `只读检索，没有改项目：\n${lines.join("\n")}`,
+          },
+        ],
+      };
+    },
+  );
+
+  const proposeAsset = studioTool("propose_asset");
+  server.tool(
+    proposeAsset.name,
+    proposeAsset.description,
+    {
+      packId: z.string().describe("catalog pack id, such as forest-adventure"),
+      assetId: z.string().describe("catalog asset id, such as coin"),
+      say: z.string().describe("one short sentence in Simplified Chinese for the child"),
+    },
+    async ({ packId, assetId, say }) => {
+      const state = await loadOwned();
+      const hit = findHit(officialCatalog(), packId, assetId);
+      if (!hit) {
+        return { content: [{ type: "text", text: "素材目录里没有这个。先用 search_assets 查，再提议。" }], isError: true };
+      }
+      const dest = libraryAssetPath(hit);
+      if (state.session.files.some((file) => file.path === dest)) {
+        return {
+          content: [{ type: "text", text: `${dest} 已经在项目里。助手不能盖掉它，请孩子自己在素材库里选择。` }],
+          isError: true,
+        };
+      }
+      const examplePath = `examples/load-${hit.assetId}.py`;
+      const load =
+        hit.mediaType.startsWith("audio/")
+          ? `sound = pygame.mixer.Sound("${dest}")\nsound.play()\n`
+          : `image = pygame.image.load("${dest}").convert_alpha()\n`;
+      const example =
+        `import pygame\n\n# ${hit.title}\n# 许可：${hit.license} · 作者：${hit.author}\n` +
+        (hit.mediaType.startsWith("audio/") ? "pygame.mixer.init()\n" : "") +
+        load;
+      const { candidateId } = await sessionFor(env, email).propose({
+        tool: proposeAsset.name,
+        say,
+        files: [{ path: examplePath, text: example }],
+        assets: [{ packId: hit.packId, assetId: hit.assetId }],
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `已交给孩子确认（候选 ${candidateId}）。素材要等他说「采用这一版」才会复制进项目，不会直接改掉已有文件。`,
+          },
+        ],
+      };
+    },
+  );
+
   server.tool(
     "list_files",
-    "List the files of the project the child shared for collaboration (paths only).",
+    studioTool("list_files").description,
     {},
     async () => {
       const state = await loadOwned();
@@ -50,7 +125,7 @@ export function createGameKitMcpServer(env: GameKitEnv, email: string): McpServe
 
   server.tool(
     "read_file",
-    "Read one text file of the shared project.",
+    studioTool("read_file").description,
     { path: z.string().describe("project-relative path, e.g. main.py") },
     async ({ path }) => {
       const state = await loadOwned();
@@ -65,7 +140,7 @@ export function createGameKitMcpServer(env: GameKitEnv, email: string): McpServe
 
   server.tool(
     "propose_files",
-    "Propose text files for the project. This only creates a candidate the child sees and adopts; it never writes the project directly. Send whole files, up to 6.",
+    studioTool("propose_files").description,
     {
       say: z.string().describe("one short sentence in Simplified Chinese for the child"),
       files: z
@@ -118,7 +193,7 @@ export function createGameKitMcpServer(env: GameKitEnv, email: string): McpServe
 
   server.tool(
     "read_activity",
-    "Read what has happened in this collaboration session so far.",
+    studioTool("read_activity").description,
     {},
     async () => {
       const state = await loadOwned();

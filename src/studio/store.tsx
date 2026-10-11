@@ -34,7 +34,12 @@ import {
 } from "../lib/agent";
 import { GatewayError } from "../lib/adk/model";
 import { forgetAllRunners, forgetProjectRunner, projectHasSession, projectRunner } from "../lib/adk/runner";
+import { loadLibrary } from "../lib/assets/catalog";
+import { materializeAsset, resolveCatalogCopy } from "../lib/assets/propose";
+import { hitsFromPacks } from "../lib/assets/search";
 import { explainMessages, readSay, type ChatImage, type ChatMessage } from "../lib/ai";
+import { lessonFor } from "../lib/recipes/check";
+import { createRecipeProject, recipeIdOf } from "../lib/recipes/catalog";
 import { buildWebBundle } from "../lib/build";
 import type { DesignCard } from "../lib/design";
 import { diagnoseProject, problemsFromConsole, tracebackTail, type Problem } from "../lib/diagnostics";
@@ -244,6 +249,20 @@ type StudioValue = {
   /** Built-in asset library. Browsing does not write; copying goes through commit. */
   libraryOpen: boolean;
   setLibraryOpen: (open: boolean) => void;
+  /** Recipes always create a new project. Challenges read the open one. */
+  recipesOpen: boolean;
+  setRecipesOpen: (open: boolean) => void;
+  challengeOpen: boolean;
+  setChallengeOpen: (open: boolean) => void;
+  /** New project from a recipe. `challenge` opens the step after the switch. */
+  newRecipe: (id: string, challenge?: boolean) => void;
+  /** The lesson's prepared edit, as a candidate. Does not call the model. */
+  offerLessonCandidate: (recipeId: string) => void;
+  /**
+   * Names a catalog asset as a candidate. Does not write the open project.
+   * A path that already holds different bytes is refused.
+   */
+  proposeCatalogAsset: (packId: string, assetId: string) => Promise<void>;
   copyLibraryAsset: (request: LibraryCopyRequest) => Promise<LibraryCopyResult>;
   pixelSession: PixelSession | null;
   /** Opens a blank canvas. False when the size or name is not allowed or the name is taken. */
@@ -412,6 +431,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [soundLibraryVersion, setSoundLibraryVersion] = useState(0);
   const [pixelNewOpen, setPixelNewOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [recipesOpen, setRecipesOpen] = useState(false);
+  const [challengeOpen, setChallengeOpen] = useState(false);
   const [pixelSession, setPixelSession] = useState<PixelSession | null>(null);
   const [mapNewOpen, setMapNewOpen] = useState(false);
   const [mapSession, setMapSession] = useState<MapSession | null>(null);
@@ -1113,15 +1134,34 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setNotice("");
       const patch = (change: (turn: Turn) => Turn) =>
         setTurns((list) => list.map((item) => (item.id === turnId ? change(item) : item)));
+      let catalog: Awaited<ReturnType<typeof hitsFromPacks>> = [];
+      try {
+        catalog = hitsFromPacks(await loadLibrary());
+      } catch (error) {
+        console.warn("Asset catalog did not load:", error);
+      }
       let outcome: AgentTurnOutcome;
       try {
-        outcome = await runAgentTurn({ id: turnId, request: fresh.request, images }, base, {
+        outcome = await runAgentTurn({ id: turnId, request: fresh.request, images, catalog }, base, {
           model: callModel,
           diagnose: diagnoseProject,
           run: runCandidate,
           cancelled: () =>
             turnRef.current?.id !== turnId || turnRef.current.cancelled || projectRef.current?.id !== base.id,
           emit: (event) => patch((item) => applyEvent(item, event)),
+          attachAssets: async (project, assets) => {
+            let next = project;
+            for (const asset of assets) {
+              const copy = await resolveCatalogCopy(asset.packId, asset.assetId);
+              if (!copy) throw new Error("Unknown library asset.");
+              const applied = await materializeAsset(next, copy);
+              if (!applied.ok && applied.reason !== "identical") {
+                throw new Error("Refusing to overwrite a library file the child already has.");
+              }
+              if (applied.ok) next = applied.project;
+            }
+            return next;
+          },
         });
       } catch (error) {
         outcome = { kind: "failed", message: error instanceof Error ? error.message : "The model call failed." };
@@ -1293,7 +1333,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       if (!current || cancelled) return;
       const settled = collabSettledRef.current.splice(0);
       const outcome = await callApi<{
-        candidates: { id: string; tool: string; say: string; files: { path: string; text: string }[]; createdAt: number }[];
+        candidates: {
+          id: string;
+          tool: string;
+          say: string;
+          files: { path: string; text: string }[];
+          assets?: { packId: string; assetId: string }[];
+          createdAt: number;
+        }[];
         activity: { at: number; tool: string; summary: string }[];
       }>("/api/collab/sync", {
         method: "POST",
@@ -1320,11 +1367,39 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         handledCandidateIdsRef.current.add(cand.id);
 
         let candidateProject = current;
-        for (const file of cand.files) {
-          candidateProject = upsertFile(candidateProject, { path: file.path, text: file.text });
+        let refused = "";
+        for (const asset of cand.assets ?? []) {
+          const copy = await resolveCatalogCopy(asset.packId, asset.assetId);
+          if (!copy) {
+            refused = text.recipes.assetMissing;
+            break;
+          }
+          const applied = await materializeAsset(candidateProject, copy);
+          if (!applied.ok && applied.reason !== "identical") {
+            refused = text.recipes.assetConflict;
+            break;
+          }
+          if (applied.ok) candidateProject = applied.project;
         }
+        if (!refused) {
+          for (const file of cand.files) {
+            if (candidateProject.files.some((item) => item.path === file.path && item.bytes)) {
+              refused = text.recipes.assetConflict;
+              break;
+            }
+            candidateProject = upsertFile(candidateProject, { path: file.path, text: file.text });
+          }
+        }
+        if (refused) {
+          collabSettledRef.current.push({ candidateId: cand.id, adopted: false });
+          setNotice(refused);
+          continue;
+        }
+        const addedBinary = candidateProject.files.some(
+          (file) => file.bytes && !current.files.some((item) => item.path === file.path && item.bytes),
+        );
         const diff = candidateDiff(current, candidateProject);
-        if (diff.length === 0) continue;
+        if (diff.length === 0 && !addedBinary) continue;
 
         const candidateResult: CandidateResult = {
           project: candidateProject,
@@ -1374,6 +1449,100 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearTimeout(initialTimer);
     };
   }, [collabActive, account.kind, makeCollabSnapshot, runProject]);
+
+  const showPreparedCandidate = useCallback((input: { request: string; say: string; project: Project }) => {
+    const current = projectRef.current;
+    if (!current || input.project.id !== current.id) return;
+    const diff = candidateDiff(current, input.project);
+    const addedBinary = input.project.files.some(
+      (file) => file.bytes && !current.files.some((item) => item.path === file.path && item.bytes),
+    );
+    if (!diff.length && !addedBinary) {
+      setNotice(text.recipes.assetSame);
+      return;
+    }
+    const design = current.design ?? { title: current.name, hero: "", goal: "", controls: [], look: "" };
+    const candidateResult: CandidateResult = {
+      project: input.project,
+      design,
+      say: input.say,
+      repairs: 0,
+      diff,
+    };
+    const turn: Turn = {
+      id: crypto.randomUUID(),
+      kind: "design",
+      request: input.request,
+      steps: [{ key: "finish", kind: "finish", status: "done" }],
+      say: input.say,
+      design,
+      candidate: candidateResult,
+      outcome: { kind: "ready" },
+      adopted: false,
+      discarded: false,
+    };
+    setTurns((list) => [...list, turn]);
+    setView("design");
+    setRecipesOpen(false);
+    setChallengeOpen(false);
+    setLibraryOpen(false);
+  }, []);
+
+  const newRecipe = useCallback((id: string, challenge = false) => {
+    const created = createRecipeProject(id);
+    if (!created) return;
+    flushSave();
+    void saveProject(created);
+    stop();
+    abortTurn();
+    setProjects((current) => [created, ...current]);
+    setActiveId(created.id);
+    setTurns([]);
+    localStorage.setItem(ACTIVE_KEY, created.id);
+    setPath("main.py");
+    setRecipesOpen(false);
+    setChallengeOpen(challenge);
+    setNotice("");
+  }, [abortTurn, flushSave, stop]);
+
+  const offerLessonCandidate = useCallback((recipeId: string) => {
+    const current = projectRef.current;
+    const lesson = lessonFor(recipeId);
+    if (!current || !lesson || recipeIdOf(current.files) !== recipeId) return;
+    if (turnBusy) {
+      setNotice(text.recipes.busy);
+      return;
+    }
+    const next = upsertFile(current, { path: lesson.suggestion.path, text: lesson.suggestion.content });
+    showPreparedCandidate({ request: lesson.goal, say: lesson.suggestion.say, project: next });
+  }, [showPreparedCandidate, turnBusy]);
+
+  const proposeCatalogAsset = useCallback(async (packId: string, assetId: string) => {
+    const current = projectRef.current;
+    if (!current) {
+      setNotice(text.recipes.needProject);
+      return;
+    }
+    if (turnBusy) {
+      setNotice(text.recipes.busy);
+      return;
+    }
+    const copy = await resolveCatalogCopy(packId, assetId);
+    if (!copy) {
+      setNotice(text.recipes.assetMissing);
+      return;
+    }
+    const applied = await materializeAsset(current, copy);
+    if (!applied.ok) {
+      setNotice(applied.reason === "identical" ? text.recipes.assetSame : text.recipes.assetConflict);
+      return;
+    }
+    showPreparedCandidate({
+      request: text.recipes.assetRequest(copy.title),
+      say: text.recipes.assetSay(applied.path),
+      project: applied.project,
+    });
+  }, [showPreparedCandidate, turnBusy]);
 
   const value = useMemo<StudioValue>(() => {
     const requireProject = () => {
@@ -1800,6 +1969,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setPixelNewOpen,
       libraryOpen,
       setLibraryOpen,
+      recipesOpen,
+      setRecipesOpen,
+      challengeOpen,
+      setChallengeOpen,
+      newRecipe,
+      offerLessonCandidate,
+      proposeCatalogAsset,
       copyLibraryAsset: async (request) => {
         const current = projectRef.current;
         if (!current) {
@@ -1895,6 +2071,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     forgetKeptSound,
     pixelNewOpen,
     libraryOpen,
+    recipesOpen,
+    challengeOpen,
+    newRecipe,
+    offerLessonCandidate,
+    proposeCatalogAsset,
     pixelSession,
     startPixelNew,
     editPixelFile,

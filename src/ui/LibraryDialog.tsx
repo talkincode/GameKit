@@ -469,6 +469,18 @@ export function LibraryDialog() {
                     <button type="button" className="run" disabled={busy || !selected} data-testid="library-add" onClick={() => void onAdd()}>
                       {text.library.add}
                     </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={busy || !selected}
+                      data-testid="library-propose"
+                      onClick={() => {
+                        if (!selected) return;
+                        void studio.proposeCatalogAsset(selected.pack.id, selected.asset.id);
+                      }}
+                    >
+                      {text.library.propose}
+                    </button>
                   </div>
                   <p className="quiet">{text.library.tryHint}</p>
                 </>

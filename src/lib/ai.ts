@@ -1,3 +1,4 @@
+import { catalogLines, findHit, type CatalogHit } from "../../shared/catalog";
 import { designFromRecord, designText, type DesignCard } from "./design";
 import type { Problem } from "./diagnostics";
 import { isAudioPath } from "./audio/format";
@@ -17,10 +18,15 @@ export type ChatImage = { dataUrl: string };
 
 export type TextChange = { path: string; content: string };
 
+/** A catalog asset the model may name. The studio copies the bytes later. */
+export type AssetIntent = { packId: string; assetId: string };
+
 /** Files a candidate version consists of, plus what to tell the child. */
 export type CandidateFiles = {
   say: string;
   files: TextChange[];
+  /** Catalog ids to copy into the candidate. Never binary bytes. */
+  assets: AssetIntent[];
 };
 
 /** One design card plus the child-facing sentence that goes with it. */
@@ -44,8 +50,8 @@ Code rules:
 - Do not use time.sleep, pygame.time.wait, or pygame.time.delay.
 - Prefer pygame.font.Font(None, size) or a project .ttf over SysFont.
 - Audio for the web build should be 16-bit PCM WAV or OGG Vorbis. The sound editor saves WAV.
-- Never write to assets/ in a reply: images, sounds and fonts are binary files the child owns.
-- The built-in asset library is read-only for you. You cannot copy a library file into the project, and you cannot rewrite assets/library.json. The child adds those files. You may load a picture or a sound that is already in the project with pygame.image.load or pygame.mixer.Sound.
+- Never write to assets/ in a reply: images, sounds and fonts are binary files the child owns. You cannot put binary bytes in a file.
+- Naming a library asset only proposes a candidate. Put up to 2 ids in an "assets" array as {"packId","assetId"}. You cannot rewrite assets/library.json, and you cannot replace a binary the child already has. The studio copies the file only into the candidate; the child adopts it. You may load a picture or a sound that is already in the project with pygame.image.load or pygame.mixer.Sound.
 - Audio files (*.wav, *.ogg, *.mp3, *.aiff) belong to the child. Do not rewrite them.
 - Sprite animation notes (*.anim.json) belong to the child. Do not rewrite them. Play a saved sheet with ordinary pygame: load the PNG, read the JSON, and blit frames by durationMs.
 - Tile maps (*.map.json, maps/*.csv, and *.tileset.png) belong to the child. Do not rewrite them. Load a saved map with ordinary pygame: read the JSON, the collision CSV, and the tileset PNG.
@@ -101,11 +107,28 @@ export function readDesign(raw: string): DesignResult {
  * Reads the files of a candidate version. Paths must stay inside the project,
  * stay text, and never replace a binary asset the child made.
  */
-export function readCandidateFiles(raw: string, project: Project, fallbackPath: string): CandidateFiles {
+function readAssetIntents(value: unknown, catalog: CatalogHit[]): AssetIntent[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error("The model named a library asset we cannot read.");
+  const assets: AssetIntent[] = [];
+  for (const item of value.slice(0, 2)) {
+    if (!item || typeof item !== "object") throw new Error("The model named a library asset we cannot read.");
+    const entry = item as { packId?: unknown; assetId?: unknown };
+    const packId = typeof entry.packId === "string" ? entry.packId : "";
+    const assetId = typeof entry.assetId === "string" ? entry.assetId : "";
+    if (!findHit(catalog, packId, assetId)) throw new Error(`Unknown library asset ${packId}/${assetId}.`);
+    assets.push({ packId, assetId });
+  }
+  if (value.length > 2) throw new Error("The model named more than 2 library assets.");
+  return assets;
+}
+
+export function readCandidateFiles(raw: string, project: Project, fallbackPath: string, catalog: CatalogHit[] = []): CandidateFiles {
   const value = parseModelJson(raw);
   if (!value || typeof value !== "object") throw new Error("The model response was empty.");
-  const record = value as { say?: unknown; explanation?: unknown; files?: unknown };
+  const record = value as { say?: unknown; explanation?: unknown; files?: unknown; assets?: unknown };
   const say = typeof record.say === "string" ? record.say.trim() : typeof record.explanation === "string" ? record.explanation.trim() : "";
+  const assets = readAssetIntents(record.assets, catalog);
   if (!Array.isArray(record.files)) throw new Error("The model did not propose a file.");
   const files: TextChange[] = [];
   for (const item of record.files.slice(0, 6)) {
@@ -128,7 +151,7 @@ export function readCandidateFiles(raw: string, project: Project, fallbackPath: 
     files.push({ path, content: entry.content });
   }
   if (!files.length) throw new Error("The model did not propose a file.");
-  return { say, files };
+  return { say, files, assets };
 }
 
 function designBlock(card: DesignCard | undefined): string {
@@ -160,7 +183,11 @@ export function designMessages(input: { request: string; base: Project; images?:
 }
 
 /** Builds the candidate version of the whole game. */
-export function buildMessages(input: { request: string; design: DesignCard; base: Project }): ChatMessage[] {
+export function buildMessages(input: { request: string; design: DesignCard; base: Project; catalog?: CatalogHit[] }): ChatMessage[] {
+  const catalog = input.catalog?.length
+    ? `素材目录（只读，最多点名 2 个，不要写字节）：\n${catalogLines(input.catalog)}\n` +
+      `要用的话，在 JSON 里加 "assets":[{"packId":"...","assetId":"..."}]。这只会产生候选，不会直接改作品。\n`
+    : "";
   return [
     { role: "system", content: SYSTEM },
     {
@@ -169,8 +196,9 @@ export function buildMessages(input: { request: string; design: DesignCard; base
         `孩子说的话：${clip(input.request.trim(), 1_000)}\n\n` +
         `${designBlock(input.design)}\n` +
         `现在项目里的文件：\n${filesForPrompt(input.base.files, MESSAGE_BUDGET - 4_000) || "（空项目）"}\n` +
+        catalog +
         `把这张设计卡做成能玩的游戏，写出完整的文件（不是片段）。必须包含 main.py。\n` +
-        `沿用项目里已经在用的结构和命名；可以新增 .py 文件；不要改动 assets/ 里的二进制素材，也不要改 assets/library.json、*.anim.json、音频文件（*.wav、*.ogg、*.mp3、*.aiff）或地图文件（*.map.json、maps/*.csv、*.tileset.png）。素材库里的图和声音要孩子自己复制进项目。动画帧、地图和声音也要孩子自己在编辑器里改。\n` +
+        `沿用项目里已经在用的结构和命名；可以新增 .py 文件；不要改动 assets/ 里的二进制素材，也不要改 assets/library.json、*.anim.json、音频文件（*.wav、*.ogg、*.mp3、*.aiff）或地图文件（*.map.json、maps/*.csv、*.tileset.png）。点名素材库只放在 assets 数组里。动画帧、地图和声音文件也要孩子自己在编辑器里改。\n` +
         `返回 {"say":"给孩子的一句话","files":[{"path":"main.py","content":"整个文件"}]}，最多 6 个文件。`,
     },
   ];
