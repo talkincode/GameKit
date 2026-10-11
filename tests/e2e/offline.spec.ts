@@ -41,7 +41,7 @@ async function storedProjects(page: Page): Promise<{ id: string; name: string; f
 }
 
 test("a recipe project with library, animation, map, and sound exports offline", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(90_000);
   const hits = watchApi(page);
   await page.goto("/");
   await expect(page.getByRole("button", { name: text.stage.play })).toBeVisible();
@@ -63,6 +63,9 @@ test("a recipe project with library, animation, map, and sound exports offline",
   await page.getByTestId("library-add").click();
   await expect(page.getByTestId("library-status")).toContainText(JUMP);
   await page.getByTestId("library-dialog").getByRole("button", { name: text.library.close }).click();
+  // The copy confirmation sits over the bottom of the next dialog until the child taps it.
+  await page.getByTestId("notice").click();
+  await expect(page.getByTestId("notice")).toHaveCount(0);
 
   await page.getByRole("tab", { name: text.header.code }).click();
   await page.getByRole("button", { name: text.code.assets, exact: true }).click();
