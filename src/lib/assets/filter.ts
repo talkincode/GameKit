@@ -7,6 +7,15 @@ export type AssetQuery = {
   tag: string | "all";
 };
 
+/**
+ * Other assets that share a tag. Style variants stay editable copies linked by
+ * tags, so a sound and a picture can belong to one theme without a new drawing.
+ */
+export function relatedAssets(assets: CatalogAsset[], asset: CatalogAsset): CatalogAsset[] {
+  const tags = new Set(asset.tags);
+  return assets.filter((other) => other !== asset && other.id !== asset.id && other.tags.some((tag) => tags.has(tag)));
+}
+
 /** Client-side filter. The pack JSON is already loaded; this does not fetch. */
 export function filterAssets(assets: CatalogAsset[], query: AssetQuery): CatalogAsset[] {
   const needle = query.text.trim().toLowerCase();

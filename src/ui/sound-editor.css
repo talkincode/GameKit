@@ -1,0 +1,25 @@
+.modal.sound-editor {
+  width: min(720px, 100%);
+  max-height: min(920px, 92vh);
+  overflow: auto;
+}
+.sound-presets, .sound-voices, .sound-waves { display: flex; flex-wrap: wrap; gap: 4px; }
+.sound-field {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 52px;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.sound-field input[type="range"] { width: 100%; }
+.sound-plot {
+  width: 100%;
+  height: 72px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.sound-plot path { stroke: var(--pine); stroke-width: 1.5; fill: none; }
+.sound-wave path { stroke: var(--ink); }
+.sound-snippet { white-space: pre-wrap; }
+.sound-problem { color: var(--danger); }

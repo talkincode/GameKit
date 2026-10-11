@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { KEPT_PACK_ID, loadKeptPack } from "../lib/audio/kept";
 import { clearCatalogCache, loadAssetBytes, loadLibrary, packAssetUrl } from "../lib/assets/catalog";
 import {
   describeLibraryCopy,
@@ -9,7 +10,7 @@ import {
   type LibraryExample,
   type LibraryPlan,
 } from "../lib/assets/copy";
-import { filterAssets } from "../lib/assets/filter";
+import { filterAssets, relatedAssets } from "../lib/assets/filter";
 import type { AssetCategory, AssetPack, CatalogAsset } from "../lib/assets/schema";
 import { pygameDemoMain, pygameSnippet, type SnippetAsset } from "../lib/assets/snippet";
 import { useStudio } from "../studio/store";
@@ -33,6 +34,8 @@ function snippetOf(asset: CatalogAsset): SnippetAsset {
     attribution: asset.attribution,
     frameWidth: asset.animation?.frameWidth ?? asset.width ?? 0,
     frameHeight: asset.animation?.frameHeight ?? asset.height ?? 0,
+    media: asset.mediaType.startsWith("audio/") ? "audio" : "image",
+    loop: asset.category === "music",
   };
 }
 
@@ -53,16 +56,20 @@ export function LibraryDialog() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [copied, setCopied] = useState(false);
+  const [localFiles, setLocalFiles] = useState<Record<string, Uint8Array>>({});
+  const [removeKept, setRemoveKept] = useState(false);
+  const [keptUrl, setKeptUrl] = useState("");
 
   useEffect(() => {
     if (!open) return;
     let cancel = false;
     setLoading(true);
     setError("");
-    void loadLibrary()
-      .then((loaded) => {
+    void Promise.all([loadLibrary(), loadKeptPack()])
+      .then(([loaded, kept]) => {
         if (cancel) return;
-        setPacks(loaded);
+        setPacks(kept ? [...loaded, kept.pack] : loaded);
+        setLocalFiles(kept?.files ?? {});
         setLoading(false);
       })
       .catch(() => {
@@ -73,7 +80,7 @@ export function LibraryDialog() {
     return () => {
       cancel = true;
     };
-  }, [open, reload]);
+  }, [open, reload, studio.soundLibraryVersion]);
 
   useEffect(() => {
     if (open) return;
@@ -108,6 +115,15 @@ export function LibraryDialog() {
   );
   const visible = rows.filter((row) => shown.includes(row.asset));
   const selected = visible.find((row) => row.asset.id === selectedId) ?? visible[0] ?? null;
+  const keptPath = selected?.pack.id === KEPT_PACK_ID && selected.asset.mediaType.startsWith("audio/") ? selected.asset.path : "";
+  useEffect(() => {
+    if (!keptPath) return;
+    const bytes = localFiles[keptPath];
+    if (!bytes) return;
+    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "audio/wav" }));
+    setKeptUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [keptPath, localFiles]);
 
   if (!open) return null;
 
@@ -126,7 +142,9 @@ export function LibraryDialog() {
   };
 
   const prepare = async (row: Row): Promise<Pending | null> => {
-    const bytes = await loadAssetBytes(row.pack.id, row.asset.path);
+    const bytes =
+      row.pack.id === KEPT_PACK_ID ? localFiles[row.asset.path] : await loadAssetBytes(row.pack.id, row.asset.path);
+    if (!bytes) throw new Error("Missing sound");
     const copy = libraryCopyFrom(row.pack, row.asset, bytes);
     if (!studio.project) {
       setStatus(text.library.message({ code: "no-project", path: "", pinsSkipped: false, exampleSkipped: false }));
@@ -201,6 +219,13 @@ export function LibraryDialog() {
 
   const dest = selected ? libraryDest({ packId: selected.pack.id, assetPath: selected.asset.path }) : "";
   const snippet = selected ? pygameSnippet(snippetOf(selected.asset), dest) : "";
+  const related = selected ? relatedAssets(rows.map((row) => row.asset), selected.asset).slice(0, 8) : [];
+  const audioPreview =
+    selected && selected.asset.mediaType.startsWith("audio/")
+      ? selected.pack.id === KEPT_PACK_ID
+        ? ""
+        : packAssetUrl(selected.pack.id, selected.asset.path)
+      : "";
 
   return (
     <div className="modal-back" role="presentation">
@@ -279,7 +304,11 @@ export function LibraryDialog() {
                   setCopied(false);
                 }}
               >
-                <img src={packAssetUrl(row.pack.id, row.asset.preview)} alt="" width={64} height={64} loading="lazy" decoding="async" />
+                {row.asset.mediaType.startsWith("audio/") ? (
+                  <span className="library-audio">{text.library.audio}</span>
+                ) : (
+                  <img src={packAssetUrl(row.pack.id, row.asset.preview)} alt="" width={64} height={64} loading="lazy" decoding="async" />
+                )}
                 <span>{row.asset.title}</span>
               </button>
             ))}
@@ -287,10 +316,15 @@ export function LibraryDialog() {
           </div>
           {selected ? (
             <div className="library-detail" data-testid="library-detail">
-              <img className="preview" src={packAssetUrl(selected.pack.id, selected.asset.preview)} alt={selected.asset.title} data-testid="library-preview" />
+              {selected.asset.mediaType.startsWith("audio/") ? (
+                <audio controls src={selected.pack.id === KEPT_PACK_ID ? keptUrl : audioPreview} data-testid="library-preview" />
+              ) : (
+                <img className="preview" src={packAssetUrl(selected.pack.id, selected.asset.preview)} alt={selected.asset.title} data-testid="library-preview" />
+              )}
               <h3>{selected.asset.title}</h3>
               <p data-testid="library-size">
                 {selected.asset.width && selected.asset.height ? text.library.size(selected.asset.width, selected.asset.height) : ""}
+                {selected.asset.mediaType.startsWith("audio/") ? text.library.audio : ""}
                 {selected.asset.animation ? ` · ${text.library.frames(selected.asset.animation.frames.length)}` : ""}
               </p>
               <p>
@@ -299,6 +333,50 @@ export function LibraryDialog() {
               <p data-testid="library-tags">
                 {text.library.tags}：{selected.asset.tags.join("、")}
               </p>
+              {selected.asset.tags.includes("变体") ? <p data-testid="library-variant">{text.library.variant}</p> : null}
+              {related.length ? (
+                <p data-testid="library-related">
+                  {text.library.related}：
+                  {related.map((asset) => (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(asset.id);
+                        setCategory("all");
+                        setTag("all");
+                        setTheme("all");
+                        setQuery("");
+                      }}
+                    >
+                      {asset.title}
+                    </button>
+                  ))}
+                </p>
+              ) : null}
+              {selected.pack.id === KEPT_PACK_ID ? (
+                removeKept ? (
+                  <div className="library-choice">
+                    <p>{text.library.confirmRemoveKept}</p>
+                    <button
+                      type="button"
+                      data-testid="library-remove-kept-confirm"
+                      onClick={() => {
+                        void studio.forgetKeptSound(selected.asset.id).then(() => {
+                          setRemoveKept(false);
+                          setStatus(text.library.removedKept);
+                        });
+                      }}
+                    >
+                      {text.library.removeKept}
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" data-testid="library-remove-kept" onClick={() => setRemoveKept(true)}>
+                    {text.library.removeKept}
+                  </button>
+                )
+              ) : null}
               {selected.asset.animation?.states ? <p>{text.library.states(Object.keys(selected.asset.animation.states).join("、"))}</p> : null}
               {selected.asset.collision ? (
                 <p>{text.library.collision(selected.asset.collision.width, selected.asset.collision.height)}</p>
@@ -395,9 +473,9 @@ export function LibraryDialog() {
                   <p className="quiet">{text.library.tryHint}</p>
                 </>
               )}
-              {status ? <p data-testid="library-status">{status}</p> : null}
             </div>
           ) : null}
+          {status ? <p data-testid="library-status">{status}</p> : null}
         </div>
       </section>
     </div>

@@ -34,6 +34,7 @@ describe("requests to the model", () => {
     expect(system.content).toContain("assets/library.json");
     expect(system.content).toContain("*.anim.json");
     expect(system.content).toContain("*.map.json");
+    expect(system.content).toContain("*.wav");
     expect(user.content).toContain("一个在太空里躲陨石的游戏");
   });
 
@@ -45,6 +46,7 @@ describe("requests to the model", () => {
     expect(user.content).toContain("assets/library.json");
     expect(user.content).toContain("*.anim.json");
     expect(user.content).toContain("*.map.json");
+    expect(user.content).toContain("*.wav");
   });
 
   it("carries the traceback into a repair request", () => {
@@ -123,6 +125,9 @@ describe("answers from the model", () => {
     expect(() =>
       readCandidateFiles('{"files":[{"path":"maps/level-1.collision.csv","content":"0"}]}', project, "main.py"),
     ).toThrow(/tile map/);
+    expect(() =>
+      readCandidateFiles('{"files":[{"path":"assets/jump.wav","content":"no"}]}', project, "main.py"),
+    ).toThrow(/audio file/);
   });
 
   it("rejects an oversized file", () => {

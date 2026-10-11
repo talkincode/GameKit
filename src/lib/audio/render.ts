@@ -54,6 +54,15 @@ function lowpass(input: Float32Array, cutoff: number): Float32Array {
   return out;
 }
 
+/** attack → decay → sustain → release，音量只往下降。编辑器画出的曲线用的是同一个函数。 */
+export function envelopeAt(
+  layer: { attack: number; decay: number; sustain: number; release: number },
+  duration: number,
+  time: number,
+): number {
+  return envelope(layer, duration)(time);
+}
+
 /** attack → decay → sustain → release，音量只往下降。 */
 function envelope(layer: { attack: number; decay: number; sustain: number; release: number }, duration: number) {
   const attack = Math.min(layer.attack, duration);

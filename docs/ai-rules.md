@@ -71,6 +71,7 @@
 - 【已实现】生成的图片先预览，接受后才存入 `assets/`。
 - 【已实现】声音也是这样：模型只挑参数（`op: "sound"`），采样在浏览器里合成（`src/lib/audio/render.ts`），
   预听的 WAV 就是最后存进 `assets/` 的那一份。参数一律夹紧到安全范围（音高 20–8000 Hz、增益 ≤ 0.6、时长 ≤ 4 秒）。
+  不登录也能用预设和编辑器做出同一份 WAV。音频文件（`*.wav`、`*.ogg`、`*.mp3`、`*.aiff`）和小助手、WebMCP 都改不了。
 - 【目标】删除文件必须在改动列表里单独列出并单独确认。
 - 【目标】来自 WebMCP 外部 Agent 的写入走同一个候选与采用流程，没有「自动采用」。
 - 【已实现】模型结果不合规时整体丢弃，不展示半成品，候选也不会生成（E2E：`a broken model answer changes nothing`）。
@@ -83,7 +84,7 @@
 - 【已实现】普通 pygame-ce，不发明 GameKit API。
 - 【已实现】帧循环里有 `await asyncio.sleep(0)`（通常紧跟 `pygame.display.flip()`）；
   不用 `time.sleep`、`pygame.time.wait`、`pygame.time.delay`。
-- 【已实现】字体用 `pygame.font.Font(None, size)` 或项目里的 `.ttf`；网页音频用 OGG Vorbis。
+- 【已实现】字体用 `pygame.font.Font(None, size)` 或项目里的 `.ttf`；网页音频用 16-bit PCM WAV 或 OGG Vorbis。
 - 【提示词】代码面向孩子阅读：变量名有意义、函数短、关键处有简短中文注释；不引入孩子还没学过的高级写法，
   除非项目里已经在用。
 - 【提示词】沿用项目已有的结构和命名；只改被要求的范围。

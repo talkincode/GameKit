@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { unzipSync } from "fflate";
 import { text } from "../../src/ui/text";
 
 // 声音资产：the model picks numbers (stubbed at the network boundary), the browser
@@ -88,7 +90,7 @@ test("a music loop is exactly as long as the score says", async ({ page }) => {
   await stubSound(page, SCORE);
   await signIn(page);
   const dialog = await openSounds(page);
-  await dialog.getByRole("button", { name: text.sounds.kinds.music }).click();
+  await dialog.getByRole("button", { name: text.sounds.kinds.music, exact: true }).click();
   await dialog.getByRole("textbox").fill("太空里的背景音乐");
   await dialog.getByRole("button", { name: text.sounds.generate }).click();
 
@@ -123,4 +125,160 @@ test("an anonymous child cannot generate sound", async ({ page }) => {
   await expect(page.getByTestId("sound-dialog")).toHaveCount(0);
   await expect(page.locator(".notice")).toContainText(text.ai.needsSignIn);
   expect(apiCalls.slice(before)).toEqual([]);
+});
+
+async function storedFile(page: Page, path: string): Promise<string | null> {
+  return page.evaluate(async (wanted) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("gamekit");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await new Promise<{ files: { path: string; base64?: string }[] }[]>((resolve, reject) => {
+      const request = db.transaction("projects").objectStore("projects").getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    const file = rows.flatMap((row) => row.files).find((item) => item.path === wanted);
+    return file?.base64 ?? null;
+  }, path);
+}
+
+async function previewWav(page: Page) {
+  return page.getByTestId("sound-preview").evaluate(async (node: HTMLAudioElement) => {
+    const bytes = new Uint8Array(await fetch(node.src).then((response) => response.arrayBuffer()));
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  });
+}
+
+test("a preset is heard and saved as the same wav, without asking the model", async ({ page }) => {
+  const hits: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/")) hits.push(request.url());
+  });
+  await page.goto("/");
+  const dialog = await openSounds(page);
+  await expect(dialog.getByTestId("sound-wave")).toBeVisible();
+  await expect(dialog.getByTestId("sound-envelope")).toBeVisible();
+  await expect(dialog.getByTestId("sound-preview")).toBeVisible();
+  await expect(dialog.getByTestId("sound-snippet")).toContainText('pygame.mixer.Sound("assets/jump.wav")');
+
+  const heard = await previewWav(page);
+  await dialog.getByRole("button", { name: text.sounds.accept }).click();
+  await expect(dialog.getByTestId("sound-status")).toContainText("assets/jump.wav");
+  expect(await storedFile(page, "assets/jump.wav")).toBe(heard);
+  expect(hits).toEqual([]);
+
+  await dialog.getByRole("button", { name: text.sounds.close }).click();
+  await page.getByRole("button", { name: text.header.undoShort }).click();
+  expect(await storedFile(page, "assets/jump.wav")).toBeNull();
+});
+
+test("a failed save leaves the project alone, and the next save works", async ({ page }) => {
+  await page.addInitScript(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args: Parameters<IDBObjectStore["put"]>) {
+      if ((window as unknown as { gkFailPut?: boolean }).gkFailPut) throw new DOMException("disk full", "QuotaExceededError");
+      return put.apply(this, args);
+    };
+  });
+  await page.goto("/");
+  const dialog = await openSounds(page);
+  await page.evaluate(() => {
+    (window as unknown as { gkFailPut: boolean }).gkFailPut = true;
+  });
+  await dialog.getByRole("button", { name: text.sounds.accept }).click();
+  await expect(dialog.getByTestId("sound-problem")).toHaveText(text.sounds.problem["write-failed"]);
+  expect(await storedFile(page, "assets/jump.wav")).toBeNull();
+  await expect(page.getByTitle(text.header.undo)).toBeDisabled();
+
+  await page.evaluate(() => {
+    (window as unknown as { gkFailPut: boolean }).gkFailPut = false;
+  });
+  const heard = await previewWav(page);
+  await dialog.getByRole("button", { name: text.sounds.accept }).click();
+  await expect(dialog.getByTestId("sound-status")).toContainText("assets/jump.wav");
+  expect(await storedFile(page, "assets/jump.wav")).toBe(heard);
+});
+
+test("an mp3 is diagnosed, and a kept sound shows up in the library", async ({ page }) => {
+  await page.goto("/");
+  const dialog = await openSounds(page);
+  await dialog.getByTestId("sound-keep").click();
+  await expect(dialog.getByTestId("sound-status")).toContainText(text.sounds.kept);
+  await dialog.getByRole("button", { name: text.sounds.close }).click();
+
+  await page.locator(".side-tools input[type=file]").setInputFiles({
+    name: "theme.mp3",
+    mimeType: "audio/mpeg",
+    buffer: Buffer.from("ID3"),
+  });
+  await page.getByRole("button", { name: text.code.problems }).click();
+  await expect(page.locator(".problems")).toContainText("MP3");
+
+  await page.getByTestId("library-open").click();
+  await page.getByRole("button", { name: "我的声音", exact: true }).click();
+  await expect(page.getByTestId("library-preview")).toBeVisible();
+  await expect(page.getByTestId("library-author")).toContainText("你");
+  await expect(page.getByTestId("library-license")).toContainText("CC0");
+  await page.getByTestId("library-remove-kept").click();
+  await page.getByTestId("library-remove-kept-confirm").click();
+  await expect(page.getByTestId("library-status")).toContainText(text.library.removedKept);
+});
+
+test("an official sound plays in pygame and is inside the offline export", async ({ page }) => {
+  test.setTimeout(180_000);
+  const hits: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/")) hits.push(request.url());
+  });
+  const packedWav = readFileSync("public/asset-packs/forest-sounds/sounds/jump.wav");
+  const path = "assets/library/forest-sounds/sounds/jump.wav";
+  await page.goto("/");
+  await page.getByTestId("library-open").click();
+  await expect(page.getByTestId("library-category-sfx")).toBeVisible();
+  await page.getByTestId("library-category-sfx").click();
+  await page.getByTestId("library-asset-jump-sfx").click();
+  await expect(page.getByTestId("library-snippet")).toContainText(`pygame.mixer.Sound("${path}")`);
+  await expect(page.getByTestId("library-snippet")).not.toContain("/asset-packs/");
+  await expect(page.getByTestId("library-related")).toContainText("轻跳");
+  await expect(page.getByTestId("library-variant")).toHaveCount(0);
+  await page.getByTestId("library-asset-jump-soft").click();
+  await expect(page.getByTestId("library-variant")).toBeVisible();
+
+  await page.getByTestId("library-asset-jump-sfx").click();
+  await page.getByTestId("library-try").click();
+  await expect(page.getByTestId("library-main-preview")).toContainText("SOUND-OK");
+  await expect(page.getByTestId("library-main-preview")).toContainText("await asyncio.sleep(0)");
+  await page.getByTestId("library-confirm-main").click();
+  await expect(page.getByTestId("library-status")).toContainText("main.py");
+  expect(hits).toEqual([]);
+
+  await page.getByTestId("library-dialog").getByRole("button", { name: text.library.close }).click();
+  await page.getByRole("button", { name: text.stage.play }).click();
+  await expect(page.locator(".console")).toContainText("async: ok", { timeout: 120_000 });
+  await page.frameLocator(`iframe[title="${text.brand.name}"]`).locator("#canvas").click({ position: { x: 10, y: 10 }, force: true });
+  await expect(page.locator(".console")).toContainText("SOUND-OK", { timeout: 120_000 });
+
+  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  const [source] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByTestId("projects-panel").getByRole("button", { name: text.project.exportSource, exact: true }).first().click(),
+  ]);
+  const packed = unzipSync(new Uint8Array(readFileSync(await source.path())));
+  expect(Buffer.from(packed[path]).equals(Buffer.from(packedWav))).toBe(true);
+  expect(new TextDecoder().decode(packed["main.py"])).toContain(`pygame.mixer.Sound("${path}")`);
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: text.header.export, exact: true }).click();
+  const [web] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: new RegExp(text.export.web) }).click(),
+  ]);
+  const outer = unzipSync(new Uint8Array(readFileSync(await web.path())));
+  const inner = unzipSync(outer["gamekit.apk"]);
+  expect(Buffer.from(inner[`assets/${path}`]).equals(Buffer.from(packedWav))).toBe(true);
 });

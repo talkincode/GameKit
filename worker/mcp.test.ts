@@ -396,6 +396,29 @@ describe("OAuth 2.1 full authorization & MCP collaboration loop", () => {
     expect(mapText).toContain("地图要孩子自己");
     expect(mapText).not.toContain("已交给孩子确认");
 
+    const audioReq = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: bearer,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 44,
+        method: "tools/call",
+        params: {
+          name: "propose_files",
+          arguments: { say: "改掉声音", files: [{ path: "assets/jump.wav", text: "no" }] },
+        },
+      }),
+    });
+    const audioRes = await worker.fetch(audioReq as never, env, {} as never);
+    expect(audioRes.status).toBe(200);
+    const audioText = await audioRes.text();
+    expect(audioText).toContain("声音文件要孩子自己");
+    expect(audioText).not.toContain("已交给孩子确认");
+
     // 11. Child's studio polls /api/collab/sync and receives the candidate
     const syncReq = new Request("http://localhost/api/collab/sync", {
       method: "POST",

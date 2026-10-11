@@ -8,10 +8,26 @@ export type SnippetAsset = {
   attribution: string;
   frameWidth: number;
   frameHeight: number;
+  media?: "image" | "audio";
+  loop?: boolean;
 };
 
 /** Standard pygame the child can copy. No GameKit API, no network path. */
 export function pygameSnippet(copy: SnippetAsset, path: string): string {
+  if (copy.media === "audio") {
+    return [
+      "import pygame",
+      "",
+      `# ${copy.title}`,
+      `# 许可：${copy.licenseName}（${copy.licenseSpdx}） · 作者：${copy.author}`,
+      `# 来源：${copy.source}`,
+      `# 署名：${copy.attribution}`,
+      "pygame.mixer.init()",
+      `sound = pygame.mixer.Sound("${path}")`,
+      copy.loop ? "sound.play(-1)" : "sound.play()",
+      "",
+    ].join("\n");
+  }
   const lines = [
     "import pygame",
     "",
@@ -33,6 +49,38 @@ export function pygameSnippet(copy: SnippetAsset, path: string): string {
 
 /** A whole main.py that loads the copied file and prints a size the preview can show. */
 export function pygameDemoMain(copy: SnippetAsset, path: string): string {
+  if (copy.media === "audio") {
+    const play = copy.loop ? "sound.play(-1)" : "sound.play()";
+    return `import asyncio
+import pygame
+
+# ${copy.title} · ${copy.licenseSpdx} · ${copy.author}
+pygame.init()
+screen = pygame.display.set_mode((320, 240))
+clock = pygame.time.Clock()
+print("SOUND-WAIT")
+
+
+async def main():
+    sound = None
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return
+            if event.type == pygame.MOUSEBUTTONDOWN and sound is None:
+                pygame.mixer.init()
+                sound = pygame.mixer.Sound("${path}")
+                print("SOUND-OK", int(round(sound.get_length() * 1000)))
+                ${play}
+        screen.fill((46, 92, 74))
+        pygame.display.flip()
+        clock.tick(60)
+        await asyncio.sleep(0)
+
+
+asyncio.run(main())
+`;
+  }
   const frame =
     copy.frameWidth > 0 && copy.frameHeight > 0
       ? `frame = image.subsurface((0, 0, ${copy.frameWidth}, ${copy.frameHeight}))`
