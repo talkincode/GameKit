@@ -79,6 +79,7 @@ test("a sound effect is rendered, played, and saved into assets/", async ({ page
   expect(wav).toEqual({ riff: "RIFF", rate: 22_050, dataBytes: Math.ceil(0.25 * 22_050) * 2, type: "audio/wav" });
 
   await dialog.getByRole("button", { name: text.sounds.accept }).click();
+  await dialog.getByRole("button", { name: text.sounds.close }).click();
   await page.getByRole("button", { name: text.code.files, exact: true }).click();
   await expect(page.locator(".tree")).toContainText("jump-coin.wav");
 
@@ -105,6 +106,7 @@ test("a music loop is exactly as long as the score says", async ({ page }) => {
   expect(frames).toBe(4 * 22_050 * 2);
 
   await dialog.getByRole("button", { name: text.sounds.accept }).click();
+  await dialog.getByRole("button", { name: text.sounds.close }).click();
   await page.getByRole("button", { name: text.code.files, exact: true }).click();
   await expect(page.locator(".tree")).toContainText("space-loop.wav");
 });
@@ -174,7 +176,7 @@ test("a preset is heard and saved as the same wav, without asking the model", as
 
   await dialog.getByRole("button", { name: text.sounds.close }).click();
   await page.getByRole("button", { name: text.header.undoShort }).click();
-  expect(await storedFile(page, "assets/jump.wav")).toBeNull();
+  await expect.poll(async () => storedFile(page, "assets/jump.wav")).toBeNull();
 });
 
 test("a failed save leaves the project alone, and the next save works", async ({ page }) => {
@@ -243,7 +245,7 @@ test("an official sound plays in pygame and is inside the offline export", async
   await page.getByTestId("library-category-sfx").click();
   await page.getByTestId("library-asset-jump-sfx").click();
   await expect(page.getByTestId("library-snippet")).toContainText(`pygame.mixer.Sound("${path}")`);
-  await expect(page.getByTestId("library-snippet")).not.toContain("/asset-packs/");
+  await expect(page.getByTestId("library-snippet")).not.toContainText("/asset-packs/");
   await expect(page.getByTestId("library-related")).toContainText("轻跳");
   await expect(page.getByTestId("library-variant")).toHaveCount(0);
   await page.getByTestId("library-asset-jump-soft").click();
@@ -258,6 +260,7 @@ test("an official sound plays in pygame and is inside the offline export", async
   expect(hits).toEqual([]);
 
   await page.getByTestId("library-dialog").getByRole("button", { name: text.library.close }).click();
+  await page.getByRole("tab", { name: text.header.code }).click();
   await page.getByRole("button", { name: text.stage.play }).click();
   await expect(page.locator(".console")).toContainText("async: ok", { timeout: 120_000 });
   await page.frameLocator(`iframe[title="${text.brand.name}"]`).locator("#canvas").click({ position: { x: 10, y: 10 }, force: true });
