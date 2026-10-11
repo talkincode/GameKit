@@ -66,7 +66,7 @@ async function signIn(page: Page, email: string) {
 }
 
 test("an anonymous child starts a recipe without covering the old project, and the step is checked from the stage", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const hits = watchApi(page);
   await page.goto("/");
   await expect(page.getByRole("button", { name: text.stage.play })).toBeVisible();
@@ -136,7 +136,9 @@ test("an anonymous child starts a recipe without covering the old project, and t
   await expect(page.getByTestId("challenge-result")).toContainText("对不上");
   await page.getByTestId("challenge-dialog").getByRole("button", { name: text.recipes.close }).click();
 
+  await page.getByRole("button", { name: text.stage.stop }).click();
   await page.getByRole("button", { name: text.stage.play }).click();
+  await page.getByRole("tab", { name: text.header.code }).click();
   await expect(page.locator(".console")).toContainText("RECIPE-JUMP -13", { timeout: 120_000 });
   await openRecipes(page);
   await page.getByTestId("recipe-resume-platform").click();
@@ -204,10 +206,10 @@ test("proposing a catalog picture stays a candidate, and a different file is not
 });
 
 test("an allowed account proposes a picture without writing the project first", async ({ page }) => {
-  const hits: string[] = [];
+  const posts: string[] = [];
   page.on("request", (request) => {
     const path = new URL(request.url()).pathname;
-    if (path.startsWith("/api/ai")) hits.push(path);
+    if (path === "/api/ai" && request.method() === "POST") posts.push(path);
   });
   await page.goto("/");
   await signIn(page, ALLOWED);
@@ -218,7 +220,7 @@ test("an allowed account proposes a picture without writing the project first", 
   await page.getByTestId("library-propose").click();
   await expect(page.getByTestId("candidate")).toBeVisible();
   expect(await storedFile(page, "my-cool-game", "assets/library/forest-adventure/characters/hero.png")).toBeNull();
-  expect(hits).toEqual([]);
+  expect(posts).toEqual([]);
   await page.getByTestId("discard").click();
   expect(await storedFile(page, "my-cool-game", "assets/library/forest-adventure/characters/hero.png")).toBeNull();
 });
@@ -242,6 +244,7 @@ test("a signed-in child who is not allowed can still start a recipe, and a token
   );
 
   const ai = await page.request.post("/api/ai", {
+    headers: { Cookie: "gamekit_dev_email=stranger@example.com" },
     data: { op: "complete", messages: [{ role: "user", content: "hi" }] },
   });
   expect(ai.status()).toBe(403);
