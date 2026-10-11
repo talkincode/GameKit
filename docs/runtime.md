@@ -35,6 +35,10 @@ await asyncio.sleep(0)
 
 预览和导出都打包项目里的这份副本（和别的 `assets/` 文件一样）。成品不请求素材库目录，也不请求 GameKit 站点。素材库以后升级，不会改掉已经复制进项目、或已经导出的那一份。模板本身没有为素材库改过。
 
+## 精灵动画
+
+精灵动画是项目里的两份普通文件：一张 PNG 精灵表，和旁边的 `.anim.json`。说明里的 `animation` 字段和素材库清单相同（帧宽高、帧序号、毫秒、动作）。预览和导出把它们和其他 `assets/` 文件一起打包。播放用普通 pygame（`image.load`、`subsurface`、`json`），可以是孩子复制的片段，或项目里可见的 `sprite_anim.py`。模板没有为动画改过。
+
 ## 模板改动
 
 `runtime/player.tmpl` 来自 pygbag 0.9.3 的 `default.tmpl`（MIT，见 `runtime/LICENSE-pygbag.txt`），只改了四件事：
