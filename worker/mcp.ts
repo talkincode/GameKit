@@ -78,6 +78,9 @@ export function createGameKitMcpServer(env: GameKitEnv, email: string): McpServe
       const state = await loadOwned();
       const binary = state.session.files.filter((file) => file.bytes).map((file) => file.path);
       for (const file of files) {
+        if (file.path === "assets/library.json") {
+          return { content: [{ type: "text", text: "素材库的版本记录要孩子自己在素材库里改，助手不能改写。" }], isError: true };
+        }
         if (![".py", ".txt", ".json", ".toml", ".md"].some((ext) => file.path.endsWith(ext))) {
           return { content: [{ type: "text", text: `只能改文本文件，${file.path} 不行。` }], isError: true };
         }

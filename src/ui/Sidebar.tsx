@@ -208,6 +208,9 @@ export function Sidebar() {
               {text.sounds.entry}
             </button>
           </div>
+          <button type="button" className="library-side" data-testid="library-open-side" onClick={() => studio.setLibraryOpen(true)}>
+            {text.library.open}
+          </button>
           <div className="asset-grid">
             {assets.map((file) => (
               <div key={file.path} className="card-cell">

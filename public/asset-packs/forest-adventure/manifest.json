@@ -1,0 +1,252 @@
+{
+  "format": "gamekit.asset-pack",
+  "formatVersion": 1,
+  "id": "forest-adventure",
+  "version": "1.0.0",
+  "title": "森林冒险",
+  "theme": "森林冒险",
+  "summary": "一套风格统一的森林素材：探险家、草地、泥土、大树、蘑菇、金币和爱心。由 GameKit 原创绘制，CC0，复制进项目后离线也能用。",
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "CC0 1.0 Universal",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+  },
+  "author": "GameKit",
+  "source": "https://github.com/talkincode/GameKit",
+  "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
+  "assets": [
+    {
+      "id": "hero",
+      "version": "1.0.0",
+      "title": "探险家",
+      "path": "characters/hero.png",
+      "mediaType": "image/png",
+      "width": 64,
+      "height": 32,
+      "animation": {
+        "frameWidth": 32,
+        "frameHeight": 32,
+        "frames": [
+          {
+            "index": 0,
+            "durationMs": 240,
+            "name": "站立"
+          },
+          {
+            "index": 1,
+            "durationMs": 120,
+            "name": "走路"
+          }
+        ],
+        "states": {
+          "站立": [
+            0
+          ],
+          "走路": [
+            1
+          ]
+        }
+      },
+      "collision": {
+        "x": 10,
+        "y": 6,
+        "width": 14,
+        "height": 22
+      },
+      "tags": [
+        "角色",
+        "主角",
+        "探险家"
+      ],
+      "theme": "森林冒险",
+      "category": "character",
+      "preview": "characters/hero.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
+      "sha256": "68e8a916499f13962917c1b1542bb355ca4e211765e22e2d7f32ee30fb069126"
+    },
+    {
+      "id": "grass",
+      "version": "1.0.0",
+      "title": "草地",
+      "path": "terrain/grass.png",
+      "mediaType": "image/png",
+      "width": 16,
+      "height": 16,
+      "collision": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      },
+      "tags": [
+        "地形",
+        "草地",
+        "瓦片"
+      ],
+      "theme": "森林冒险",
+      "category": "terrain",
+      "preview": "terrain/grass.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
+      "sha256": "0cf06e531964fd17dcf9c435964700082c0eb4347d94adb3419801180baf6b39"
+    },
+    {
+      "id": "dirt",
+      "version": "1.0.0",
+      "title": "泥土",
+      "path": "terrain/dirt.png",
+      "mediaType": "image/png",
+      "width": 16,
+      "height": 16,
+      "collision": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      },
+      "tags": [
+        "地形",
+        "泥土",
+        "瓦片"
+      ],
+      "theme": "森林冒险",
+      "category": "terrain",
+      "preview": "terrain/dirt.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
+      "sha256": "29d3861eea3b52c5220d20878e3d5a0b99fccc5045bbed6681802afa0081921c"
+    },
+    {
+      "id": "tree",
+      "version": "1.0.0",
+      "title": "大树",
+      "path": "props/tree.png",
+      "mediaType": "image/png",
+      "width": 32,
+      "height": 32,
+      "collision": {
+        "x": 12,
+        "y": 16,
+        "width": 8,
+        "height": 14
+      },
+      "tags": [
+        "道具",
+        "树",
+        "森林"
+      ],
+      "theme": "森林冒险",
+      "category": "prop",
+      "preview": "props/tree.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
+      "sha256": "5fd12ecdb7387e534275d3e0a5cc0f905762c5d9d874e7af97cc50ad737acb80"
+    },
+    {
+      "id": "mushroom",
+      "version": "1.0.0",
+      "title": "蘑菇",
+      "path": "props/mushroom.png",
+      "mediaType": "image/png",
+      "width": 16,
+      "height": 16,
+      "collision": {
+        "x": 2,
+        "y": 3,
+        "width": 12,
+        "height": 11
+      },
+      "tags": [
+        "道具",
+        "蘑菇"
+      ],
+      "theme": "森林冒险",
+      "category": "prop",
+      "preview": "props/mushroom.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
+      "sha256": "b051060ee39ca181f78373e1209886b4746fad886e7d50ba1c4bb24747b3b3aa"
+    },
+    {
+      "id": "coin",
+      "version": "1.0.0",
+      "title": "金币",
+      "path": "props/coin.png",
+      "mediaType": "image/png",
+      "width": 16,
+      "height": 16,
+      "tags": [
+        "道具",
+        "金币"
+      ],
+      "theme": "森林冒险",
+      "category": "prop",
+      "preview": "props/coin.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
+      "sha256": "9f8cf2f580d265ca0ffd110fca6005780623c8d990ce9b3741f06d5941f4088d"
+    },
+    {
+      "id": "heart",
+      "version": "1.0.0",
+      "title": "爱心",
+      "path": "ui/heart.png",
+      "mediaType": "image/png",
+      "width": 16,
+      "height": 16,
+      "tags": [
+        "界面",
+        "爱心"
+      ],
+      "theme": "森林冒险",
+      "category": "ui",
+      "preview": "ui/heart.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
+      "sha256": "85eb15e07820492186a450ff04d87699a05713c3806ae1ba5188d3914aeaf72f"
+    }
+  ]
+}

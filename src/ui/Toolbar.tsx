@@ -102,6 +102,17 @@ export function Toolbar() {
         <button
           className="ghost"
           type="button"
+          data-testid="library-open"
+          onClick={() => {
+            studio.setMenu(null);
+            studio.setLibraryOpen(true);
+          }}
+        >
+          {text.library.open}
+        </button>
+        <button
+          className="ghost"
+          type="button"
           onClick={() => {
             studio.setMenu(null);
             studio.setProjectsOpen(true);
