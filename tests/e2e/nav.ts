@@ -9,9 +9,18 @@ export async function openProjectMenu(page: Page) {
 }
 
 export async function openProjectsPanel(page: Page) {
-  await openProjectMenu(page);
-  await page.getByTestId("projects-open").click();
-  await expect(page.getByTestId("projects-panel")).toBeVisible();
+  const projects = page.getByTestId("projects-panel");
+  // A preview that starts mid-click closes the menu (setMenu(null)). Retry until the panel is up.
+  await expect(async () => {
+    if (await projects.isVisible()) return;
+    const menu = page.getByTestId("project-menu-panel");
+    if (!(await menu.isVisible())) {
+      await page.getByTestId("project-menu").click();
+      await expect(menu).toBeVisible({ timeout: 1_000 });
+    }
+    await page.getByTestId("projects-open").click({ timeout: 1_000 });
+    await expect(projects).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 export async function openRecipes(page: Page) {
