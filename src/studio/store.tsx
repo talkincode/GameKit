@@ -71,6 +71,7 @@ import { readSoundSpec } from "../lib/audio/spec";
 import { pcmToWav } from "../lib/audio/wav";
 import { prepareAsset } from "../lib/sprite";
 import { createBlankProject, createStarterProject } from "../lib/starter";
+import { applyLibraryCopy, type LibraryCopyRequest, type LibraryCopyResult } from "../lib/assets/copy";
 import { deleteStoredProject, loadProjects, saveProject } from "../lib/storage";
 import { text } from "../ui/text";
 
@@ -220,6 +221,10 @@ type StudioValue = {
   setSoundOpen: (open: boolean) => void;
   pixelNewOpen: boolean;
   setPixelNewOpen: (open: boolean) => void;
+  /** Built-in asset library. Browsing does not write; copying goes through commit. */
+  libraryOpen: boolean;
+  setLibraryOpen: (open: boolean) => void;
+  copyLibraryAsset: (request: LibraryCopyRequest) => Promise<LibraryCopyResult>;
   pixelSession: PixelSession | null;
   /** Opens a blank canvas. False when the size or name is not allowed or the name is taken. */
   startPixelNew: (input: PixelNewInput) => boolean;
@@ -357,6 +362,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [soundOpen, setSoundOpen] = useState(false);
   const [soundKind, setSoundKind] = useState<SoundKind>("sfx");
   const [pixelNewOpen, setPixelNewOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [pixelSession, setPixelSession] = useState<PixelSession | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -1551,6 +1557,32 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearAsset: () => setAssetDraft(null),
       pixelNewOpen,
       setPixelNewOpen,
+      libraryOpen,
+      setLibraryOpen,
+      copyLibraryAsset: async (request) => {
+        const current = projectRef.current;
+        if (!current) {
+          const missing: LibraryCopyResult = {
+            ok: false,
+            changed: false,
+            path: "",
+            code: "no-project",
+            pinsSkipped: false,
+            exampleSkipped: false,
+            project: { id: "", name: "", createdAt: 0, updatedAt: 0, files: [] },
+          };
+          setNotice(text.library.message(missing));
+          return missing;
+        }
+        const outcome = await applyLibraryCopy(current, request.copy, request.choice, request.example);
+        if (outcome.changed) {
+          remember(current);
+          commit(outcome.project);
+          setPath(outcome.examplePath === "main.py" ? "main.py" : outcome.path);
+        }
+        setNotice(text.library.message(outcome));
+        return outcome;
+      },
       pixelSession,
       startPixelNew,
       editPixelFile,
@@ -1607,6 +1639,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     soundOpen,
     soundKind,
     pixelNewOpen,
+    libraryOpen,
     pixelSession,
     startPixelNew,
     editPixelFile,

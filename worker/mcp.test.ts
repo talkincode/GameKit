@@ -327,6 +327,29 @@ describe("OAuth 2.1 full authorization & MCP collaboration loop", () => {
     const proposeText = await proposeRes.text();
     expect(proposeText).toContain("已交给孩子确认");
 
+    const pinReq = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: bearer,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 41,
+        method: "tools/call",
+        params: {
+          name: "propose_files",
+          arguments: { say: "改掉版本记录", files: [{ path: "assets/library.json", text: "{}" }] },
+        },
+      }),
+    });
+    const pinRes = await worker.fetch(pinReq as never, env, {} as never);
+    expect(pinRes.status).toBe(200);
+    const pinText = await pinRes.text();
+    expect(pinText).toContain("素材库的版本记录");
+    expect(pinText).not.toContain("已交给孩子确认");
+
     // 11. Child's studio polls /api/collab/sync and receives the candidate
     const syncReq = new Request("http://localhost/api/collab/sync", {
       method: "POST",

@@ -29,6 +29,12 @@ await asyncio.sleep(0)
 
 文件可以是多个，例如 `from game.player import Player`。资源用普通路径，例如 `assets/player.png`，相对项目根目录。
 
+## 素材库
+
+内置素材放在站点的 `public/asset-packs/`，打开素材库才请求说明文件和缩略图，不打进页面脚本。复制进项目的是文件字节，路径像 `assets/library/forest-adventure/characters/hero.png`，用普通 `pygame.image.load`。`assets/library.json` 只记下复制时的包版本、hash 和许可来源，游戏不要读它。
+
+预览和导出都打包项目里的这份副本（和别的 `assets/` 文件一样）。成品不请求素材库目录，也不请求 GameKit 站点。素材库以后升级，不会改掉已经复制进项目、或已经导出的那一份。模板本身没有为素材库改过。
+
 ## 模板改动
 
 `runtime/player.tmpl` 来自 pygbag 0.9.3 的 `default.tmpl`（MIT，见 `runtime/LICENSE-pygbag.txt`），只改了四件事：

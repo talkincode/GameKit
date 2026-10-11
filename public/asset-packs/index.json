@@ -1,0 +1,18 @@
+{
+  "format": "gamekit.asset-catalog",
+  "formatVersion": 1,
+  "packs": [
+    {
+      "id": "forest-adventure",
+      "version": "1.0.0",
+      "title": "森林冒险",
+      "theme": "森林冒险",
+      "summary": "一套风格统一的森林素材：探险家、草地、泥土、大树、蘑菇、金币和爱心。由 GameKit 原创绘制，CC0，复制进项目后离线也能用。",
+      "license": "CC0-1.0",
+      "author": "GameKit",
+      "source": "https://github.com/talkincode/GameKit",
+      "attribution": "本包由 GameKit 原创绘制，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的。",
+      "assetCount": 7
+    }
+  ]
+}

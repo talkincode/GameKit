@@ -1,7 +1,8 @@
-/** Dialogs that stand on their own: the asset maker. Everything the agent does
- * lives in the pane, not in a modal. */
+/** Dialogs that stand on their own: the asset maker and the built-in library.
+ * Everything the agent does lives in the pane, not in a modal. */
 import { useEffect, useState } from "react";
 import { useStudio } from "../studio/store";
+import { LibraryDialog } from "./LibraryDialog";
 import { PixelEditor } from "./PixelEditor";
 import { PixelNewDialog } from "./PixelNewDialog";
 import { text } from "./text";
@@ -13,6 +14,7 @@ export function Overlays() {
       {studio.assetOpen ? <AssetDialog /> : null}
       {studio.soundOpen ? <SoundDialog /> : null}
       {studio.pixelNewOpen ? <PixelNewDialog /> : null}
+      <LibraryDialog />
       <PixelEditor />
     </>
   );

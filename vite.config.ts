@@ -1,12 +1,25 @@
 import react from "@vitejs/plugin-react";
 import { cloudflare } from "@cloudflare/vite-plugin";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { resolve } from "node:path";
+import { checkAssetPacks } from "./src/lib/assets/check-disk";
+
+/** Refuses to build when a shipped pack fails schema, provenance, or hash checks. */
+function assetPackGate(): Plugin {
+  return {
+    name: "gamekit-asset-pack-gate",
+    async buildStart() {
+      const issues = await checkAssetPacks(resolve(import.meta.dirname, "public/asset-packs"));
+      if (!issues.length) return;
+      this.error(issues.map((issue) => `${issue.code}: ${issue.message}`).join("\n"));
+    },
+  };
+}
 
 // The Worker has no bindings that need a Cloudflare login: text and images both go
 // through server-held keys, so local dev, preview and CI all run the same code.
 export default defineConfig({
-  plugins: process.env.VITEST ? [react()] : [react(), cloudflare()],
+  plugins: process.env.VITEST ? [assetPackGate(), react()] : [assetPackGate(), react(), cloudflare()],
   resolve: {
     alias: process.env.VITEST
       ? {

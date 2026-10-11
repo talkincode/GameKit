@@ -1,4 +1,5 @@
 import type { SignInNote } from "../lib/account";
+import type { LibraryNoticeCode } from "../lib/assets/copy";
 
 /**
  * Kid-facing copy. New interface text goes here, not inline in components.
@@ -371,6 +372,82 @@ export const text = {
     used: (size: string) => `已用 ${size}`,
     namePrompt: "给新项目起个名字",
     switchHint: "换项目会开新的一局对话，作品都在本机。",
+  },
+  library: {
+    open: "素材库",
+    title: "素材库",
+    copy: "挑一张放进项目。放进去的是复制的一份，不联网也能玩，也可以撤销。",
+    search: "搜索素材",
+    all: "全部",
+    categories: {
+      character: "角色",
+      terrain: "地形",
+      prop: "道具",
+      ui: "界面",
+      effect: "特效",
+      tileset: "图块",
+    } as const,
+    empty: "没有找到这样的素材。换个词试试。",
+    loading: "正在打开素材库…",
+    failed: "素材库没打开。再试一次吧。",
+    retry: "再试一次",
+    close: "关闭",
+    size: (width: number, height: number) => `${width}×${height} 像素`,
+    license: "许可",
+    author: "作者",
+    source: "来源",
+    attribution: "署名",
+    tags: "标签",
+    theme: "主题",
+    version: "版本",
+    add: "复制到项目",
+    dest: (path: string) => `会复制到 ${path}`,
+    try: "用这段代码试玩",
+    tryHint: "会先给你看 main.py 变成什么样，确认后才写。",
+    confirmMain: "写到 main.py",
+    cancel: "取消",
+    keep: "保留原来的",
+    saveAs: "另存为新文件",
+    replace: "替换这一份",
+    conflictName: "项目里已经有这个文件。要保留、另存，还是替换？替换可以撤销。",
+    conflictEdited: "你改过这张图。要保留你的、另存一份，还是换成素材库的？换成之后可以撤销。",
+    conflictDifferent: "项目里的这一份和素材库不一样。要保留、另存，还是替换？",
+    update: (from: string, to: string) => `素材库里有更新（${from} → ${to}）。替换可以撤销。已经导出的游戏不会跟着变。`,
+    snippet: "在代码里这样用",
+    copyCode: "复制这段代码",
+    copied: "已经复制。",
+    mainPreview: "确认后，main.py 会变成下面这样。原来的可以撤销找回来。",
+    saveExample: "把示例存成文件",
+    states: (names: string) => `动作：${names}`,
+    collision: (width: number, height: number) => `碰撞范围 ${width}×${height}`,
+    frames: (count: number) => `${count} 帧`,
+    message(input: {
+      code: LibraryNoticeCode;
+      path: string;
+      examplePath?: string;
+      pinsSkipped: boolean;
+      exampleSkipped: boolean;
+    }): string {
+      const head = {
+        added: `已经复制到 ${input.path}。这是项目里的一份，可以撤销。`,
+        identical: "项目里已经有同样的一份，没有再复制。",
+        kept: "保留了项目里原来的文件。",
+        replaced: "换成了素材库里的这一份。不满意可以撤销。",
+        "saved-as": `没有盖掉原来的，另存成了 ${input.path}。可以撤销。`,
+        updated: "换成了素材库里的新版本。不满意可以撤销。",
+        "hash-mismatch": "这份素材和记录对不上，没有放进项目。",
+        "needs-choice": "项目里已经有同名文件。先选保留、另存，还是替换。",
+        "example-main": "示例写进了 main.py。可以在舞台上试玩，也可以撤销。",
+        "example-file": `示例写在 ${input.examplePath ?? "examples"}。图片在 ${input.path}。舞台运行的还是 main.py。`,
+        "example-kept": "示例文件已经在了，没有覆盖它。",
+        "no-project": "先打开一个项目，再加入素材。",
+      }[input.code];
+      const extra = [
+        input.pinsSkipped ? "版本记录文件被改过，所以没有动它。" : "",
+        input.exampleSkipped ? "示例文件已经在了，没有覆盖它。" : "",
+      ].filter(Boolean);
+      return [head, ...extra].join("");
+    },
   },
   export: {
     copy: "导出的就是文件，GameKit 不帮你发布。",
