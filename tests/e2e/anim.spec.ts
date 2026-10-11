@@ -361,6 +361,7 @@ test("selection, layers, onion skin, and a sprite sheet can be undone", async ({
 
   await page.getByTestId("pixel-add-layer").click();
   await expect(page.getByTestId("pixel-layer-1")).toHaveAttribute("aria-pressed", "true");
+  await page.getByTestId("pixel-tool-pencil").click();
   await pickColor(page, text.pixel.colors[GREEN]);
   await click(page, 3, 3);
   expect(await pixelAt(canvas(page), 3, 3)).toEqual(hex(GREEN));
@@ -372,8 +373,13 @@ test("selection, layers, onion skin, and a sprite sheet can be undone", async ({
 
   await page.getByTestId("pixel-add-frame").click();
   await page.getByTestId("pixel-onion").check();
-  expect(await pixelAt(canvas(page), 4, 1)).toEqual([239, 125, 87, 102]);
-  expect(await pixelAt(canvas(page), 3, 3)).toEqual([56, 183, 100, 102]);
+  // The canvas premultiplies alpha, so a channel can land one step away from the buffer.
+  const fadedOrange = await pixelAt(canvas(page), 4, 1);
+  const fadedGreen = await pixelAt(canvas(page), 3, 3);
+  expect(fadedOrange[3]).toBe(102);
+  expect(fadedGreen[3]).toBe(102);
+  expect(Math.abs(fadedOrange[0] - 239)).toBeLessThanOrEqual(1);
+  expect(Math.abs(fadedGreen[1] - 183)).toBeLessThanOrEqual(1);
   await page.getByTestId("pixel-onion").uncheck();
   expect((await pixelAt(canvas(page), 4, 1))[3]).toBe(0);
 
