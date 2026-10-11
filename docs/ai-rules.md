@@ -67,8 +67,8 @@
   候选必须带 `main.py`，否则这一轮算失败。
 - 【已实现】素材目录可以检索，也可以点名进候选：模型在 `assets` 里写最多两个 `{packId, assetId}`，不写字节。
   工作室把文件复制进候选；孩子采用才写入，并记下 `assets/library.json`。路径上已有不同字节时这一步失败，作品不变。
-  模型不能在 `files` 里改 `assets/library.json`、不能替换已有二进制。孩子在素材库里点「复制到项目」仍是直接复制（先说明再写，可撤销）。
-  页面上的「做成候选」不调用模型。WebMCP 的 `search_assets` 只读，`propose_asset` 只产生候选。
+  模型不能在 `files` 里改 `assets/library.json`、不能替换已有二进制。孩子在素材库里点「放进我的游戏」仍是直接复制（先说明再写，可撤销）。
+  页面上的「先做一版给我看」不调用模型。WebMCP 的 `search_assets` 只读，`propose_asset` 只产生候选。
 - 【已实现】精灵动画说明（`*.anim.json`）也是孩子的：小助手和 WebMCP 不能改写。播放用普通 pygame 读 PNG 和这份 JSON。
 - 【已实现】瓦片地图（`*.map.json`、`maps/*.csv`、`*.tileset.png`）也是孩子的：小助手和 WebMCP 不能改写。加载用普通 pygame 读 JSON、碰撞 CSV 和瓦片 PNG。
 - 【已实现】生成的图片先预览，接受后才存入 `assets/`。
@@ -161,7 +161,7 @@
 ## 8. 工具层与 WebMCP
 
 - 【已实现】工具名称、说明和权限等级写在 `shared/tools.ts`。WebMCP 用这份说明注册 `search_assets` 和 `propose_asset`，
-  以及原来的列文件、读文件、提议文本、读记录。页面上的检索和「做成候选」遵守同一张表：检索只读，提议要人采用。
+  以及原来的列文件、读文件、提议文本、读记录。页面上的检索和「先做一版给我看」遵守同一张表：检索只读，提议要人采用。
   小助手的设计、制作、修复、讲解仍是一轮里的步骤（`src/lib/agent.ts`），制作时可以点名目录里的素材。
 - 【目标】浏览器里的 `document.modelContext` 还没注册。不支持时不注册、不报错。外部协作走已经上线的 MCP 通道。
 - 【目标】每个工具有一个权限等级：
