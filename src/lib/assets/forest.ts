@@ -8,8 +8,8 @@ import { catalogIndexSchema, type AssetPack, type CatalogAsset, type CatalogInde
  *
  * Drawn for GameKit and released CC0. It is not a copy of a third-party pack:
  * every pixel, the license, the author, and the source are ours to stand behind.
- * Later packs can add other CC0 sources (Kenney and similar) the same way,
- * once each file has been reviewed and the provenance fields are filled in.
+ * Kenney CC0 packs live beside this one under public/asset-packs.
+ * Each of those files keeps its own author, source, and hash.
  */
 
 const OUTLINE: Rgba = [43, 33, 24, 255];

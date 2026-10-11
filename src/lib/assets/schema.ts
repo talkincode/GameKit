@@ -44,6 +44,18 @@ export const collisionSchema = z.object({
   height: z.number().int().positive(),
 });
 
+/**
+ * A tileset grid the map editor can paint from.
+ * `names[0]` is tile 1 (the top-left cell), then left to right, then the next row.
+ */
+export const tilesetSchema = z.object({
+  tileWidth: z.number().int().positive(),
+  tileHeight: z.number().int().positive(),
+  columns: z.number().int().positive(),
+  rows: z.number().int().positive(),
+  names: z.array(nonEmpty).min(1),
+});
+
 export const catalogAssetSchema = z.object({
   id: idSchema,
   version: versionSchema,
@@ -54,6 +66,7 @@ export const catalogAssetSchema = z.object({
   height: z.number().int().positive().optional(),
   animation: animationSchema.optional(),
   collision: collisionSchema.optional(),
+  tileset: tilesetSchema.optional(),
   tags: z.array(nonEmpty).min(1),
   theme: nonEmpty,
   category: z.enum(ASSET_CATEGORIES),

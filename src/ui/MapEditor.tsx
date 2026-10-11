@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { linePoints } from "../lib/pixel/buffer";
 import type { Pixels } from "../lib/pixel/buffer";
-import { encodePng } from "../lib/pixel/png";
+import { decodePng, encodePng } from "../lib/pixel/png";
 import {
   exportBundle,
   importBundle,
@@ -88,13 +88,15 @@ export function MapEditor() {
     );
   }
   const map = createMap(session);
-  const tileset = starterTileset(session.tileWidth);
-  if (!map || !tileset) return <MapOpenError reason="size" />;
+  const decoded = session.tilesetPng ? decodePng(session.tilesetPng) : null;
+  const tileset = decoded?.ok ? decoded.pixels : starterTileset(session.tileWidth);
+  const tilesetPng = session.tilesetPng ?? (tileset ? encodePng(tileset) : null);
+  if (!map || !tileset || !tilesetPng) return <MapOpenError reason="size" />;
   return (
     <MapPainter
       key={session.id}
       session={session}
-      initial={{ map, tileset, tilesetPng: encodePng(tileset) }}
+      initial={{ map, tileset, tilesetPng }}
       saveMode="create"
       owned={[]}
     />
@@ -409,7 +411,7 @@ function MapPainter({
               {Array.from({ length: tileCount(map) }, (_, index) => {
                 const id = index + 1;
                 const swatch = STARTER_TILES[index];
-                const label = swatch?.name ?? `${id}`;
+                const label = (session.source === "new" ? session.tileNames?.[index] : undefined) ?? swatch?.name ?? `${id}`;
                 return (
                   <button
                     key={id}

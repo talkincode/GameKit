@@ -68,7 +68,8 @@ import {
 } from "../lib/project";
 import { parseHex } from "../lib/pixel/buffer";
 import { canEditPixels, checkSize, imagePath } from "../lib/pixel/rules";
-import { animationSidecarPath } from "../lib/pixel/anim";
+import { animationSidecarPath, type SpriteAnimation } from "../lib/pixel/anim";
+import { decodePng } from "../lib/pixel/png";
 import { planAnimExample, planPixelSave, type AnimExampleInput, type AnimExampleResult, type PixelSaveFailure, type PixelSaveInput } from "../lib/pixel/save";
 import { collisionCsvPath, layerCsvPath, mapDocumentPath, slugFromDocumentPath, tilesetPath, type MapFileBlob } from "../lib/map/document";
 import { cleanMapName, createMap, isMapSlug } from "../lib/map/model";
@@ -81,6 +82,7 @@ import { readSoundSpec, type SoundSpec } from "../lib/audio/spec";
 import { prepareAsset } from "../lib/sprite";
 import { createBlankProject, createStarterProject } from "../lib/starter";
 import { applyLibraryCopy, type LibraryCopyRequest, type LibraryCopyResult } from "../lib/assets/copy";
+import { librarySpriteNote } from "../lib/assets/sprite-note";
 import { deleteStoredProject, loadProjects, saveProject } from "../lib/storage";
 import { text } from "../ui/text";
 
@@ -142,6 +144,11 @@ export type MapNewInput = {
   rows: number;
   tileWidth: number;
   tileHeight: number;
+  /** A library tileset copied into the editor. The map stores this PNG, not a link. */
+  tilesetColumns?: number;
+  tilesetRows?: number;
+  tilesetPng?: Uint8Array;
+  tileNames?: string[];
 };
 
 export type MapOpen = ({ source: "new" } & MapNewInput) | { source: "file"; path: string; files: MapFileBlob[] };
@@ -264,6 +271,11 @@ type StudioValue = {
    */
   proposeCatalogAsset: (packId: string, assetId: string) => Promise<void>;
   copyLibraryAsset: (request: LibraryCopyRequest) => Promise<LibraryCopyResult>;
+  /**
+   * Copies a sprite sheet, writes the animation note beside it, and opens the editor.
+   * A conflict returns needs-choice and does not open anything.
+   */
+  openLibrarySprite: (copy: LibraryCopyRequest["copy"], animation: SpriteAnimation, choice: LibraryCopyRequest["choice"]) => Promise<LibraryCopyResult>;
   pixelSession: PixelSession | null;
   /** Opens a blank canvas. False when the size or name is not allowed or the name is taken. */
   startPixelNew: (input: PixelNewInput) => boolean;
@@ -838,6 +850,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     (input: MapNewInput) => {
       const current = projectRef.current;
       if (!current || !isMapSlug(input.slug) || !cleanMapName(input.name) || !createMap(input)) return false;
+      if (input.tilesetPng) {
+        const decoded = decodePng(input.tilesetPng);
+        const columns = input.tilesetColumns ?? 0;
+        const rows = input.tilesetRows ?? 0;
+        if (!decoded.ok || decoded.pixels.width !== input.tileWidth * columns || decoded.pixels.height !== input.tileHeight * rows) return false;
+      }
       const paths = [mapDocumentPath(input.slug), tilesetPath(input.slug), collisionCsvPath(input.slug), layerCsvPath(input.slug, "ground")];
       if (paths.some((path) => !path || current.files.some((file) => file.path === path))) return false;
       openMapEditor({ source: "new", ...input });
@@ -1999,6 +2017,48 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         }
         setNotice(text.library.message(outcome));
         return outcome;
+      },
+      openLibrarySprite: async (copy, animation, choice) => {
+        const current = projectRef.current;
+        if (!current) {
+          const missing: LibraryCopyResult = {
+            ok: false,
+            changed: false,
+            path: "",
+            code: "no-project",
+            pinsSkipped: false,
+            exampleSkipped: false,
+            project: { id: "", name: "", createdAt: 0, updatedAt: 0, files: [] },
+          };
+          setNotice(text.library.message(missing));
+          return missing;
+        }
+        const outcome = await applyLibraryCopy(current, copy, choice, "none");
+        if (!outcome.ok) {
+          setNotice(text.library.message(outcome));
+          return outcome;
+        }
+        const side = animationSidecarPath(outcome.path);
+        const note = side ? librarySpriteNote(outcome.path, animation) : null;
+        let next = outcome.project;
+        let changed = outcome.changed;
+        if (side && note) {
+          const existing = next.files.find((file) => file.path === side);
+          if (existing?.text !== note) {
+            next = upsertFile(next, { path: side, text: note });
+            changed = true;
+          }
+        }
+        if (changed) {
+          remember(current);
+          commit(next);
+          setPath(outcome.path);
+        }
+        projectRef.current = next;
+        setNotice(text.library.message(outcome));
+        setLibraryOpen(false);
+        editPixelFile(outcome.path);
+        return { ...outcome, changed, project: next };
       },
       pixelSession,
       startPixelNew,

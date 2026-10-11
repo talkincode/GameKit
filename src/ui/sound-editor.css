@@ -4,6 +4,14 @@
   overflow: auto;
 }
 .sound-presets, .sound-voices, .sound-waves { display: flex; flex-wrap: wrap; gap: 4px; }
+.sound-library {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 9rem;
+  overflow: auto;
+}
+.sound-library audio { width: 100%; height: 32px; }
 .sound-field {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr) 52px;

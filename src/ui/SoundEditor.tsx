@@ -11,6 +11,7 @@ import {
 import { pygameSoundDemo, pygameSoundSnippet } from "../lib/audio/play";
 import { presetsFor, soundPreset, type SoundPreset } from "../lib/audio/presets";
 import type { MusicTrack, SfxLayer, SfxSpec, SoundSpec, Wave } from "../lib/audio/spec";
+import { loadLibrary, packAssetUrl } from "../lib/assets/catalog";
 import { uniquePath } from "../lib/project";
 import { useStudio } from "../studio/store";
 import { text } from "./text";
@@ -82,7 +83,31 @@ export function SoundDialog() {
   const [stageOpen, setStageOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [generated, setGenerated] = useState(false);
+  const [librarySounds, setLibrarySounds] = useState<{ id: string; title: string; src: string }[]>([]);
   const adopted = useRef(0);
+
+  useEffect(() => {
+    let cancel = false;
+    void loadLibrary()
+      .then((packs) => {
+        if (cancel) return;
+        setLibrarySounds(
+          packs.flatMap((pack) =>
+            pack.assets.flatMap((asset) => {
+              if (asset.category !== "sfx" && asset.category !== "music") return [];
+              if (!asset.mediaType.startsWith("audio/")) return [];
+              return [{ id: asset.id, title: `${asset.title} · ${pack.title}`, src: packAssetUrl(pack.id, asset.path) }];
+            }),
+          ),
+        );
+      })
+      .catch(() => {
+        if (!cancel) setLibrarySounds([]);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, []);
 
   useEffect(() => {
     const recipe = studio.soundRecipe;
@@ -202,6 +227,18 @@ export function SoundDialog() {
           ))}
         </div>
         {preset?.tags.includes("变体") ? <p>{text.sounds.variant}</p> : null}
+        {librarySounds.length ? (
+          <div className="sound-library" data-testid="sound-library">
+            <p>{text.sounds.library}</p>
+            <p className="quiet">{text.sounds.libraryHint}</p>
+            {librarySounds.map((sound) => (
+              <label key={sound.id}>
+                <span>{sound.title}</span>
+                <audio controls preload="none" src={sound.src} data-testid={`sound-library-${sound.id}`} />
+              </label>
+            ))}
+          </div>
+        ) : null}
         <textarea
           value={prompt}
           rows={2}

@@ -35,13 +35,13 @@ await asyncio.sleep(0)
 
 ## 素材库
 
-内置素材放在站点的 `public/asset-packs/`，打开素材库才请求说明文件和缩略图，不打进页面脚本。复制进项目的是文件字节，路径像 `assets/library/forest-adventure/characters/hero.png`，用普通 `pygame.image.load`。`assets/library.json` 只记下复制时的包版本、hash 和许可来源，游戏不要读它。
+内置素材放在站点的 `public/asset-packs/`，打开素材库、新建地图或声音编辑器才请求说明文件和缩略图，不打进页面脚本。除了 GameKit 画的森林，还有 Kenney 的 CC0 精选（见 [docs/asset-credits.md](asset-credits.md)）。复制进项目的是文件字节，路径像 `assets/library/forest-adventure/characters/hero.png`，用普通 `pygame.image.load`。地图如果从素材库的图块开始，瓦片图也会存进项目里的 `maps/*.tileset.png`。`assets/library.json` 只记下复制时的包版本、hash 和许可来源，游戏不要读它。
 
 预览和导出都打包项目里的这份副本（和别的 `assets/` 文件一样）。成品不请求素材库目录，也不请求 GameKit 站点。素材库以后升级，不会改掉已经复制进项目、或已经导出的那一份。模板本身没有为素材库改过。
 
 ## 声音
 
-声音编辑器把参数合成成 16-bit 单声道 22.05 kHz WAV。试听播放的字节和保存进 `assets/` 的字节是同一份，所以导出的游戏不调用生成接口。pygame-web 能播这种 PCM WAV，也能播通过文件头检查的 OGG Vorbis。MP3、AIFF、坏掉的 WAV、以及 Ogg 里的 Opus 会在问题面板里说明，不会假装能播。官方音效在素材库里，复制进项目之后和别的 `assets/` 文件一样打包。播放用普通 `pygame.mixer.Sound`。模板没有为声音改过。声音要等孩子点一下画面才会响。
+声音编辑器把参数合成成 16-bit 单声道 22.05 kHz WAV。试听播放的字节和保存进 `assets/` 的字节是同一份，所以导出的游戏不调用生成接口。pygame-web 能播这种 PCM WAV，也能播通过文件头检查的 OGG Vorbis。MP3、AIFF、坏掉的 WAV、以及 Ogg 里的 Opus 会在问题面板里说明，不会假装能播。官方音效在素材库里，包括 Kenney 原来的 OGG Vorbis。复制进项目之后和别的 `assets/` 文件一样打包。播放用普通 `pygame.mixer.Sound`。模板没有为声音改过。声音要等孩子点一下画面才会响。
 
 ## 精灵动画
 

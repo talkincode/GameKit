@@ -1,0 +1,378 @@
+{
+  "format": "gamekit.asset-pack",
+  "formatVersion": 1,
+  "id": "kenney-sfx",
+  "version": "1.0.0",
+  "title": "音效",
+  "theme": "音效",
+  "summary": "跳跃、金币、激光、脚步、开门和点击。来自 Kenney 的几套 CC0 音效，都是原来的 OGG Vorbis。",
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "CC0 1.0 Universal",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+  },
+  "author": "Kenney",
+  "source": "https://kenney.nl/assets",
+  "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。这一套把 Digital Audio、Impact Sounds、Interface Sounds、RPG Audio 和 Sci-fi Sounds 里的短声音放在一起。每条声音的来源链到它自己的原包。原始包：https://kenney.nl/assets",
+  "assets": [
+    {
+      "id": "sfx-jump",
+      "version": "1.0.0",
+      "title": "跳跃",
+      "path": "sounds/jump.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "跳跃",
+        "平台跳跃"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/jump.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/digital-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/digital-audio",
+      "sha256": "c60069ed7108678dd6a1306404d168a93cc2575cda37b06add9dd6c4d46352a3"
+    },
+    {
+      "id": "sfx-jump-soft",
+      "version": "1.0.0",
+      "title": "轻跳",
+      "path": "sounds/jump-soft.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "跳跃",
+        "变体"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/jump-soft.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/digital-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/digital-audio",
+      "sha256": "5d85717cfca231f7da7887cef5f44b2131bbe3308eb0c1fee0b4f9e61d59b571"
+    },
+    {
+      "id": "sfx-coin",
+      "version": "1.0.0",
+      "title": "金币",
+      "path": "sounds/coin.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "金币",
+        "益智"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/coin.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/digital-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/digital-audio",
+      "sha256": "f2f44effce087e47683f0fea05a71002bd8dca78fb10bf93d9f0b38d49f9590e"
+    },
+    {
+      "id": "sfx-laser",
+      "version": "1.0.0",
+      "title": "激光",
+      "path": "sounds/laser.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "射击",
+        "激光"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/laser.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/digital-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/digital-audio",
+      "sha256": "0bf468769b48a834dc1c6e38e457f2c71159b010225a9aedf84316795e8cc3e5"
+    },
+    {
+      "id": "sfx-power",
+      "version": "1.0.0",
+      "title": "升级",
+      "path": "sounds/power.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "道具",
+        "升级"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/power.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/digital-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/digital-audio",
+      "sha256": "8c361b624b560c0bc30ea3063b71212bc30caebf425c9df2481c13b25561485c"
+    },
+    {
+      "id": "sfx-step",
+      "version": "1.0.0",
+      "title": "草地脚步",
+      "path": "sounds/step.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "走路",
+        "平台跳跃"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/step.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/impact-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/impact-sounds",
+      "sha256": "9d49497777405d78d7cf7f2888e28277f3a23192300cfd1d79d54876b20f479f"
+    },
+    {
+      "id": "sfx-hit",
+      "version": "1.0.0",
+      "title": "轻撞",
+      "path": "sounds/hit.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "撞击"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/hit.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/impact-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/impact-sounds",
+      "sha256": "7d3ba0bb5e60a11b5d3e558c141303dcf494256675fbf753c0d252d2cf0481e3"
+    },
+    {
+      "id": "sfx-punch",
+      "version": "1.0.0",
+      "title": "拳击",
+      "path": "sounds/punch.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "撞击",
+        "地牢"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/punch.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/impact-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/impact-sounds",
+      "sha256": "486988aa2d6440ffc4c62a0e8ccf3c23673ba84424bd4723378d451b7255eb5c"
+    },
+    {
+      "id": "sfx-click",
+      "version": "1.0.0",
+      "title": "点击",
+      "path": "sounds/click.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "界面",
+        "点击"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/click.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/interface-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/interface-sounds",
+      "sha256": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9"
+    },
+    {
+      "id": "sfx-confirm",
+      "version": "1.0.0",
+      "title": "确认",
+      "path": "sounds/confirm.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "界面",
+        "确认"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/confirm.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/interface-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/interface-sounds",
+      "sha256": "063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a"
+    },
+    {
+      "id": "sfx-back",
+      "version": "1.0.0",
+      "title": "返回",
+      "path": "sounds/back.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "界面",
+        "返回"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/back.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/interface-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/interface-sounds",
+      "sha256": "07db973f79f6ae0f2edc34561e7592e24d0577455919fb602cb8ecc0da991dcf"
+    },
+    {
+      "id": "sfx-door",
+      "version": "1.0.0",
+      "title": "开门",
+      "path": "sounds/door.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "门",
+        "迷宫地牢"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/door.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/rpg-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/rpg-audio",
+      "sha256": "4ab93bab96522d8eb109ff96dc57cb6765deb02448fe14c10472084be5bb2a0b"
+    },
+    {
+      "id": "sfx-step-stone",
+      "version": "1.0.0",
+      "title": "石地脚步",
+      "path": "sounds/step-stone.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "走路",
+        "迷宫地牢"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/step-stone.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/rpg-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/rpg-audio",
+      "sha256": "6fe61ef1fc3bcf0e253bf2eb64759db6cb69e2fe452f4d88cc597ecf78a3d601"
+    },
+    {
+      "id": "sfx-laser-small",
+      "version": "1.0.0",
+      "title": "小激光",
+      "path": "sounds/laser-small.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "射击",
+        "变体"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/laser-small.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/sci-fi-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/sci-fi-sounds",
+      "sha256": "72b589eadd41781257ac859e4f4d030222e623390e4a1a83f6d05329a6e026f1"
+    },
+    {
+      "id": "sfx-boom",
+      "version": "1.0.0",
+      "title": "爆炸",
+      "path": "sounds/boom.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "爆炸",
+        "射击"
+      ],
+      "theme": "音效",
+      "category": "sfx",
+      "preview": "sounds/boom.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/sci-fi-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/sci-fi-sounds",
+      "sha256": "cdda50600a4928f2f1b8371224d53c171ac799c1cf2c30b11999508985250b3b"
+    }
+  ]
+}

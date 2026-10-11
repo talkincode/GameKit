@@ -1,4 +1,5 @@
 import { inspectAudio } from "../audio/format";
+import { MAX_TILES, isTileSize } from "../map/model";
 import { sha256Hex } from "./hash";
 import { assetPackSchema, type AssetPack, type CatalogAsset } from "./schema";
 
@@ -17,6 +18,7 @@ export type PackIssueCode =
   | "missing-size"
   | "animation"
   | "collision"
+  | "tileset"
   | "preview"
   | "tag-language"
   | "title-language"
@@ -60,6 +62,32 @@ function checkAnimation(asset: CatalogAsset, issues: PackIssue[]): void {
     if (indexes.some((index) => !known.has(index))) {
       issues.push({ code: "animation", path: asset.path, message: `${asset.id} state ${state} points at a missing frame.` });
     }
+  }
+}
+
+function checkTileset(asset: CatalogAsset, issues: PackIssue[]): void {
+  const grid = asset.tileset;
+  if (asset.category === "tileset" && !grid) {
+    issues.push({ code: "tileset", path: asset.path, message: `${asset.id} is a tileset and needs a grid.` });
+    return;
+  }
+  if (!grid) return;
+  if (!asset.width || !asset.height) {
+    issues.push({ code: "tileset", path: asset.path, message: `${asset.id} has a tileset grid but no pixel size.` });
+    return;
+  }
+  if (grid.tileWidth * grid.columns !== asset.width || grid.tileHeight * grid.rows !== asset.height) {
+    issues.push({ code: "tileset", path: asset.path, message: `${asset.id} tileset grid does not match the image.` });
+  }
+  if (grid.names.length !== grid.columns * grid.rows) {
+    issues.push({ code: "tileset", path: asset.path, message: `${asset.id} tileset names do not match the cell count.` });
+  }
+  if (!grid.names.every((name) => hasCjk(name))) {
+    issues.push({ code: "tileset", path: asset.path, message: `${asset.id} tileset names need Chinese.` });
+  }
+  // The map editor paints 8/16/32 cells and at most 32 of them. A shipped tileset has to fit.
+  if (grid.tileWidth !== grid.tileHeight || !isTileSize(grid.tileWidth) || grid.columns * grid.rows > MAX_TILES) {
+    issues.push({ code: "tileset", path: asset.path, message: `${asset.id} tileset cannot be used in the map editor.` });
   }
 }
 
@@ -134,6 +162,7 @@ export async function validateAssetPack(
 
     checkAnimation(asset, issues);
     checkCollision(asset, issues);
+    checkTileset(asset, issues);
   }
 
   if (issues.length) return { ok: false, issues };

@@ -25,6 +25,90 @@
       "source": "https://github.com/talkincode/GameKit",
       "attribution": "这些声音由 GameKit 用参数合成，以 CC0 1.0 贡献到公共领域。使用时无需署名。不是从第三方素材站搬运的，也不是调用生成接口做的。",
       "assetCount": 5
+    },
+    {
+      "id": "kenney-dungeon",
+      "version": "1.0.0",
+      "title": "迷宫地牢",
+      "theme": "迷宫地牢",
+      "summary": "16 像素的地砖、墙、门、箱子和旗帜，可以放进地图编辑器。来自 Kenney 的 Tiny Dungeon，CC0。",
+      "license": "CC0-1.0",
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/tiny-dungeon",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。图块按 4×4 排好，每格 16 像素，地图编辑器的调色板可以直接用。原始包：https://kenney.nl/assets/tiny-dungeon",
+      "assetCount": 7
+    },
+    {
+      "id": "kenney-platform",
+      "version": "1.0.0",
+      "title": "平台跳跃",
+      "theme": "平台跳跃",
+      "summary": "绿色和蓝色小人、草地、泥土、石砖和水面，加上跳跃和脚步声。来自 Kenney 的 Pixel Platformer，CC0。",
+      "license": "CC0-1.0",
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "assetCount": 11
+    },
+    {
+      "id": "kenney-puzzle",
+      "version": "1.0.0",
+      "title": "益智",
+      "theme": "益智",
+      "summary": "推箱子的人和 32 像素的地面、方块、箱子。来自 Kenney 的 Sokoban，CC0。",
+      "license": "CC0-1.0",
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/sokoban",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地图格子从原来的 64 像素缩小到 32 像素，好放进地图编辑器。人还是 64 像素，四帧排成精灵表。原始包：https://kenney.nl/assets/sokoban",
+      "assetCount": 4
+    },
+    {
+      "id": "kenney-racing",
+      "version": "1.0.0",
+      "title": "竞速",
+      "theme": "竞速",
+      "summary": "赛车、走路的人、路障和一段公路，加上撞击声。来自 Kenney 的 Pixel Vehicle Pack，CC0。",
+      "license": "CC0-1.0",
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "assetCount": 11
+    },
+    {
+      "id": "kenney-sfx",
+      "version": "1.0.0",
+      "title": "音效",
+      "theme": "音效",
+      "summary": "跳跃、金币、激光、脚步、开门和点击。来自 Kenney 的几套 CC0 音效，都是原来的 OGG Vorbis。",
+      "license": "CC0-1.0",
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。这一套把 Digital Audio、Impact Sounds、Interface Sounds、RPG Audio 和 Sci-fi Sounds 里的短声音放在一起。每条声音的来源链到它自己的原包。原始包：https://kenney.nl/assets",
+      "assetCount": 15
+    },
+    {
+      "id": "kenney-space",
+      "version": "1.0.0",
+      "title": "太空射击",
+      "theme": "太空射击",
+      "summary": "飞船、敌机、地面图块和闪光，加上激光声。来自 Kenney 的 Pixel Shmup，CC0。",
+      "license": "CC0-1.0",
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-shmup",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地面图块按 4×4 排好，每格 16 像素，地图编辑器可以直接用。飞船是原来的 32 像素。原始包：https://kenney.nl/assets/pixel-shmup",
+      "assetCount": 9
+    },
+    {
+      "id": "kenney-ui",
+      "version": "1.0.0",
+      "title": "界面",
+      "theme": "界面",
+      "summary": "箭头、勾、叉、星星和点击声。来自 Kenney 的 UI Pack，只要蓝色的一小套，CC0。",
+      "license": "CC0-1.0",
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "assetCount": 13
     }
   ]
 }
