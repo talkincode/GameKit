@@ -1,9 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { loadAssetBytes, loadLibrary } from "../lib/assets/catalog";
+import { editorTileset, type EditorTileset } from "../lib/assets/tileset";
 import { MAP_PRESETS, TILE_SIZES, cleanMapName, isMapSlug, nextMapSlug } from "../lib/map/model";
 import { mapDocumentPath } from "../lib/map/document";
 import { useStudio } from "../studio/store";
 import { text } from "./text";
 import "./map-editor.css";
+
+type LibrarySheet = { id: string; title: string; fit: EditorTileset; packId: string; path: string };
 
 /** Picks a name and a size. Nothing is written until the child saves inside the editor. */
 export function MapNewDialog() {
@@ -23,6 +27,31 @@ export function MapNewDialog() {
   const [name, setName] = useState("第一关");
   const [preset, setPreset] = useState<(typeof MAP_PRESETS)[number]["id"]>("small");
   const [tile, setTile] = useState<(typeof TILE_SIZES)[number]>(16);
+  const [sheets, setSheets] = useState<LibrarySheet[]>([]);
+  const [sheetId, setSheetId] = useState("starter");
+  const [sheetProblem, setSheetProblem] = useState("");
+  useEffect(() => {
+    let cancel = false;
+    void loadLibrary()
+      .then((packs) => {
+        if (cancel) return;
+        setSheets(
+          packs.flatMap((pack) =>
+            pack.assets.flatMap((asset) => {
+              const fit = editorTileset(asset);
+              return fit ? [{ id: asset.id, title: asset.title, fit, packId: pack.id, path: asset.path }] : [];
+            }),
+          ),
+        );
+      })
+      .catch(() => {
+        if (!cancel) setSheets([]);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, []);
+  const chosenSheet = sheets.find((sheet) => sheet.id === sheetId && sheet.fit.tileWidth === tile) ?? null;
   const cleanSlug = slug.trim().toLowerCase();
   const slugOk = isMapSlug(cleanSlug);
   const nameOk = !!cleanMapName(name);
@@ -33,15 +62,32 @@ export function MapNewDialog() {
 
   const start = () => {
     if (!slugOk || !nameOk || taken) return;
-    const opened = studio.startMapNew({
+    const base = {
       slug: cleanSlug,
       name: cleanMapName(name) ?? name,
       columns: size.columns,
       rows: size.rows,
       tileWidth: tile,
       tileHeight: tile,
+    };
+    setSheetProblem("");
+    if (!chosenSheet) {
+      studio.startMapNew(base);
+      return;
+    }
+    const sheet = chosenSheet;
+    void loadAssetBytes(sheet.packId, sheet.path).then((bytes) => {
+      const opened =
+        !!bytes &&
+        studio.startMapNew({
+          ...base,
+          tilesetColumns: sheet.fit.columns,
+          tilesetRows: sheet.fit.rows,
+          tilesetPng: bytes,
+          tileNames: sheet.fit.names,
+        });
+      if (!opened) setSheetProblem(text.map.tilesetMissing);
     });
-    if (!opened) return;
   };
 
   return (
@@ -99,6 +145,38 @@ export function MapNewDialog() {
             </button>
           ))}
         </div>
+        <div className="map-mode" role="group" aria-label={text.map.tileset}>
+          <button
+            type="button"
+            className={chosenSheet ? "" : "on"}
+            aria-pressed={!chosenSheet}
+            data-testid="map-tileset-starter"
+            onClick={() => {
+              setSheetId("starter");
+              setSheetProblem("");
+            }}
+          >
+            {text.map.starterTiles}
+          </button>
+          {sheets
+            .filter((sheet) => sheet.fit.tileWidth === tile)
+            .map((sheet) => (
+              <button
+                key={sheet.id}
+                type="button"
+                className={chosenSheet?.id === sheet.id ? "on" : ""}
+                aria-pressed={chosenSheet?.id === sheet.id}
+                data-testid={`map-tileset-${sheet.id}`}
+                onClick={() => {
+                  setSheetId(sheet.id);
+                  setSheetProblem("");
+                }}
+              >
+                {sheet.title}
+              </button>
+            ))}
+        </div>
+        {sheetProblem ? <p className="map-problem">{sheetProblem}</p> : null}
         <div className="modal-actions">
           <button type="button" onClick={() => studio.setMapNewOpen(false)}>
             {text.map.cancel}

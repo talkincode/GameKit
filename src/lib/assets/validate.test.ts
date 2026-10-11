@@ -13,9 +13,13 @@ describe("forest adventure pack", () => {
     const built = await buildForestPack();
     const sounds = await buildSoundPack();
     const manifest = JSON.parse(readFileSync(join(root, "forest-adventure", "manifest.json"), "utf8"));
-    const index = JSON.parse(readFileSync(join(root, "index.json"), "utf8"));
+    const index = JSON.parse(readFileSync(join(root, "index.json"), "utf8")) as { packs: { id: string }[] };
     expect(manifest).toEqual(built.manifest);
-    expect(index).toEqual(catalogIndex([built.manifest, sounds.manifest]));
+    const forestIndex = catalogIndex([built.manifest, sounds.manifest]);
+    for (const pack of forestIndex.packs) {
+      expect(index.packs.find((item) => item.id === pack.id)).toEqual(pack);
+    }
+    expect(index.packs.length).toBeGreaterThan(forestIndex.packs.length);
     for (const asset of built.manifest.assets) {
       const bytes = readFileSync(join(root, "forest-adventure", asset.path));
       expect(Buffer.from(bytes).equals(Buffer.from(built.files[asset.path]))).toBe(true);

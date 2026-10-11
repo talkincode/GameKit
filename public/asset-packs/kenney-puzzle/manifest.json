@@ -1,0 +1,184 @@
+{
+  "format": "gamekit.asset-pack",
+  "formatVersion": 1,
+  "id": "kenney-puzzle",
+  "version": "1.0.0",
+  "title": "益智",
+  "theme": "益智",
+  "summary": "推箱子的人和 32 像素的地面、方块、箱子。来自 Kenney 的 Sokoban，CC0。",
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "CC0 1.0 Universal",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+  },
+  "author": "Kenney",
+  "source": "https://kenney.nl/assets/sokoban",
+  "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地图格子从原来的 64 像素缩小到 32 像素，好放进地图编辑器。人还是 64 像素，四帧排成精灵表。原始包：https://kenney.nl/assets/sokoban",
+  "assets": [
+    {
+      "id": "puzzle-player",
+      "version": "1.0.0",
+      "title": "推箱子的人",
+      "path": "characters/player.png",
+      "mediaType": "image/png",
+      "tags": [
+        "角色",
+        "益智"
+      ],
+      "theme": "益智",
+      "category": "character",
+      "preview": "characters/player.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/sokoban",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地图格子从原来的 64 像素缩小到 32 像素，好放进地图编辑器。人还是 64 像素，四帧排成精灵表。原始包：https://kenney.nl/assets/sokoban",
+      "sha256": "69d90e23af4ecbb2276a69766e23dea0a297979788d71fa59d72b0573f94f34a",
+      "width": 256,
+      "height": 64,
+      "animation": {
+        "frameWidth": 64,
+        "frameHeight": 64,
+        "frames": [
+          {
+            "index": 0,
+            "durationMs": 200,
+            "name": "站立"
+          },
+          {
+            "index": 1,
+            "durationMs": 140,
+            "name": "迈步"
+          },
+          {
+            "index": 2,
+            "durationMs": 140,
+            "name": "侧身"
+          },
+          {
+            "index": 3,
+            "durationMs": 140,
+            "name": "回头"
+          }
+        ],
+        "states": {
+          "站立": [
+            0
+          ],
+          "走路": [
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "collision": {
+        "x": 16,
+        "y": 8,
+        "width": 32,
+        "height": 48
+      }
+    },
+    {
+      "id": "puzzle-tiles",
+      "version": "1.0.0",
+      "title": "益智图块",
+      "path": "tilesets/blocks.png",
+      "mediaType": "image/png",
+      "tags": [
+        "图块",
+        "地形",
+        "益智"
+      ],
+      "theme": "益智",
+      "category": "tileset",
+      "preview": "tilesets/blocks.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/sokoban",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地图格子从原来的 64 像素缩小到 32 像素，好放进地图编辑器。人还是 64 像素，四帧排成精灵表。原始包：https://kenney.nl/assets/sokoban",
+      "sha256": "df84b50bbe408110a103f3d7b03a75baba2b678471d76000016ecc3ba2157cb9",
+      "width": 128,
+      "height": 128,
+      "tileset": {
+        "tileWidth": 32,
+        "tileHeight": 32,
+        "columns": 4,
+        "rows": 4,
+        "names": [
+          "地面",
+          "深地面",
+          "石地面",
+          "木地面",
+          "方块",
+          "红方块",
+          "蓝方块",
+          "绿方块",
+          "木箱",
+          "铁箱",
+          "墙壁",
+          "石墙",
+          "草地",
+          "沙地",
+          "黄方块",
+          "标记"
+        ]
+      }
+    },
+    {
+      "id": "puzzle-place",
+      "version": "1.0.0",
+      "title": "放好",
+      "path": "sounds/place.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "金币",
+        "益智"
+      ],
+      "theme": "益智",
+      "category": "sfx",
+      "preview": "sounds/place.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/digital-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/digital-audio",
+      "sha256": "f2f44effce087e47683f0fea05a71002bd8dca78fb10bf93d9f0b38d49f9590e"
+    },
+    {
+      "id": "puzzle-ok",
+      "version": "1.0.0",
+      "title": "完成",
+      "path": "sounds/ok.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "界面",
+        "益智"
+      ],
+      "theme": "益智",
+      "category": "sfx",
+      "preview": "sounds/ok.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/interface-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/interface-sounds",
+      "sha256": "063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a"
+    }
+  ]
+}

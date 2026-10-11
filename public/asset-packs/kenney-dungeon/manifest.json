@@ -1,0 +1,217 @@
+{
+  "format": "gamekit.asset-pack",
+  "formatVersion": 1,
+  "id": "kenney-dungeon",
+  "version": "1.0.0",
+  "title": "迷宫地牢",
+  "theme": "迷宫地牢",
+  "summary": "16 像素的地砖、墙、门、箱子和旗帜，可以放进地图编辑器。来自 Kenney 的 Tiny Dungeon，CC0。",
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "CC0 1.0 Universal",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+  },
+  "author": "Kenney",
+  "source": "https://kenney.nl/assets/tiny-dungeon",
+  "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。图块按 4×4 排好，每格 16 像素，地图编辑器的调色板可以直接用。原始包：https://kenney.nl/assets/tiny-dungeon",
+  "assets": [
+    {
+      "id": "dungeon-tiles",
+      "version": "1.0.0",
+      "title": "地牢图块",
+      "path": "tilesets/rooms.png",
+      "mediaType": "image/png",
+      "tags": [
+        "图块",
+        "地形",
+        "地牢"
+      ],
+      "theme": "迷宫地牢",
+      "category": "tileset",
+      "preview": "tilesets/rooms.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/tiny-dungeon",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。图块按 4×4 排好，每格 16 像素，地图编辑器的调色板可以直接用。原始包：https://kenney.nl/assets/tiny-dungeon",
+      "sha256": "41511ff2c66d33e65a506c70da6d82ad0e610bb2b349c9e0082a386e41a820fa",
+      "width": 64,
+      "height": 64,
+      "tileset": {
+        "tileWidth": 16,
+        "tileHeight": 16,
+        "columns": 4,
+        "rows": 4,
+        "names": [
+          "棕色地砖",
+          "深色地砖",
+          "灰色地砖",
+          "蓝灰地砖",
+          "暗色地砖",
+          "砖墙",
+          "石墙",
+          "蓝砖",
+          "木地板",
+          "白花",
+          "石碑",
+          "木桶",
+          "木箱",
+          "木门",
+          "旗帜",
+          "木箱盖"
+        ]
+      }
+    },
+    {
+      "id": "dungeon-flower",
+      "version": "1.0.0",
+      "title": "白花",
+      "path": "effects/flower.png",
+      "mediaType": "image/png",
+      "tags": [
+        "特效",
+        "花"
+      ],
+      "theme": "迷宫地牢",
+      "category": "effect",
+      "preview": "effects/flower.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/tiny-dungeon",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。图块按 4×4 排好，每格 16 像素，地图编辑器的调色板可以直接用。原始包：https://kenney.nl/assets/tiny-dungeon",
+      "sha256": "a4cda9571f99b9d4f597bb5a99d3b419a7d54756567d8204e9b291e60019bfe6",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "dungeon-door",
+      "version": "1.0.0",
+      "title": "木门",
+      "path": "props/door.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "门"
+      ],
+      "theme": "迷宫地牢",
+      "category": "prop",
+      "preview": "props/door.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/tiny-dungeon",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。图块按 4×4 排好，每格 16 像素，地图编辑器的调色板可以直接用。原始包：https://kenney.nl/assets/tiny-dungeon",
+      "sha256": "ba976d7810eb6096c163158c0ffd171356aa9efa805bedf270e198744cc75c2d",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "dungeon-crate",
+      "version": "1.0.0",
+      "title": "木箱",
+      "path": "props/crate.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "箱子"
+      ],
+      "theme": "迷宫地牢",
+      "category": "prop",
+      "preview": "props/crate.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/tiny-dungeon",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。图块按 4×4 排好，每格 16 像素，地图编辑器的调色板可以直接用。原始包：https://kenney.nl/assets/tiny-dungeon",
+      "sha256": "25afdd367cb93441e72fa9a70699f8c0b2df6e09ef4ff124fa196f7e76247339",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "dungeon-flag",
+      "version": "1.0.0",
+      "title": "旗帜",
+      "path": "props/flag.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "旗帜"
+      ],
+      "theme": "迷宫地牢",
+      "category": "prop",
+      "preview": "props/flag.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/tiny-dungeon",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。图块按 4×4 排好，每格 16 像素，地图编辑器的调色板可以直接用。原始包：https://kenney.nl/assets/tiny-dungeon",
+      "sha256": "6cee741dcc6bf96b37a1a72dc4e99f3309358cd1f572a7093159f388ff2fecf3",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "dungeon-door-sfx",
+      "version": "1.0.0",
+      "title": "开门",
+      "path": "sounds/door.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "门",
+        "地牢"
+      ],
+      "theme": "迷宫地牢",
+      "category": "sfx",
+      "preview": "sounds/door.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/rpg-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/rpg-audio",
+      "sha256": "4ab93bab96522d8eb109ff96dc57cb6765deb02448fe14c10472084be5bb2a0b"
+    },
+    {
+      "id": "dungeon-step",
+      "version": "1.0.0",
+      "title": "石地脚步",
+      "path": "sounds/step.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "走路",
+        "地牢"
+      ],
+      "theme": "迷宫地牢",
+      "category": "sfx",
+      "preview": "sounds/step.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/rpg-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/rpg-audio",
+      "sha256": "6fe61ef1fc3bcf0e253bf2eb64759db6cb69e2fe452f4d88cc597ecf78a3d601"
+    }
+  ]
+}

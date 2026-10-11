@@ -22,7 +22,9 @@ import { text } from "./text";
  */
 
 type Row = { pack: AssetPack; asset: CatalogAsset };
-type Pending = { copy: LibraryAssetCopy; plan: LibraryPlan };
+type OpenIntent = "copy" | "sprite";
+type Prepared = { copy: LibraryAssetCopy; plan: LibraryPlan };
+type Pending = Prepared & { intent: OpenIntent };
 
 function snippetOf(asset: CatalogAsset): SnippetAsset {
   return {
@@ -127,10 +129,13 @@ export function LibraryDialog() {
 
   if (!open) return null;
 
-  const finish = async (copy: LibraryAssetCopy, choice: LibraryChoice, example: LibraryExample) => {
+  const finish = async (copy: LibraryAssetCopy, choice: LibraryChoice, example: LibraryExample, intent: OpenIntent = "copy") => {
     setBusy(true);
     try {
-      const outcome = await studio.copyLibraryAsset({ copy, choice, example });
+      const animation = intent === "sprite" && choice !== "keep" ? selected?.asset.animation : undefined;
+      const outcome = animation
+        ? await studio.openLibrarySprite(copy, animation, choice)
+        : await studio.copyLibraryAsset({ copy, choice, example });
       setStatus(text.library.message(outcome));
       if (outcome.ok) {
         setPending(null);
@@ -141,7 +146,7 @@ export function LibraryDialog() {
     }
   };
 
-  const prepare = async (row: Row): Promise<Pending | null> => {
+  const prepare = async (row: Row): Promise<Prepared | null> => {
     const bytes =
       row.pack.id === KEPT_PACK_ID ? localFiles[row.asset.path] : await loadAssetBytes(row.pack.id, row.asset.path);
     if (!bytes) throw new Error("Missing sound");
@@ -162,7 +167,7 @@ export function LibraryDialog() {
       const next = await prepare(selected);
       if (!next) return;
       if (next.plan.kind === "conflict" || next.plan.kind === "update") {
-        setPending(next);
+        setPending({ ...next, intent: "copy" });
         setMainPreview(null);
         setStatus("");
         return;
@@ -182,7 +187,7 @@ export function LibraryDialog() {
       const next = await prepare(selected);
       if (!next) return;
       if (next.plan.kind === "conflict" || next.plan.kind === "update") {
-        setPending(next);
+        setPending({ ...next, intent: "copy" });
         setMainPreview(null);
         return;
       }
@@ -206,10 +211,30 @@ export function LibraryDialog() {
       const next = await prepare(selected);
       if (!next) return;
       if (next.plan.kind === "conflict" || next.plan.kind === "update") {
-        setPending(next);
+        setPending({ ...next, intent: "copy" });
         return;
       }
       await finish(next.copy, next.plan.kind === "identical" ? "keep" : "add", "file");
+    } catch {
+      setError(text.library.failed);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onOpenSprite = async () => {
+    if (!selected?.asset.animation) return;
+    setBusy(true);
+    try {
+      const next = await prepare(selected);
+      if (!next) return;
+      if (next.plan.kind === "conflict" || next.plan.kind === "update") {
+        setPending({ ...next, intent: "sprite" });
+        setMainPreview(null);
+        setStatus("");
+        return;
+      }
+      await finish(next.copy, "add", "none", "sprite");
     } catch {
       setError(text.library.failed);
     } finally {
@@ -409,13 +434,13 @@ export function LibraryDialog() {
                           : text.library.conflictName}
                   </p>
                   <div className="modal-actions">
-                    <button type="button" disabled={busy} onClick={() => void finish(pending.copy, "keep", "none")}>
+                    <button type="button" disabled={busy} onClick={() => void finish(pending.copy, "keep", "none", pending.intent)}>
                       {text.library.keep}
                     </button>
-                    <button type="button" disabled={busy} onClick={() => void finish(pending.copy, "save-as", "none")}>
+                    <button type="button" disabled={busy} onClick={() => void finish(pending.copy, "save-as", "none", pending.intent)}>
                       {text.library.saveAs}
                     </button>
-                    <button type="button" className="run" disabled={busy} data-testid="library-replace" onClick={() => void finish(pending.copy, "replace", "none")}>
+                    <button type="button" className="run" disabled={busy} data-testid="library-replace" onClick={() => void finish(pending.copy, "replace", "none", pending.intent)}>
                       {text.library.replace}
                     </button>
                   </div>
@@ -469,6 +494,11 @@ export function LibraryDialog() {
                     <button type="button" className="run" disabled={busy || !selected} data-testid="library-add" onClick={() => void onAdd()}>
                       {text.library.add}
                     </button>
+                    {selected.asset.animation ? (
+                      <button type="button" disabled={busy} data-testid="library-open-sprite" onClick={() => void onOpenSprite()}>
+                        {text.library.openSprite}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="ghost"

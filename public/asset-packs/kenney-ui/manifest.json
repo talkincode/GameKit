@@ -1,0 +1,342 @@
+{
+  "format": "gamekit.asset-pack",
+  "formatVersion": 1,
+  "id": "kenney-ui",
+  "version": "1.0.0",
+  "title": "界面",
+  "theme": "界面",
+  "summary": "箭头、勾、叉、星星和点击声。来自 Kenney 的 UI Pack，只要蓝色的一小套，CC0。",
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "CC0 1.0 Universal",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+  },
+  "author": "Kenney",
+  "source": "https://kenney.nl/assets/ui-pack",
+  "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+  "assets": [
+    {
+      "id": "ui-check",
+      "version": "1.0.0",
+      "title": "打勾",
+      "path": "icons/check.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "勾"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/check.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "82a5c1c3dfe9a704e9f5f220c9510b622c77c2207c226b41728978c2335b1f3b",
+      "width": 20,
+      "height": 18
+    },
+    {
+      "id": "ui-cross",
+      "version": "1.0.0",
+      "title": "叉号",
+      "path": "icons/cross.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "叉"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/cross.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "32eea5ea58f44f15c82691cad35406b32dfad7c3c1152d633dcd74a25e430d48",
+      "width": 18,
+      "height": 18
+    },
+    {
+      "id": "ui-circle",
+      "version": "1.0.0",
+      "title": "圆点",
+      "path": "icons/circle.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "圆"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/circle.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "14ac9f54d1d165fa4b8da9dda962b60ab4786987af0eb7052460ede6c6ecd885",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "ui-square",
+      "version": "1.0.0",
+      "title": "方块",
+      "path": "icons/square.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "方块"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/square.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "43d8616b7a23e56753929bf723106053994b3cf5720d47abd04dbdc67b9d595b",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "ui-up",
+      "version": "1.0.0",
+      "title": "向上",
+      "path": "icons/up.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "箭头"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/up.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "8afaa9889de96dbc5ce2dd6623a3b95aad814b6419247d9f6b4af282c71f9c72",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": "ui-right",
+      "version": "1.0.0",
+      "title": "向右",
+      "path": "icons/right.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "箭头"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/right.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "5517436e154ef58b64ae46ebac37ab1b8a8df8ef3e9220b4154e78acde0221da",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": "ui-down",
+      "version": "1.0.0",
+      "title": "向下",
+      "path": "icons/down.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "箭头"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/down.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "94cee47dc0cc708320ecadc59795413a5ac59e0802d6f42a92163411f6ed43e2",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": "ui-left",
+      "version": "1.0.0",
+      "title": "向左",
+      "path": "icons/left.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "箭头"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/left.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "576db7b4e55f6937306d0fa56ea4da000aeaf4f53891fa967d2bd7dc0a83950f",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": "ui-box",
+      "version": "1.0.0",
+      "title": "方框",
+      "path": "icons/box.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "方框"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/box.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "e11648f1188535916da8645cde5532f90c806ff0d678a03b668957f0aea431df",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": "ui-box-check",
+      "version": "1.0.0",
+      "title": "勾选",
+      "path": "icons/box-check.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "勾"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/box-check.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "dc8624ee930b125a1d2086b31df6c4db3c8a395b7be2c4f6e355694475bdcd96",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "id": "ui-star",
+      "version": "1.0.0",
+      "title": "星星",
+      "path": "icons/star.png",
+      "mediaType": "image/png",
+      "tags": [
+        "界面",
+        "星星"
+      ],
+      "theme": "界面",
+      "category": "ui",
+      "preview": "icons/star.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/ui-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。只收了蓝色默认样式里的小图标，没有把整套颜色都放进来。原始包：https://kenney.nl/assets/ui-pack",
+      "sha256": "ba91a196117f8c324beac04ae426379d054e9497be901469eea5d333b369265c",
+      "width": 64,
+      "height": 60
+    },
+    {
+      "id": "ui-click",
+      "version": "1.0.0",
+      "title": "点击",
+      "path": "sounds/click.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "界面",
+        "点击"
+      ],
+      "theme": "界面",
+      "category": "sfx",
+      "preview": "sounds/click.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/interface-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/interface-sounds",
+      "sha256": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9"
+    },
+    {
+      "id": "ui-back",
+      "version": "1.0.0",
+      "title": "返回",
+      "path": "sounds/back.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "界面",
+        "返回"
+      ],
+      "theme": "界面",
+      "category": "sfx",
+      "preview": "sounds/back.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/interface-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/interface-sounds",
+      "sha256": "07db973f79f6ae0f2edc34561e7592e24d0577455919fb602cb8ecc0da991dcf"
+    }
+  ]
+}

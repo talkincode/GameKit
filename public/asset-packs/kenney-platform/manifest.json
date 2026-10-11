@@ -1,0 +1,354 @@
+{
+  "format": "gamekit.asset-pack",
+  "formatVersion": 1,
+  "id": "kenney-platform",
+  "version": "1.0.0",
+  "title": "平台跳跃",
+  "theme": "平台跳跃",
+  "summary": "绿色和蓝色小人、草地、泥土、石砖和水面，加上跳跃和脚步声。来自 Kenney 的 Pixel Platformer，CC0。",
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "CC0 1.0 Universal",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+  },
+  "author": "Kenney",
+  "source": "https://kenney.nl/assets/pixel-platformer",
+  "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+  "assets": [
+    {
+      "id": "platform-walker",
+      "version": "1.0.0",
+      "title": "绿色小人",
+      "path": "characters/walker.png",
+      "mediaType": "image/png",
+      "tags": [
+        "角色",
+        "主角",
+        "跳跃"
+      ],
+      "theme": "平台跳跃",
+      "category": "character",
+      "preview": "characters/walker.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "sha256": "8d6cc222ff669cc8ba51bbe23bfa28c9cf85aca2049b30adec8bfbdca8e33459",
+      "width": 48,
+      "height": 24,
+      "animation": {
+        "frameWidth": 24,
+        "frameHeight": 24,
+        "frames": [
+          {
+            "index": 0,
+            "durationMs": 240,
+            "name": "站立"
+          },
+          {
+            "index": 1,
+            "durationMs": 120,
+            "name": "走路"
+          }
+        ],
+        "states": {
+          "站立": [
+            0
+          ],
+          "走路": [
+            1
+          ]
+        }
+      },
+      "collision": {
+        "x": 6,
+        "y": 4,
+        "width": 12,
+        "height": 18
+      }
+    },
+    {
+      "id": "platform-walker-blue",
+      "version": "1.0.0",
+      "title": "蓝色小人",
+      "path": "characters/walker-blue.png",
+      "mediaType": "image/png",
+      "tags": [
+        "角色",
+        "跳跃",
+        "变体"
+      ],
+      "theme": "平台跳跃",
+      "category": "character",
+      "preview": "characters/walker-blue.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "sha256": "8d83952f01b5162c213ab43370d7a06f315b4efd7bfd4291da6e27f42efbfb5e",
+      "width": 48,
+      "height": 24,
+      "animation": {
+        "frameWidth": 24,
+        "frameHeight": 24,
+        "frames": [
+          {
+            "index": 0,
+            "durationMs": 240,
+            "name": "站立"
+          },
+          {
+            "index": 1,
+            "durationMs": 120,
+            "name": "走路"
+          }
+        ],
+        "states": {
+          "站立": [
+            0
+          ],
+          "走路": [
+            1
+          ]
+        }
+      },
+      "collision": {
+        "x": 6,
+        "y": 4,
+        "width": 12,
+        "height": 18
+      }
+    },
+    {
+      "id": "platform-grass",
+      "version": "1.0.0",
+      "title": "草地",
+      "path": "terrain/grass.png",
+      "mediaType": "image/png",
+      "tags": [
+        "地形",
+        "草地"
+      ],
+      "theme": "平台跳跃",
+      "category": "terrain",
+      "preview": "terrain/grass.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "sha256": "a677f7d9da75c6f3f32d08d9e2b44e48f03afcba678170a9aca99cb697fcafb8",
+      "width": 18,
+      "height": 18
+    },
+    {
+      "id": "platform-grass-edge",
+      "version": "1.0.0",
+      "title": "草地边",
+      "path": "terrain/grass-edge.png",
+      "mediaType": "image/png",
+      "tags": [
+        "地形",
+        "草地"
+      ],
+      "theme": "平台跳跃",
+      "category": "terrain",
+      "preview": "terrain/grass-edge.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "sha256": "d48e9fe1197c99b7bac2c6f465160f89a8082d8059bd709e5de8fa83bfa81f7b",
+      "width": 18,
+      "height": 18
+    },
+    {
+      "id": "platform-dirt",
+      "version": "1.0.0",
+      "title": "泥土",
+      "path": "terrain/dirt.png",
+      "mediaType": "image/png",
+      "tags": [
+        "地形",
+        "泥土"
+      ],
+      "theme": "平台跳跃",
+      "category": "terrain",
+      "preview": "terrain/dirt.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "sha256": "c82caa64467a4f8bbb5524e627aca73797731b3403d43e8a729d894578beafaa",
+      "width": 18,
+      "height": 18
+    },
+    {
+      "id": "platform-stone",
+      "version": "1.0.0",
+      "title": "石砖",
+      "path": "terrain/stone.png",
+      "mediaType": "image/png",
+      "tags": [
+        "地形",
+        "石头"
+      ],
+      "theme": "平台跳跃",
+      "category": "terrain",
+      "preview": "terrain/stone.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "sha256": "d7d12bf435f5b5fc2c12a93a86495a0e6e6afdccdb90f77436f08cf20a7f0c95",
+      "width": 18,
+      "height": 18
+    },
+    {
+      "id": "platform-water",
+      "version": "1.0.0",
+      "title": "水面",
+      "path": "terrain/water.png",
+      "mediaType": "image/png",
+      "tags": [
+        "地形",
+        "水面"
+      ],
+      "theme": "平台跳跃",
+      "category": "terrain",
+      "preview": "terrain/water.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "sha256": "51ff60a7a1a9c690f9a4ec7d8b00acfba7b7e726a35ef278d3adfb61b0f91bf0",
+      "width": 18,
+      "height": 18
+    },
+    {
+      "id": "platform-pebble",
+      "version": "1.0.0",
+      "title": "小石块",
+      "path": "props/pebble.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "石头"
+      ],
+      "theme": "平台跳跃",
+      "category": "prop",
+      "preview": "props/pebble.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "sha256": "0647aab90ffff15e94560f34e4063dc77d5037852e3c7c8005632c3bc8196ae4",
+      "width": 18,
+      "height": 18
+    },
+    {
+      "id": "platform-dust",
+      "version": "1.0.0",
+      "title": "尘土",
+      "path": "effects/dust.png",
+      "mediaType": "image/png",
+      "tags": [
+        "特效",
+        "尘土"
+      ],
+      "theme": "平台跳跃",
+      "category": "effect",
+      "preview": "effects/dust.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-platformer",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。小人的两帧排成了一张精灵表，动画编辑器可以直接打开。地形保持原来的 18 像素。原始包：https://kenney.nl/assets/pixel-platformer",
+      "sha256": "b1fa9ae1eb841985464b732030ae7cfb5fccce61b4b3a8221932a478652ac312",
+      "width": 18,
+      "height": 18
+    },
+    {
+      "id": "platform-jump",
+      "version": "1.0.0",
+      "title": "跳跃",
+      "path": "sounds/jump.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "跳跃",
+        "角色"
+      ],
+      "theme": "平台跳跃",
+      "category": "sfx",
+      "preview": "sounds/jump.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/digital-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/digital-audio",
+      "sha256": "c60069ed7108678dd6a1306404d168a93cc2575cda37b06add9dd6c4d46352a3"
+    },
+    {
+      "id": "platform-step",
+      "version": "1.0.0",
+      "title": "脚步",
+      "path": "sounds/step.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "走路",
+        "角色"
+      ],
+      "theme": "平台跳跃",
+      "category": "sfx",
+      "preview": "sounds/step.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/impact-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/impact-sounds",
+      "sha256": "9d49497777405d78d7cf7f2888e28277f3a23192300cfd1d79d54876b20f479f"
+    }
+  ]
+}

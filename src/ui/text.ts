@@ -215,6 +215,8 @@ export const text = {
     seconds: (value: string) => `${value} 秒 · WAV`,
     use: (path: string) => `在代码里这样用：pygame.mixer.Sound("${path}")`,
     presets: "预设",
+    library: "素材库里的声音",
+    libraryHint: "点一下就能听。这些是原来的声音，不会变成上面的预设。",
     wave: "波形",
     waves: { sine: "正弦", triangle: "三角", square: "方波", saw: "锯齿", noise: "噪音" },
     from: "开始音高",
@@ -529,6 +531,7 @@ export const text = {
     states: (names: string) => `动作：${names}`,
     collision: (width: number, height: number) => `碰撞范围 ${width}×${height}`,
     frames: (count: number) => `${count} 帧`,
+    openSprite: "在动画里打开",
     message(input: {
       code: LibraryNoticeCode;
       path: string;
@@ -572,6 +575,9 @@ export const text = {
     sizes: { small: "小 10×8", medium: "中 20×12", large: "大 32×18" },
     tile: "格子大小",
     tileValue: (px: number) => `${px} 像素`,
+    tileset: "图块",
+    starterTiles: "纯色方块",
+    tilesetMissing: "这套图块没有打开。可以改用纯色方块。",
     start: "开始画",
     cancel: "取消",
     taken: (slug: string) => `已经有 maps/${slug}.map.json 了。`,

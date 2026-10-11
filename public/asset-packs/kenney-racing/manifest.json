@@ -1,0 +1,330 @@
+{
+  "format": "gamekit.asset-pack",
+  "formatVersion": 1,
+  "id": "kenney-racing",
+  "version": "1.0.0",
+  "title": "竞速",
+  "theme": "竞速",
+  "summary": "赛车、走路的人、路障和一段公路，加上撞击声。来自 Kenney 的 Pixel Vehicle Pack，CC0。",
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "CC0 1.0 Universal",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+  },
+  "author": "Kenney",
+  "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+  "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+  "assets": [
+    {
+      "id": "racing-driver",
+      "version": "1.0.0",
+      "title": "车手",
+      "path": "characters/driver.png",
+      "mediaType": "image/png",
+      "tags": [
+        "角色",
+        "车手",
+        "走路"
+      ],
+      "theme": "竞速",
+      "category": "character",
+      "preview": "characters/driver.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "sha256": "e2fabbfcb3ef0d873ee65407306612cf2f01ae08c5f191babd57097902638c01",
+      "width": 48,
+      "height": 16,
+      "animation": {
+        "frameWidth": 16,
+        "frameHeight": 16,
+        "frames": [
+          {
+            "index": 0,
+            "durationMs": 200,
+            "name": "站立"
+          },
+          {
+            "index": 1,
+            "durationMs": 120,
+            "name": "迈步"
+          },
+          {
+            "index": 2,
+            "durationMs": 120,
+            "name": "再迈"
+          }
+        ],
+        "states": {
+          "站立": [
+            0
+          ],
+          "走路": [
+            1,
+            2
+          ]
+        }
+      },
+      "collision": {
+        "x": 4,
+        "y": 1,
+        "width": 8,
+        "height": 14
+      }
+    },
+    {
+      "id": "racing-car-green",
+      "version": "1.0.0",
+      "title": "绿色跑车",
+      "path": "props/car-green.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "赛车"
+      ],
+      "theme": "竞速",
+      "category": "prop",
+      "preview": "props/car-green.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "sha256": "7ee6636fe8cf687b0d62cc7366ff722f8a840528f9d93482a93c24da5c62c39d",
+      "width": 29,
+      "height": 11
+    },
+    {
+      "id": "racing-taxi",
+      "version": "1.0.0",
+      "title": "出租车",
+      "path": "props/taxi.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "赛车"
+      ],
+      "theme": "竞速",
+      "category": "prop",
+      "preview": "props/taxi.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "sha256": "0f39c03adcfd54066512eafd1a35c75dbb01b367b778880ec6c2e567e4eabd28",
+      "width": 33,
+      "height": 14
+    },
+    {
+      "id": "racing-bus",
+      "version": "1.0.0",
+      "title": "巴士",
+      "path": "props/bus.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "赛车"
+      ],
+      "theme": "竞速",
+      "category": "prop",
+      "preview": "props/bus.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "sha256": "237460909a5d648639e58ebd10ed0ea93b74f22ed4b9dcdfb40fbbd97a612d4d",
+      "width": 45,
+      "height": 21
+    },
+    {
+      "id": "racing-car-red",
+      "version": "1.0.0",
+      "title": "红色跑车",
+      "path": "props/car-red.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "赛车",
+        "变体"
+      ],
+      "theme": "竞速",
+      "category": "prop",
+      "preview": "props/car-red.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "sha256": "8ad2db0c825644db82219a2dc754dd16d7feadfc79c97b17d62f74357827a853",
+      "width": 34,
+      "height": 12
+    },
+    {
+      "id": "racing-road",
+      "version": "1.0.0",
+      "title": "公路",
+      "path": "terrain/road.png",
+      "mediaType": "image/png",
+      "tags": [
+        "地形",
+        "公路"
+      ],
+      "theme": "竞速",
+      "category": "terrain",
+      "preview": "terrain/road.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "sha256": "0a217e56d57c183ce31ea44996a3a1d7afc62ce9b70d993acd2e0bc84df7e5ed",
+      "width": 32,
+      "height": 31
+    },
+    {
+      "id": "racing-barrier",
+      "version": "1.0.0",
+      "title": "路障",
+      "path": "props/barrier.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "路障"
+      ],
+      "theme": "竞速",
+      "category": "prop",
+      "preview": "props/barrier.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "sha256": "7a9c64c35f66d661f9a8ee8ed48bc85a799700b5c4b5be4f0909f058721b3954",
+      "width": 25,
+      "height": 7
+    },
+    {
+      "id": "racing-sign",
+      "version": "1.0.0",
+      "title": "路牌",
+      "path": "props/sign.png",
+      "mediaType": "image/png",
+      "tags": [
+        "道具",
+        "路牌"
+      ],
+      "theme": "竞速",
+      "category": "prop",
+      "preview": "props/sign.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "sha256": "2c37315d9b1f797589d5c495d33202f65139e5beef499e157efd474c94461431",
+      "width": 7,
+      "height": 21
+    },
+    {
+      "id": "racing-light",
+      "version": "1.0.0",
+      "title": "路灯",
+      "path": "effects/light.png",
+      "mediaType": "image/png",
+      "tags": [
+        "特效",
+        "灯光"
+      ],
+      "theme": "竞速",
+      "category": "effect",
+      "preview": "effects/light.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-vehicle-pack",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。人的三帧原来宽窄不一样，这里放在同样的 16×16 透明格子里，动画编辑器才能打开。车还是原来的大小。原始包：https://kenney.nl/assets/pixel-vehicle-pack",
+      "sha256": "d4290d719cfe12455b047da5c27fc26049e8de028e598378940ff2d13d3e7369",
+      "width": 7,
+      "height": 27
+    },
+    {
+      "id": "racing-crash",
+      "version": "1.0.0",
+      "title": "撞击",
+      "path": "sounds/crash.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "撞击",
+        "赛车"
+      ],
+      "theme": "竞速",
+      "category": "sfx",
+      "preview": "sounds/crash.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/impact-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/impact-sounds",
+      "sha256": "33b5e6e37c6e9d54e07bf5a89b12c76e879f40c1ea83cdd82714df1d6f9fec6d"
+    },
+    {
+      "id": "racing-clank",
+      "version": "1.0.0",
+      "title": "金属声",
+      "path": "sounds/clank.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "撞击",
+        "变体"
+      ],
+      "theme": "竞速",
+      "category": "sfx",
+      "preview": "sounds/clank.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/impact-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/impact-sounds",
+      "sha256": "6e797cf8a5bfc52d7ed5eb47c227974c1cf2a674954fec5b539cea7d62c7282c"
+    }
+  ]
+}

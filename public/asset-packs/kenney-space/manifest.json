@@ -1,0 +1,288 @@
+{
+  "format": "gamekit.asset-pack",
+  "formatVersion": 1,
+  "id": "kenney-space",
+  "version": "1.0.0",
+  "title": "太空射击",
+  "theme": "太空射击",
+  "summary": "飞船、敌机、地面图块和闪光，加上激光声。来自 Kenney 的 Pixel Shmup，CC0。",
+  "license": {
+    "spdx": "CC0-1.0",
+    "name": "CC0 1.0 Universal",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+  },
+  "author": "Kenney",
+  "source": "https://kenney.nl/assets/pixel-shmup",
+  "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地面图块按 4×4 排好，每格 16 像素，地图编辑器可以直接用。飞船是原来的 32 像素。原始包：https://kenney.nl/assets/pixel-shmup",
+  "assets": [
+    {
+      "id": "space-tiles",
+      "version": "1.0.0",
+      "title": "空地图块",
+      "path": "tilesets/ground.png",
+      "mediaType": "image/png",
+      "tags": [
+        "图块",
+        "地形",
+        "射击"
+      ],
+      "theme": "太空射击",
+      "category": "tileset",
+      "preview": "tilesets/ground.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-shmup",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地面图块按 4×4 排好，每格 16 像素，地图编辑器可以直接用。飞船是原来的 32 像素。原始包：https://kenney.nl/assets/pixel-shmup",
+      "sha256": "1be0694b8254a75c9850029623a6e0b0348dd6a9d4a6b0b2a345743e4db4664e",
+      "width": 64,
+      "height": 64,
+      "tileset": {
+        "tileWidth": 16,
+        "tileHeight": 16,
+        "columns": 4,
+        "rows": 4,
+        "names": [
+          "草地",
+          "浅草",
+          "黄绿草地",
+          "绿草地",
+          "冰面",
+          "沙地",
+          "褐沙",
+          "泥土",
+          "木板",
+          "浅木板",
+          "木纹",
+          "深木板",
+          "黄草地",
+          "深草地",
+          "石地",
+          "泥地"
+        ]
+      }
+    },
+    {
+      "id": "space-ship",
+      "version": "1.0.0",
+      "title": "飞船",
+      "path": "characters/ship.png",
+      "mediaType": "image/png",
+      "tags": [
+        "角色",
+        "飞船",
+        "射击"
+      ],
+      "theme": "太空射击",
+      "category": "character",
+      "preview": "characters/ship.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-shmup",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地面图块按 4×4 排好，每格 16 像素，地图编辑器可以直接用。飞船是原来的 32 像素。原始包：https://kenney.nl/assets/pixel-shmup",
+      "sha256": "15bc356dca89cc1009e88e6ac2ee80db47c9f2c973f7c113f1c6cb07b2d1ddb3",
+      "width": 32,
+      "height": 32,
+      "collision": {
+        "x": 4,
+        "y": 4,
+        "width": 24,
+        "height": 24
+      }
+    },
+    {
+      "id": "space-enemy",
+      "version": "1.0.0",
+      "title": "敌机",
+      "path": "characters/enemy.png",
+      "mediaType": "image/png",
+      "tags": [
+        "角色",
+        "敌人",
+        "射击"
+      ],
+      "theme": "太空射击",
+      "category": "character",
+      "preview": "characters/enemy.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-shmup",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地面图块按 4×4 排好，每格 16 像素，地图编辑器可以直接用。飞船是原来的 32 像素。原始包：https://kenney.nl/assets/pixel-shmup",
+      "sha256": "f3bfd6862e07207946b9fbbfc07da92e1efa89407eac9f211ac56f02553fe286",
+      "width": 32,
+      "height": 32,
+      "collision": {
+        "x": 4,
+        "y": 4,
+        "width": 24,
+        "height": 24
+      }
+    },
+    {
+      "id": "space-enemy-2",
+      "version": "1.0.0",
+      "title": "另一艘敌机",
+      "path": "characters/enemy-2.png",
+      "mediaType": "image/png",
+      "tags": [
+        "角色",
+        "敌人",
+        "变体"
+      ],
+      "theme": "太空射击",
+      "category": "character",
+      "preview": "characters/enemy-2.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-shmup",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地面图块按 4×4 排好，每格 16 像素，地图编辑器可以直接用。飞船是原来的 32 像素。原始包：https://kenney.nl/assets/pixel-shmup",
+      "sha256": "f9cd302cad20ce52b54eb9f0ea734499004b0f1daa75931b3f730b174de8d26e",
+      "width": 32,
+      "height": 32,
+      "collision": {
+        "x": 4,
+        "y": 4,
+        "width": 24,
+        "height": 24
+      }
+    },
+    {
+      "id": "space-star",
+      "version": "1.0.0",
+      "title": "金星",
+      "path": "effects/star.png",
+      "mediaType": "image/png",
+      "tags": [
+        "特效",
+        "星星"
+      ],
+      "theme": "太空射击",
+      "category": "effect",
+      "preview": "effects/star.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-shmup",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地面图块按 4×4 排好，每格 16 像素，地图编辑器可以直接用。飞船是原来的 32 像素。原始包：https://kenney.nl/assets/pixel-shmup",
+      "sha256": "a1722110d4449ee28052e8abc5f188fa419905bf1ff8b4ec535df2f21d8ab02f",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "space-spark",
+      "version": "1.0.0",
+      "title": "闪光",
+      "path": "effects/spark.png",
+      "mediaType": "image/png",
+      "tags": [
+        "特效",
+        "闪光"
+      ],
+      "theme": "太空射击",
+      "category": "effect",
+      "preview": "effects/spark.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-shmup",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地面图块按 4×4 排好，每格 16 像素，地图编辑器可以直接用。飞船是原来的 32 像素。原始包：https://kenney.nl/assets/pixel-shmup",
+      "sha256": "3894569f83ee9276927913eda7e725eca9f84df191c2a51af02b4a412619a4b4",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "space-flare",
+      "version": "1.0.0",
+      "title": "火花",
+      "path": "effects/flare.png",
+      "mediaType": "image/png",
+      "tags": [
+        "特效",
+        "火花"
+      ],
+      "theme": "太空射击",
+      "category": "effect",
+      "preview": "effects/flare.png",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/pixel-shmup",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。地面图块按 4×4 排好，每格 16 像素，地图编辑器可以直接用。飞船是原来的 32 像素。原始包：https://kenney.nl/assets/pixel-shmup",
+      "sha256": "16d2c8ba66ff60a811429ceb9574ada6d4a86538e392bfc7c367f514cd843338",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "id": "space-laser",
+      "version": "1.0.0",
+      "title": "激光",
+      "path": "sounds/laser.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "射击",
+        "激光"
+      ],
+      "theme": "太空射击",
+      "category": "sfx",
+      "preview": "sounds/laser.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/digital-audio",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/digital-audio",
+      "sha256": "0bf468769b48a834dc1c6e38e457f2c71159b010225a9aedf84316795e8cc3e5"
+    },
+    {
+      "id": "space-hit",
+      "version": "1.0.0",
+      "title": "击中",
+      "path": "sounds/hit.ogg",
+      "mediaType": "audio/ogg",
+      "tags": [
+        "音效",
+        "撞击",
+        "射击"
+      ],
+      "theme": "太空射击",
+      "category": "sfx",
+      "preview": "sounds/hit.ogg",
+      "license": {
+        "spdx": "CC0-1.0",
+        "name": "CC0 1.0 Universal",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode"
+      },
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets/impact-sounds",
+      "attribution": "这些素材来自 Kenney（www.kenney.nl）的 CC0 包，使用时无需署名。GameKit 只收了原包里的一小部分。声音是 Kenney 原来的 OGG Vorbis，没有转码。原始包：https://kenney.nl/assets/impact-sounds",
+      "sha256": "7d3ba0bb5e60a11b5d3e558c141303dcf494256675fbf753c0d252d2cf0481e3"
+    }
+  ]
+}
