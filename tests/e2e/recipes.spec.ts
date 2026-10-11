@@ -3,7 +3,7 @@ import { strToU8, zipSync } from "fflate";
 import { createPixels } from "../../src/lib/pixel/buffer";
 import { encodePng } from "../../src/lib/pixel/png";
 import { text } from "../../src/ui/text";
-import { openProjectsPanel, openRecipes } from "./nav";
+import { openProjectsPanel, openRecipes as openRecipeMenu } from "./nav";
 
 // 配方、分步挑战、素材提议。不登录就能做。检查看源码和舞台标记，不请模型打分。
 // 做成候选不会写作品；丢掉或冲突则项目不变；采用之后可以撤销。
@@ -55,7 +55,7 @@ async function fileText(page: Page, name: string, path: string): Promise<string 
 }
 
 async function openRecipes(page: Page) {
-  await openRecipes(page);
+  await openRecipeMenu(page);
   await expect(page.getByTestId("recipes-dialog")).toBeVisible();
 }
 
