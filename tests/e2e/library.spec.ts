@@ -197,6 +197,22 @@ test("sound cards show names, filters are unique, and the player has a duration"
   });
   await page.goto("/");
   await openLibrary(page);
+  const overlapped = await page.locator(".library-card").evaluateAll((nodes) => {
+    const boxes = nodes.map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom };
+    });
+    let count = 0;
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        const a = boxes[i];
+        const b = boxes[j];
+        if (a.x < b.right - 1 && b.x < a.right - 1 && a.y < b.bottom - 1 && b.y < a.bottom - 1) count += 1;
+      }
+    }
+    return count;
+  });
+  expect(overlapped).toBe(0);
   await page.getByTestId("library-category-sfx").click();
 
   const cards = await page.locator(".library-card").evaluateAll((nodes) =>

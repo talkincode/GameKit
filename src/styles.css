@@ -878,7 +878,10 @@ button:disabled { opacity: 0.45; cursor: default; }
   width: 100%;
   display: block;
   height: auto;
-  min-height: 0;
+  /* A button's max-content height inside a grid is one line, so the next row
+     paints over the title. min-height is what the row actually uses; a longer
+     name still grows past it. */
+  min-height: 124px;
   padding: 6px;
   white-space: normal;
   overflow: visible;
