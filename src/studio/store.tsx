@@ -406,6 +406,19 @@ function toAdkParts(content: unknown): { text?: string; inlineData?: { mimeType:
   return parts.length ? parts : [{ text: "" }];
 }
 
+type ApiProblem = "sign-in" | "denied" | "unavailable" | "offline" | "error";
+
+/**
+ * A model call only starts after the studio thought the child was signed in.
+ * A 401 is a lost session, so the sentence is the expired one. The category
+ * and request id stay, for 查看详情.
+ */
+function forKnownSession(problem: ApiProblem, failure: PublicFailure): PublicFailure {
+  if (problem === "sign-in") return { ...failure, message: text.account.notes.expired };
+  if (problem === "denied") return { ...failure, message: text.account.notes.denied };
+  return failure;
+}
+
 /** Folds one agent event into the round it belongs to. */
 function applyEvent(turn: Turn, event: AgentEvent): Turn {
   if (event.kind === "step") return { ...turn, steps: foldStep(turn.steps, event.step) };
@@ -568,12 +581,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
    * notice, for callers that report the failure themselves.
    */
   /** Tells the child what went wrong with an AI call, and updates who-is-signed-in. */
-  const noteApiProblem = useCallback((problem: "sign-in" | "denied" | "unavailable" | "offline" | "error", message: string, failure?: PublicFailure) => {
+  const noteApiProblem = useCallback((problem: ApiProblem, message: string, failure?: PublicFailure) => {
     if (problem === "sign-in" || problem === "denied") {
       const note = problem === "denied" ? "denied" : "expired";
       setSignInHint(false);
       setAccount({ kind: "anonymous", note });
-      if (failure) setFailureNotice(failure);
+      const shown = failure ? forKnownSession(problem, failure) : undefined;
+      if (shown) setFailureNotice(shown);
       else setNotice(text.account.notes[note]);
       return;
     }
@@ -615,12 +629,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       });
       return outcome.value;
     }
-    logFailure("assistant", outcome.failure, summary);
+    const failure = forKnownSession(outcome.problem === "error" ? "error" : outcome.problem, outcome.failure);
+    logFailure("assistant", failure, summary);
     if (quiet && outcome.problem === "error") {
-      console.warn("AI request failed:", outcome.failure.detail);
+      console.warn("AI request failed:", failure.detail);
       return null;
     }
-    noteApiProblem(outcome.problem === "error" ? "error" : outcome.problem, outcome.message, outcome.failure);
+    noteApiProblem(outcome.problem === "error" ? "error" : outcome.problem, failure.message, failure);
     return null;
   }, [noteApiProblem]);
 
@@ -1171,10 +1186,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       try {
         return await runner.run(stepParts);
       } catch (error) {
-        const failure = failureFromUnknown(error);
-        const problem = failure.code === "sign_in" ? "sign-in" : failure.code === "not_allowed" ? "denied" : failure.code === "not_configured" ? "unavailable" : failure.code === "network" ? "offline" : "error";
+        const raw = failureFromUnknown(error);
+        const problem = raw.code === "sign_in" ? "sign-in" : raw.code === "not_allowed" ? "denied" : raw.code === "not_configured" ? "unavailable" : raw.code === "network" ? "offline" : "error";
+        const failure = forKnownSession(problem, raw);
         noteApiProblem(problem, failure.message, failure);
-        throw error instanceof GatewayError ? error : new GatewayError(failure);
+        throw new GatewayError(failure);
       }
     },
     [noteApiProblem],
