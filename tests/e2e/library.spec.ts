@@ -305,6 +305,7 @@ test("the detail panel leads with one action and keeps the rest folded", async (
   expect(wrapped.whites.every((space) => space === "nowrap")).toBe(true);
   expect(wrapped.texts.every((label) => !label.includes("\n"))).toBe(true);
 
+  await page.getByTestId("library-more").locator("summary").click();
   await page.getByTestId("library-code").locator("summary").click();
   await page.getByTestId("library-adult").locator("summary").click();
   await page.getByTestId("library-detail-scroll").evaluate((el) => {

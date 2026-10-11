@@ -70,6 +70,7 @@ export function LibraryDialog() {
   const [tagsOpen, setTagsOpen] = useState(false);
   const [playing, setPlaying] = useState(false);
   const playerRef = useRef<HTMLAudioElement | null>(null);
+  const moreRef = useRef<HTMLDetailsElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -291,6 +292,7 @@ export function LibraryDialog() {
   };
 
   const onAction = (id: SecondaryAction) => {
+    if (moreRef.current) moreRef.current.open = false;
     if (!selected) return;
     if (id === "hear") {
       playSelected();
@@ -679,7 +681,7 @@ export function LibraryDialog() {
                     {text.library.add}
                   </button>
                   {actions.shortcuts.map((id) => renderAction(id, "bar"))}
-                  <details className="library-more" data-testid="library-more" key={selected.asset.id}>
+                  <details className="library-more" data-testid="library-more" key={selected.asset.id} ref={moreRef}>
                     <summary>{text.library.moreActions}</summary>
                     <div className="library-more-menu" data-testid="library-more-menu">
                       {actions.more.map((id) => renderAction(id, "menu"))}
