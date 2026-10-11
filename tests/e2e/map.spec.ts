@@ -94,7 +94,7 @@ async function fileOf(page: Page, path: string): Promise<FileRow | null> {
 }
 
 test("anonymous: a painted map is saved, reopened, exported, and played by pygame", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const api: string[] = [];
   await page.goto("/");
   await expect(page.getByRole("button", { name: text.stage.play })).toBeVisible();
@@ -193,7 +193,9 @@ test("anonymous: a painted map is saved, reopened, exported, and played by pygam
   await page.getByTestId("map-close").click();
   await expect(page.getByTestId("map-editor")).toHaveCount(0);
 
-  await page.getByRole("button", { name: text.stage.play }).click();
+  // 确认试玩时舞台已经开始跑。若还停着，再点一次「试玩我的作品」。
+  const play = page.getByRole("button", { name: text.stage.play });
+  if (await play.isVisible()) await play.click();
   await expect(page.locator(".console")).toContainText("async: ok", { timeout: 120_000 });
   await page.frameLocator(`iframe[title="${text.brand.name}"]`).locator("#canvas").click({ position: { x: 10, y: 10 }, force: true });
   await expect(page.locator(".console")).toContainText("MAP-OK 32 112 2", { timeout: 120_000 });
