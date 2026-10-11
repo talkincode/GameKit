@@ -88,6 +88,31 @@ describe("forest adventure pack", () => {
     }
   });
 
+  it("blocks an asset with no display name", async () => {
+    const built = await buildForestPack();
+    const manifest = structuredClone(built.manifest);
+    manifest.assets[0].title = "   ";
+    const checked = await validateAssetPack(manifest, built.files);
+    expect(checked.ok).toBe(false);
+    if (!checked.ok) expect(checked.issues.map((issue) => issue.code)).toContain("missing-title");
+  });
+
+  it("blocks an ogg that has no wav preview", async () => {
+    const id = "kenney-sfx";
+    const manifest = JSON.parse(readFileSync(join(root, id, "manifest.json"), "utf8")) as AssetPack;
+    const files: Record<string, Uint8Array> = {};
+    for (const asset of manifest.assets) {
+      files[asset.path] = new Uint8Array(readFileSync(join(root, id, asset.path)));
+      const preview = asset.path.replace(/\.ogg$/, ".preview.wav");
+      files[preview] = new Uint8Array(readFileSync(join(root, id, preview)));
+    }
+    expect((await validateAssetPack(manifest, files)).ok).toBe(true);
+    delete files[manifest.assets[0].path.replace(/\.ogg$/, ".preview.wav")];
+    const missing = await validateAssetPack(manifest, files);
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.issues.map((issue) => issue.code)).toContain("audio-preview");
+  });
+
   it("blocks an audio file the browser runtime cannot play", async () => {
     const sounds = await buildSoundPack();
     const manifest = structuredClone(sounds.manifest);

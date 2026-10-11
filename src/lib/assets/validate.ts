@@ -1,6 +1,8 @@
 import { inspectAudio } from "../audio/format";
 import { MAX_TILES, isTileSize } from "../map/model";
+import { assetDisplayName } from "./display";
 import { sha256Hex } from "./hash";
+import { oggPreviewWavPath } from "./preview-audio";
 import { assetPackSchema, type AssetPack, type CatalogAsset } from "./schema";
 
 /**
@@ -22,7 +24,9 @@ export type PackIssueCode =
   | "preview"
   | "tag-language"
   | "title-language"
-  | "audio-format";
+  | "missing-title"
+  | "audio-format"
+  | "audio-preview";
 
 export type PackIssue = { code: PackIssueCode; message: string; path?: string };
 
@@ -31,6 +35,13 @@ const PROVENANCE = /license|author|source|attribution/;
 
 function hasCjk(value: string): boolean {
   return CJK.test(value);
+}
+
+/** Asset titles are the card's display name. An empty one is its own gate, not a generic schema miss. */
+function issueCode(path: string): PackIssueCode {
+  if (PROVENANCE.test(path)) return "provenance";
+  if (/^assets\.\d+\.title$/.test(path)) return "missing-title";
+  return "schema";
 }
 
 function fits(x: number, y: number, width: number, height: number, boxWidth: number, boxHeight: number): boolean {
@@ -110,7 +121,7 @@ export async function validateAssetPack(
     const issues: PackIssue[] = parsed.error.issues.map((issue) => {
       const path = issue.path.join(".");
       return {
-        code: PROVENANCE.test(path) ? "provenance" : "schema",
+        code: issueCode(path),
         path,
         message: `${path || "manifest"}: ${issue.message}`,
       };
@@ -133,7 +144,9 @@ export async function validateAssetPack(
     if (paths.has(asset.path)) issues.push({ code: "duplicate-path", path: asset.path, message: `Duplicate path ${asset.path}.` });
     paths.add(asset.path);
 
-    if (!hasCjk(asset.title)) {
+    if (!assetDisplayName(asset)) {
+      issues.push({ code: "missing-title", path: asset.id, message: `${asset.id} needs a non-empty display name.` });
+    } else if (!hasCjk(asset.title)) {
       issues.push({ code: "title-language", path: asset.id, message: `${asset.id} needs a Chinese title.` });
     }
     if (!asset.tags.some(hasCjk)) {
@@ -157,6 +170,19 @@ export async function validateAssetPack(
       const verdict = inspectAudio(asset.path, bytes);
       if (!verdict?.ok) {
         issues.push({ code: "audio-format", path: asset.path, message: `${asset.id} is not audio the browser runtime can play.` });
+      }
+    }
+
+    if (asset.mediaType === "audio/ogg") {
+      const previewPath = oggPreviewWavPath(asset.path);
+      const preview = previewPath ? files[previewPath] : undefined;
+      const previewVerdict = previewPath ? inspectAudio(previewPath, preview) : null;
+      if (!previewPath || !previewVerdict?.ok || previewVerdict.format !== "wav") {
+        issues.push({
+          code: "audio-preview",
+          path: previewPath ?? asset.path,
+          message: `${asset.id} needs a PCM WAV preview next to the OGG so Safari can play it in the library.`,
+        });
       }
     }
 
