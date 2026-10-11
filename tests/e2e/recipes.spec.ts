@@ -164,6 +164,7 @@ test("proposing a catalog picture stays a candidate, and a different file is not
   await page.getByTestId("library-open").click();
   await page.getByTestId("library-search").fill("金币");
   await page.getByTestId("library-asset-coin").click();
+  await page.getByTestId("library-more").locator("summary").click();
   await page.getByTestId("library-propose").click();
   await expect(page.getByTestId("candidate")).toBeVisible();
   await expect(page.getByTestId("design-turn")).toContainText("coin.png");
@@ -177,6 +178,7 @@ test("proposing a catalog picture stays a candidate, and a different file is not
   await page.getByTestId("library-open").click();
   await page.getByTestId("library-search").fill("金币");
   await page.getByTestId("library-asset-coin").click();
+  await page.getByTestId("library-more").locator("summary").click();
   await page.getByTestId("library-propose").click();
   await page.getByTestId("adopt").click();
   await expect.poll(async () => (await storedFile(page, "my-cool-game", COIN))?.base64 ?? null).not.toBeNull();
@@ -198,6 +200,7 @@ test("proposing a catalog picture stays a candidate, and a different file is not
   await page.getByTestId("library-open").click();
   await page.getByTestId("library-search").fill("金币");
   await page.getByTestId("library-asset-coin").click();
+  await page.getByTestId("library-more").locator("summary").click();
   await page.getByTestId("library-propose").click();
   await expect(page.getByTestId("notice")).toContainText("没有盖掉");
   await expect(page.getByTestId("candidate")).toHaveCount(0);
@@ -217,6 +220,7 @@ test("an allowed account proposes a picture without writing the project first", 
 
   await page.getByTestId("library-open").click();
   await page.getByTestId("library-asset-hero").click();
+  await page.getByTestId("library-more").locator("summary").click();
   await page.getByTestId("library-propose").click();
   await expect(page.getByTestId("candidate")).toBeVisible();
   expect(await storedFile(page, "my-cool-game", "assets/library/forest-adventure/characters/hero.png")).toBeNull();

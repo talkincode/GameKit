@@ -224,6 +224,7 @@ test("an mp3 is diagnosed, and a kept sound shows up in the library", async ({ p
   await page.getByTestId("library-open").click();
   await page.getByRole("button", { name: "我的声音", exact: true }).click();
   await expect(page.getByTestId("library-preview")).toBeVisible();
+  await page.getByTestId("library-adult").locator("summary").click();
   await expect(page.getByTestId("library-author")).toContainText("你");
   await expect(page.getByTestId("library-license")).toContainText("CC0");
   await page.getByTestId("library-remove-kept").click();
@@ -244,14 +245,16 @@ test("an official sound plays in pygame and is inside the offline export", async
   await expect(page.getByTestId("library-category-sfx")).toBeVisible();
   await page.getByTestId("library-category-sfx").click();
   await page.getByTestId("library-asset-jump-sfx").click();
+  await page.getByTestId("library-code").locator("summary").click();
   await expect(page.getByTestId("library-snippet")).toContainText(`pygame.mixer.Sound("${path}")`);
   await expect(page.getByTestId("library-snippet")).not.toContainText("/asset-packs/");
-  await expect(page.getByTestId("library-related")).toContainText("轻跳");
+  await expect(page.getByTestId("library-related").getByRole("button", { name: "轻跳", exact: true })).toBeVisible();
   await expect(page.getByTestId("library-variant")).toHaveCount(0);
   await page.getByTestId("library-asset-jump-soft").click();
   await expect(page.getByTestId("library-variant")).toBeVisible();
 
   await page.getByTestId("library-asset-jump-sfx").click();
+  await page.getByTestId("library-more").locator("summary").click();
   await page.getByTestId("library-try").click();
   await expect(page.getByTestId("library-main-preview")).toContainText("SOUND-OK");
   await expect(page.getByTestId("library-main-preview")).toContainText("await asyncio.sleep(0)");

@@ -37,11 +37,13 @@ test("searching finds a Kenney tileset, and pygame plus the export use the copy"
   await expect(page.getByTestId("library-asset-dungeon-tiles")).toBeVisible();
   await expect(page.getByTestId("library-asset-hero")).toHaveCount(0);
   await page.getByTestId("library-asset-dungeon-tiles").click();
+  await page.getByTestId("library-adult").locator("summary").click();
   await expect(page.getByTestId("library-license")).toContainText("CC0");
   await expect(page.getByTestId("library-author")).toContainText("Kenney");
   await expect(page.getByTestId("library-source")).toContainText("https://kenney.nl/assets/tiny-dungeon");
   await expect(page.getByTestId("library-size")).toContainText("64×64");
 
+  await page.getByTestId("library-more").locator("summary").click();
   await page.getByTestId("library-try").click();
   await expect(page.getByTestId("library-main-preview")).toContainText(`pygame.image.load("${TILES}")`);
   await expect(page.getByTestId("library-main-preview")).not.toContainText("/asset-packs/");
