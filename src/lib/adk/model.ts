@@ -6,6 +6,7 @@
  * Usage comes along, because ADK's token budget and compactor are built on it.
  */
 import { BaseLlm, type LlmRequest, type LlmResponse } from "@google/adk";
+import { makeFailure, readPublicFailure, type PublicFailure } from "../../../shared/assistant-error";
 
 type Part = { text?: string; inlineData?: { mimeType?: string; data?: string } };
 type Content = { role?: string; parts?: Part[] };
@@ -18,13 +19,27 @@ export type GatewayProblem = "sign-in" | "denied" | "unavailable" | "offline" | 
 
 /** A gateway failure that the studio knows how to explain to the child. */
 export class GatewayError extends Error {
-  constructor(readonly problem: GatewayProblem) {
-    super(problem);
+  readonly failure: PublicFailure;
+
+  constructor(failure: PublicFailure) {
+    super(failure.message);
+    this.name = "GatewayError";
+    this.failure = failure;
+  }
+
+  /** Coarse bucket the studio already uses for sign-in and offline. */
+  get problem(): GatewayProblem {
+    if (this.failure.code === "sign_in") return "sign-in";
+    if (this.failure.code === "not_allowed") return "denied";
+    if (this.failure.code === "not_configured") return "unavailable";
+    if (this.failure.code === "network") return "offline";
+    return "failed";
   }
 }
 
 export type GatewayAnswer = {
   text: string;
+  requestId: string;
   promptTokens?: number;
   completionTokens?: number;
 };
@@ -41,24 +56,27 @@ export async function askGateway(messages: GatewayMessage[]): Promise<GatewayAns
       redirect: "manual",
     });
   } catch {
-    throw new GatewayError("offline");
+    throw new GatewayError(makeFailure("network", "The network request failed.", ""));
   }
   if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
-    throw new GatewayError("sign-in");
+    throw new GatewayError(makeFailure("sign_in", "sign-in redirect", ""));
   }
   const payload = (await response.json().catch(() => ({}))) as {
     text?: string;
+    requestId?: string;
     usage?: { promptTokens?: number; completionTokens?: number };
-    code?: string;
   };
-  if (!response.ok) {
-    if (response.status === 401) throw new GatewayError("sign-in");
-    if (response.status === 403) throw new GatewayError("denied");
-    if (response.status === 503) throw new GatewayError("unavailable");
-    throw new GatewayError("failed");
+  if (!response.ok) throw new GatewayError(readPublicFailure(payload, response.status));
+  const requestId = typeof payload.requestId === "string" ? payload.requestId : "";
+  if (typeof payload.text !== "string" || !payload.text.trim()) {
+    throw new GatewayError(makeFailure("empty", "model returned an empty response", requestId));
   }
-  if (typeof payload.text !== "string" || !payload.text.trim()) throw new GatewayError("failed");
-  return { text: payload.text, promptTokens: payload.usage?.promptTokens, completionTokens: payload.usage?.completionTokens };
+  return {
+    text: payload.text,
+    requestId,
+    promptTokens: payload.usage?.promptTokens,
+    completionTokens: payload.usage?.completionTokens,
+  };
 }
 
 function gatewayContent(content: Content, withImages: boolean): string | GatewayPart[] {
@@ -100,7 +118,9 @@ export function toGatewayMessages(contents: Content[], system?: string): Gateway
 export class GatewayLlm extends BaseLlm {
   static readonly supportedModels: (string | RegExp)[] = [/.*/];
   /** Why the last call failed, for the runner to rethrow as a GatewayError. */
-  lastProblem: GatewayProblem | null = null;
+  lastFailure: PublicFailure | null = null;
+  /** requestId of the last call, success or failure. */
+  lastRequestId = "";
 
   constructor(readonly instruction = "") {
     super({ model: "gamekit-gateway" });
@@ -119,11 +139,14 @@ export class GatewayLlm extends BaseLlm {
     let answer: GatewayAnswer;
     try {
       answer = await askGateway(toGatewayMessages(contents, this.instruction));
-      this.lastProblem = null;
+      this.lastFailure = null;
+      this.lastRequestId = answer.requestId;
     } catch (error) {
       // ADK turns a thrown error into an event, so remember the reason here.
-      this.lastProblem = error instanceof GatewayError ? error.problem : "failed";
-      throw error;
+      const failure = error instanceof GatewayError ? error.failure : makeFailure("worker", "The model did not answer.", "");
+      this.lastFailure = failure;
+      this.lastRequestId = failure.requestId;
+      throw error instanceof GatewayError ? error : new GatewayError(failure);
     }
     yield {
       content: { role: "model", parts: [{ text: answer.text }] },

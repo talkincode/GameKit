@@ -275,5 +275,10 @@ export function parseModelJson(raw: string): unknown {
   const start = body.indexOf("{");
   const end = body.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("The model did not return JSON.");
-  return JSON.parse(body.slice(start, end + 1)) as unknown;
+  // SyntaxError messages quote the input. Keep only the position.
+  try {
+    return JSON.parse(body.slice(start, end + 1)) as unknown;
+  } catch {
+    throw new Error(`JSON parse failed at character ${start}.`);
+  }
 }

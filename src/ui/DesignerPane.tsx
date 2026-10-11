@@ -4,6 +4,7 @@ import { MAX_ATTACHMENTS, imagesFrom, prepareImage, type PreparedImage } from ".
 import { listen, voiceSupported, type VoiceSession } from "../lib/speech";
 import { useStudio, type Turn } from "../studio/store";
 import { AgentWorking } from "./AgentWorking";
+import { ErrorDetail } from "./ErrorDetail";
 import { text } from "./text";
 
 /**
@@ -325,6 +326,9 @@ function ExplainTurn({ turn }: { turn: Turn }) {
         {turn.request}
       </p>
       <p className="answer">{turn.answer ?? text.pane.explainBusy}</p>
+      {turn.outcome?.kind === "failed" ? (
+        <ErrorDetail failure={turn.outcome.failure} summary={turn.request} testId="turn-error-detail" />
+      ) : null}
     </article>
   );
 }
@@ -400,7 +404,12 @@ function DesignTurn({ turn }: { turn: Turn }) {
       {turn.adopted ? <p className="turn-foot good">{text.pane.adopted}</p> : null}
       {turn.discarded ? <p className="turn-foot">{text.pane.discarded}</p> : null}
       {!turn.adopted && !turn.discarded && outcome && outcomeCopy(turn) ? (
-        <p className={`turn-foot ${outcome.kind}`}>{outcomeCopy(turn)}</p>
+        <div className={`turn-foot ${outcome.kind}`}>
+          <p>{outcomeCopy(turn)}</p>
+          {outcome.kind === "failed" ? (
+            <ErrorDetail failure={outcome.failure} summary={turn.request} testId="turn-error-detail" />
+          ) : null}
+        </div>
       ) : null}
       {canAdopt ? (
         <div className="turn-actions">
@@ -428,7 +437,7 @@ function outcomeCopy(turn: Turn): string {
   if (!outcome) return "";
   if (outcome.kind === "cancelled") return text.pane.cancelled;
   if (outcome.kind === "blocked") return text.pane.blocked;
-  if (outcome.kind === "failed") return text.pane.failed;
+  if (outcome.kind === "failed") return outcome.failure.message;
   if (outcome.unverified) return text.pane.unverified;
   return "";
 }

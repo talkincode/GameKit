@@ -335,7 +335,7 @@ Worker 对每个 `/api/*` 请求校验 Access JWT（签名、aud、iss、过期�
 - **同步不静默覆盖。** 两台设备改了同一个项目时保留两份，让人选择；不做「最后写入者赢」。
 - **不做公开作品广场和社交功能。** 不做公开发布、评论、点赞、私信；它们带来的儿童内容审核和隐私责任超出本项目边界。
   分享只通过导出文件完成。
-- **不接入第三方统计、广告或追踪 SDK。** 服务端日志只记录诊断所需的元数据，不记录孩子的代码和提示词全文。
+- **不接入第三方统计、广告或追踪 SDK。** 服务端日志只记录诊断所需的元数据（`requestId`、操作、耗时、用量、失败分类），不记录孩子的代码和提示词全文。本机「日志」同样不上传。
 - **不托管成品游戏，不对接第三方发布平台账号。** 导出只生成文件（沿用现有边界）。
 
 ## 方向与意图
@@ -345,6 +345,8 @@ Worker 对每个 `/api/*` 请求校验 Access JWT（签名、aud、iss、过期�
 两个视图：**做游戏**（默认：舞台 + 一句话输入 + 每轮一张的对话卡）和 **看代码**（文件树、Monaco、控制台、调试）。
 中文优先（文案集中管理，便于以后加其他语言），大号可点目标、适配平板触控和键盘；进度只说行动，不展示模型内部推理。
 报错、空状态、加载、失败都用鼓励式短句，技术细节折叠在「看代码」里。服务于「孩子看得懂、敢动手」。
+小助手失败按原因换一句话（太忙、网络断了、请登录），旁边可以「查看详情」（分类、编号、时间、可公开的技术细节）。
+工作室有「日志」，记在这台电脑上，不上传，不需要登录。编号和 Worker 的 `requestId` 是同一个，方便大人到 Cloudflare 日志里查。
 
 - 游戏配方与分步教程
 
@@ -439,6 +441,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 | 代码编辑 | 已有 | 低 | ✅（在「与代码」视图里看到项目内容；三块面板可收拢） | 不适用 | 不适用 | 不适用（持久化见上一行） | `tests/e2e/agent.spec.ts`：`an idea becomes a candidate, and the child adopts it`；`tests/e2e/layout.spec.ts` |
 | 浏览器内运行 | 已有 | 中 | ✅（候选版本在舞台上跑起来，循环能拿到「在跑」证据） | ❌ 缺口（出错行定位） | 不适用 | 不适用（不改持久状态） | `tests/e2e/agent.spec.ts` 的每一条都要经过运行阶段；`src/lib/export.test.ts`（打包与模板）；`tests/e2e/issue-regressions.spec.ts`（停止/换项目取消启动中的预览、预览在独立来源的 iframe 里）、`src/lib/session.test.ts`（多标签页不清掉彼此的预览缓存）。画面本身与真实帧率仍需人工看 |
 | 诊断与报错 | 已有 | 中 | ✅（小助手靠静态检查发现 time.sleep 并修好） | ✅ 单元 | 不适用 | 不适用（只读） | `src/lib/diagnostics.test.ts`（含没有 Traceback 抬头的语法错误）；`tests/e2e/agent.spec.ts`：`a candidate the checks reject is repaired before the child sees it`；`tests/e2e/issue-regressions.spec.ts`：`export build errors are reported in the Problems panel` |
+| 本机日志与小助手错误详情 | 已有 | 中（看不懂失败、密钥进日志） | ✅（匿名打开「日志」，没有 `/api/` 请求；授权用户一轮结束后日志里有这一条） | ✅（上游 429：孩子看到「太忙」，点「查看详情」能看到 `requestId` 和状态码；页面和复制内容不含密钥） | ✅ 匿名可看日志 / 授权用户才会打到小助手 | ✅（清空前再问一次；失败不改作品，坏答案仍不写入） | `tests/e2e/logs.spec.ts`；`worker/index.test.ts`：`classifies a rate limit…`、`gives a refused sign-in a request id…`；`src/lib/log/journal.test.ts`；`src/lib/agent.test.ts`：`fails loudly when the model answer is unusable` |
 | AI 游戏设计器（Agent 循环） | 已有 | 高（改动作品、消耗额度） | ✅（想法 → 候选 → 采用 → 撤销；第二轮在已采用的基础上继续改；图片输入） | ✅（坏答案不写入；静态问题先修；修复超限停下；中途取消；换项目不串写；越界路径、二进制素材、超大文件；图片类型/张数/大小） | ✅ 匿名 / 授权 / 已登录未授权 | ✅（采用后撤销；取消、失败、登录丢失后作品不变） | `tests/e2e/agent.spec.ts`（7 条）、`tests/e2e/attachments.spec.ts`（3 条）、`tests/e2e/ask.spec.ts`（3 条）、`tests/e2e/account.spec.ts`（6 条）、`src/lib/agent.test.ts`（15 条）、`src/lib/ai.test.ts`（12 条）；`worker/index.test.ts`：`ai gateway` |
 | AI 讲解（只读） | 已有 | 低 | ✅（讲讲这段 → 对话面板里出现回答，项目不变） | ✅ 单元（模型没答好时显示「没想好」） | ✅ 匿名时不可用 / 授权可用 | 不适用（不写入） | `tests/e2e/account.spec.ts`：`allowed account: 讲讲这段 reads code and never rewrites the project`；`src/lib/ai.test.ts`：`asks for an explanation without allowing new files` |
 | 声音生成 | 已有 | 中（消耗额度、噪音扰人） | ✅（音效与音乐生成 → 试听 → 保存到项目 → 撤销） | ✅ 单元（参数越界全部夹紧、非 JSON 拒绝、确定性渲染、循环长度与首尾无爆音、WAV 头） | ✅ 匿名不可用 / 授权可用 | ✅（接受前不写入，保存后可撤销） | `tests/e2e/sounds.spec.ts`（3 条）、`src/lib/audio/render.test.ts`（10 条） |

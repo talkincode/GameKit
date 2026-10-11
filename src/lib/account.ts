@@ -1,3 +1,5 @@
+import { makeFailure, readPublicFailure, type PublicFailure } from "../../shared/assistant-error";
+
 /**
  * Sign-in state as the page sees it.
  *
@@ -23,7 +25,7 @@ export type SignInNote = "denied" | "failed" | "expired" | "unavailable" | "sign
 
 export type ApiOutcome<T> =
   | { ok: true; value: T }
-  | { ok: false; problem: "sign-in" | "denied" | "unavailable" | "offline" | "error"; message: string };
+  | { ok: false; problem: "sign-in" | "denied" | "unavailable" | "offline" | "error"; message: string; failure: PublicFailure };
 
 const HINT_KEY = "gamekit.signedIn";
 
@@ -60,11 +62,13 @@ export async function callApi<T>(path: string, init: RequestInit = {}): Promise<
   try {
     response = await fetch(path, { ...init, credentials: "same-origin", redirect: "manual" });
   } catch {
-    return { ok: false, problem: "offline", message: "The network request failed." };
+    const failure = makeFailure("network", "The network request failed.", "");
+    return { ok: false, problem: "offline", message: failure.message, failure };
   }
   // Cloudflare Access redirects to its login page when the session is missing.
   if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
-    return { ok: false, problem: "sign-in", message: "Sign in again." };
+    const failure = makeFailure("sign_in", "sign-in redirect", "");
+    return { ok: false, problem: "sign-in", message: failure.message, failure };
   }
   let payload: { error?: string; code?: string } & Record<string, unknown> = {};
   try {
@@ -72,12 +76,13 @@ export async function callApi<T>(path: string, init: RequestInit = {}): Promise<
   } catch {
     // A non-JSON answer is handled by the status checks below.
   }
-  const message = typeof payload.error === "string" ? payload.error : `HTTP ${response.status}`;
   if (response.ok) return { ok: true, value: payload as T };
-  if (response.status === 401) return { ok: false, problem: "sign-in", message };
-  if (response.status === 403) return { ok: false, problem: "denied", message };
-  if (response.status === 503) return { ok: false, problem: "unavailable", message };
-  return { ok: false, problem: "error", message };
+  const failure = readPublicFailure(payload, response.status);
+  const message = failure.message;
+  if (response.status === 401) return { ok: false, problem: "sign-in", message, failure };
+  if (response.status === 403) return { ok: false, problem: "denied", message, failure };
+  if (response.status === 503) return { ok: false, problem: "unavailable", message, failure };
+  return { ok: false, problem: "error", message, failure };
 }
 
 /** Asks the server who is signed in. Only call this when there is a sign-in hint. */

@@ -1,3 +1,5 @@
+import type { AssistantCode } from "../shared/assistant-error";
+
 /** Error codes the page understands. Keep in sync with `src/lib/account.ts`. */
 export type ErrorCode =
   | "sign_in_required"
@@ -7,13 +9,28 @@ export type ErrorCode =
   | "not_found"
   | "upstream_failed";
 
+export type HttpErrorExtra = {
+  /** Finer category for `/api/ai`. Identity routes leave this unset. */
+  assistantCode?: AssistantCode;
+  /** Public technical detail. Never the provider body or a secret. */
+  detail?: string;
+};
+
 export class HttpError extends Error {
+  readonly assistantCode?: AssistantCode;
+  readonly detail?: string;
+  /** Which AI operation was in progress, when this came from `/api/ai`. */
+  op = "";
+
   constructor(
     readonly status: number,
     readonly code: ErrorCode,
     message: string,
+    extra?: HttpErrorExtra,
   ) {
     super(message);
+    this.assistantCode = extra?.assistantCode;
+    this.detail = extra?.detail;
   }
 }
 

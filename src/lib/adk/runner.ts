@@ -6,6 +6,7 @@
  * one ADK run whose answer we parse exactly as before.
  */
 import { InMemorySessionService, LlmAgent, LlmSummarizer, Runner, TokenBasedContextCompactor } from "@google/adk";
+import { localRequestId, makeFailure } from "../../../shared/assistant-error";
 import { GatewayError, GatewayLlm } from "./model";
 import { ProjectSessionService } from "./session";
 
@@ -14,7 +15,7 @@ const KEEP_RECENT_EVENTS = 10;
 
 export type ProjectRunner = {
   sessionId: string;
-  run: (parts: { text?: string; inlineData?: { mimeType: string; data: string } }[]) => Promise<string>;
+  run: (parts: { text?: string; inlineData?: { mimeType: string; data: string } }[]) => Promise<{ text: string; requestId: string }>;
 };
 
 /** The only user of a project's conversation is the child who owns it. */
@@ -87,9 +88,11 @@ export function projectRunner(input: { system: string; sessionId: string; budget
       if (!answer.trim()) {
         // A refused sign-in or an offline gateway must reach the studio, not
         // disappear inside the event stream.
-        throw new GatewayError(llm.lastProblem ?? "failed");
+        throw new GatewayError(
+          llm.lastFailure ?? makeFailure("empty", "model returned an empty response", llm.lastRequestId || localRequestId()),
+        );
       }
-      return answer;
+      return { text: answer, requestId: llm.lastRequestId || localRequestId() };
     },
   };
   runners.set(key, created);

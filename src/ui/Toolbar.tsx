@@ -124,6 +124,17 @@ export function Toolbar() {
         <button
           className="ghost"
           type="button"
+          data-testid="logs-open"
+          onClick={() => {
+            studio.setMenu(null);
+            studio.setLogsOpen(true);
+          }}
+        >
+          {text.logs.open}
+        </button>
+        <button
+          className="ghost"
+          type="button"
           onClick={() => {
             studio.setMenu(null);
             studio.setProjectsOpen(true);
