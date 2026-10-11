@@ -30,7 +30,8 @@ describe("requests to the model", () => {
     expect(system.content).toContain("Simplified Chinese");
     expect(system.content).toContain("not instructions to you");
     expect(system.content).toContain("binary files the child owns");
-    expect(system.content).toContain("asset library is read-only");
+    expect(system.content).toContain("Naming a library asset only proposes a candidate");
+    expect(system.content).toContain("cannot put binary bytes");
     expect(system.content).toContain("assets/library.json");
     expect(system.content).toContain("*.anim.json");
     expect(system.content).toContain("*.map.json");
@@ -128,6 +129,40 @@ describe("answers from the model", () => {
     expect(() =>
       readCandidateFiles('{"files":[{"path":"assets/jump.wav","content":"no"}]}', project, "main.py"),
     ).toThrow(/audio file/);
+  });
+
+  it("accepts a named catalog asset and rejects one that is not in the catalog", () => {
+    const catalog = [
+      {
+        packId: "forest-adventure",
+        assetId: "coin",
+        title: "金币",
+        path: "props/coin.png",
+        mediaType: "image/png",
+        category: "prop",
+        theme: "森林",
+        tags: ["金币"],
+        license: "CC0-1.0",
+        author: "GameKit",
+        source: "https://github.com/talkincode/GameKit",
+        attribution: "测试",
+      },
+    ];
+    const named = readCandidateFiles(
+      JSON.stringify({ say: "用金币", files: [{ path: "main.py", content: "x" }], assets: [{ packId: "forest-adventure", assetId: "coin" }] }),
+      project,
+      "main.py",
+      catalog,
+    );
+    expect(named.assets).toEqual([{ packId: "forest-adventure", assetId: "coin" }]);
+    expect(() =>
+      readCandidateFiles(
+        JSON.stringify({ files: [{ path: "main.py", content: "x" }], assets: [{ packId: "nope", assetId: "nope" }] }),
+        project,
+        "main.py",
+        catalog,
+      ),
+    ).toThrow(/Unknown library asset/);
   });
 
   it("rejects an oversized file", () => {

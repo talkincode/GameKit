@@ -26,6 +26,8 @@ export type CollabCandidate = {
   tool: string;
   say: string;
   files: { path: string; text: string }[];
+  /** Catalog ids to copy when the child adopts. Not file bytes. */
+  assets?: { packId: string; assetId: string }[];
   createdAt: number;
   adopted?: boolean;
   discarded?: boolean;
@@ -120,6 +122,7 @@ export class CollabSession extends DurableObject<GameKitEnv> {
     tool: string;
     say: string;
     files: { path: string; text: string }[];
+    assets?: { packId: string; assetId: string }[];
   }): Promise<{ candidateId: string }> {
     const state = await this.load();
     if (!state) throw new Error("No collaboration session is open for this project.");
@@ -128,6 +131,7 @@ export class CollabSession extends DurableObject<GameKitEnv> {
       tool: input.tool,
       say: input.say,
       files: input.files,
+      assets: input.assets,
       createdAt: Date.now(),
     };
     state.candidates = [...state.candidates, candidate].slice(-MAX_CANDIDATES);

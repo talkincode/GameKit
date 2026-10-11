@@ -81,6 +81,27 @@ function testEnv(): GameKitEnv {
   };
 }
 
+describe("catalog search is not anonymous on the MCP channel", () => {
+  it("refuses search_assets without a token", async () => {
+    const env = testEnv();
+    const response = await worker.fetch(
+      new Request("https://gamekit.talkincode.net/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "search_assets", arguments: { query: "金币" } },
+        }),
+      }) as never,
+      env,
+      {} as never,
+    );
+    expect(response.status).toBe(401);
+  });
+});
+
 describe("MCP OAuth discovery and endpoints", () => {
   it("challenges unauthenticated requests to /mcp with 401 and resource_metadata", async () => {
     const env = testEnv();
@@ -419,6 +440,47 @@ describe("OAuth 2.1 full authorization & MCP collaboration loop", () => {
     expect(audioText).toContain("声音文件要孩子自己");
     expect(audioText).not.toContain("已交给孩子确认");
 
+    const searchReq = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: bearer,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 45,
+        method: "tools/call",
+        params: { name: "search_assets", arguments: { query: "金币" } },
+      }),
+    });
+    const searchRes = await worker.fetch(searchReq as never, env, {} as never);
+    expect(searchRes.status).toBe(200);
+    const searchText = await searchRes.text();
+    expect(searchText).toContain("只读检索");
+    expect(searchText).toContain("forest-adventure/coin");
+    expect(searchText).not.toContain("已交给孩子确认");
+
+    const missingAsset = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: bearer,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 46,
+        method: "tools/call",
+        params: { name: "propose_asset", arguments: { packId: "forest-adventure", assetId: "no-such", say: "没有的图" } },
+      }),
+    });
+    const missingRes = await worker.fetch(missingAsset as never, env, {} as never);
+    expect(missingRes.status).toBe(200);
+    const missingText = await missingRes.text();
+    expect(missingText).toContain("没有这个");
+    expect(missingText).not.toContain("已交给孩子确认");
+
     // 11. Child's studio polls /api/collab/sync and receives the candidate
     const syncReq = new Request("http://localhost/api/collab/sync", {
       method: "POST",
@@ -478,5 +540,93 @@ describe("OAuth 2.1 full authorization & MCP collaboration loop", () => {
     expect(actRes.status).toBe(200);
     const actText = await actRes.text();
     expect(actText).toContain(`孩子采用了 ${candidateId}`);
+
+    const assetReq = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: bearer,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 47,
+        method: "tools/call",
+        params: { name: "propose_asset", arguments: { packId: "forest-adventure", assetId: "coin", say: "用这枚金币" } },
+      }),
+    });
+    const assetRes = await worker.fetch(assetReq as never, env, {} as never);
+    expect(assetRes.status).toBe(200);
+    const assetText = await assetRes.text();
+    expect(assetText).toContain("已交给孩子确认");
+    expect(assetText).not.toContain("iVBOR");
+
+    const assetSync = await worker.fetch(
+      new Request("http://localhost/api/collab/sync", {
+        method: "POST",
+        headers: { Cookie: devCookie, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          snapshot: {
+            projectId: "proj-123",
+            name: "弹球小游戏",
+            files: [{ path: "main.py", text: "import pygame\nSPEED = 5\n" }],
+          },
+        }),
+      }) as never,
+      env,
+      {} as never,
+    );
+    expect(assetSync.status).toBe(200);
+    const assetData = (await assetSync.json()) as {
+      candidates: { say: string; files: { path: string; text: string }[]; assets?: { packId: string; assetId: string }[] }[];
+    };
+    expect(assetData.candidates).toHaveLength(1);
+    expect(assetData.candidates[0].say).toBe("用这枚金币");
+    expect(assetData.candidates[0].assets).toEqual([{ packId: "forest-adventure", assetId: "coin" }]);
+    expect(assetData.candidates[0].files[0].path).toBe("examples/load-coin.py");
+    expect(assetData.candidates[0].files[0].text).not.toMatch(/[A-Za-z0-9+/]{40,}/);
+
+    const clash = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: bearer,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 48,
+        method: "tools/call",
+        params: {
+          name: "propose_asset",
+          arguments: { packId: "forest-adventure", assetId: "coin", say: "再盖一次" },
+        },
+      }),
+    });
+    // The published snapshot still has no coin, so a second propose is another candidate.
+    // Publishing the path makes the next propose refuse to overwrite.
+    await worker.fetch(
+      new Request("http://localhost/api/collab/sync", {
+        method: "POST",
+        headers: { Cookie: devCookie, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          settled: [],
+          snapshot: {
+            projectId: "proj-123",
+            name: "弹球小游戏",
+            files: [
+              { path: "main.py", text: "import pygame\n" },
+              { path: "assets/library/forest-adventure/props/coin.png", bytes: 12 },
+            ],
+          },
+        }),
+      }) as never,
+      env,
+      {} as never,
+    );
+    const clashRes = await worker.fetch(clash as never, env, {} as never);
+    const clashText = await clashRes.text();
+    expect(clashText).toContain("不能盖掉");
+    expect(clashText).not.toContain("已交给孩子确认");
   });
 });
