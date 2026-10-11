@@ -3,6 +3,7 @@ import { strToU8, unzipSync, zipSync } from "fflate";
 import { createPixels } from "../../src/lib/pixel/buffer";
 import { encodePng } from "../../src/lib/pixel/png";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel } from "./nav";
 
 // 像素编辑器 / 新建图片：不登录、不要模型。The child draws on a real canvas, the PNG
 // that lands in assets/ is read back from IndexedDB and decoded by the browser,
@@ -553,7 +554,7 @@ test("a drawn picture is in the exported zips, byte for byte", async ({ page }) 
   await page.getByTestId("pixel-close").click();
   const bytes = Uint8Array.from(Buffer.from(png.base64, "base64"));
 
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   const [source] = await Promise.all([
     page.waitForEvent("download"),
     page.getByTestId("projects-panel").getByRole("button", { name: text.project.exportSource, exact: true }).first().click(),
@@ -599,7 +600,7 @@ test("pygame in the preview loads the pictures that were drawn and edited", asyn
   const archive = Buffer.from(zipSync({ "main.py": strToU8(game), "assets/hero.png": hero }));
 
   await page.goto("/");
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await page.getByTestId("projects-panel").locator('input[type="file"]').setInputFiles({ name: "pixel-game.zip", mimeType: "application/zip", buffer: archive });
   await expect(page.getByTestId("projects-panel")).toHaveCount(0);
 

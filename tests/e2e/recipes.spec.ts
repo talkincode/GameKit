@@ -3,6 +3,7 @@ import { strToU8, zipSync } from "fflate";
 import { createPixels } from "../../src/lib/pixel/buffer";
 import { encodePng } from "../../src/lib/pixel/png";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel, openRecipes } from "./nav";
 
 // 配方、分步挑战、素材提议。不登录就能做。检查看源码和舞台标记，不请模型打分。
 // 做成候选不会写作品；丢掉或冲突则项目不变；采用之后可以撤销。
@@ -54,7 +55,7 @@ async function fileText(page: Page, name: string, path: string): Promise<string 
 }
 
 async function openRecipes(page: Page) {
-  await page.getByTestId("recipes-open").click();
+  await openRecipes(page);
   await expect(page.getByTestId("recipes-dialog")).toBeVisible();
 }
 
@@ -146,7 +147,7 @@ test("an anonymous child starts a recipe without covering the old project, and t
   await expect(page.getByTestId("challenge-result")).toHaveAttribute("data-ok", "true");
   await page.getByTestId("challenge-dialog").getByRole("button", { name: text.recipes.close }).click();
 
-  await page.getByRole("button", { name: text.header.undoShort, exact: true }).click();
+  await page.getByTestId("undo").click();
   await expect.poll(async () => fileText(page, "平台跳跃", "main.py")).toContain("JUMP = -9");
   expect(await fileText(page, starter.name, "main.py")).toBe(starterMain);
   await openRecipes(page);
@@ -184,12 +185,12 @@ test("proposing a catalog picture stays a candidate, and a different file is not
   await expect.poll(async () => (await storedFile(page, "my-cool-game", COIN))?.base64 ?? null).not.toBeNull();
   expect(await fileText(page, "my-cool-game", "examples/load-coin.py")).toContain("pygame.image.load");
 
-  await page.getByRole("button", { name: text.header.undoShort, exact: true }).click();
+  await page.getByTestId("undo").click();
   await expect.poll(async () => storedFile(page, "my-cool-game", COIN)).toBeNull();
 
   const old = encodePng(createPixels(2, 2, [200, 40, 40, 255]));
   const archive = Buffer.from(zipSync({ "main.py": strToU8("print('keep')\n"), [COIN]: old }));
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await page.getByTestId("projects-panel").locator('input[type="file"]').setInputFiles({
     name: "clash.zip",
     mimeType: "application/zip",

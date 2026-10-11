@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { text } from "../../src/ui/text";
 
-// 看代码 的版面：三块面板各自可以收拢，右侧「撤销」是图标加一个字。
+// 看代码 的版面：三块面板各自可以收拢。开关在编辑区标签栏。撤销是顶栏上的图标按钮。
 
 test("the code view panels collapse, and the choice sticks", async ({ page }) => {
   await page.goto("/");
@@ -39,10 +39,12 @@ test("the code view panels collapse, and the choice sticks", async ({ page }) =>
   await expect(page.locator(".sidebar")).toBeVisible();
 });
 
-test("undo is an icon with a word, and says what it does", async ({ page }) => {
+test("undo is an icon button, and says what it does", async ({ page }) => {
   await page.goto("/");
-  const undo = page.getByRole("button", { name: text.header.undoShort });
+  const undo = page.getByTestId("undo");
   await expect(undo).toBeVisible();
   await expect(undo).toHaveAttribute("title", text.header.undo);
+  await expect(undo).toHaveAttribute("aria-label", text.header.undo);
+  await expect(undo).toHaveText("");
   await expect(undo).toBeDisabled();
 });

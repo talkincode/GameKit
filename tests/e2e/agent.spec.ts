@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel } from "./nav";
 
 // The agent loop end to end against the real Worker: idea → candidate → adopt.
 // The model is the mock in tests/e2e/mock-model.mjs; the pygame runtime needs the
@@ -159,7 +160,7 @@ test("a round that is still running cannot write into another project", async ({
   await page.getByLabel(text.pane.placeholder).fill(IDEA);
   await page.getByRole("button", { name: text.pane.send }).click();
   // Switch projects while the round is in flight (the panel's 复制 makes a copy and opens it).
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await page
     .getByTestId("projects-panel")
     .locator(".project-card")

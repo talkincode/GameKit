@@ -5,6 +5,7 @@ import { sha256Hex } from "../../src/lib/assets/hash";
 import { projectFromArchive } from "../../src/lib/export";
 import { auditExportedProject, auditWebArchive } from "../../src/lib/offline";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel, openRecipes } from "./nav";
 
 // 阶段 G：配方项目里再放入素材库副本、动画、地图和声音。
 // 源码包和网页包都不请求 GameKit 或在线素材目录，文件 hash 和钉住的副本一致。
@@ -48,7 +49,7 @@ test("a recipe project with library, animation, map, and sound exports offline",
   const starter = (await storedProjects(page))[0];
   const starterMain = starter.files.find((file) => file.path === "main.py")?.text ?? "";
 
-  await page.getByTestId("recipes-open").click();
+  await openRecipes(page);
   await page.getByTestId("recipe-new-platform").click();
   await expect(page.getByTestId("recipes-dialog")).toHaveCount(0);
   await expect.poll(async () => (await storedProjects(page)).length).toBe(2);
@@ -108,7 +109,7 @@ test("a recipe project with library, animation, map, and sound exports offline",
     page.getByRole("button", { name: new RegExp(text.export.web) }).click(),
   ]);
 
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await expect(page.getByTestId("export-source-hint")).toContainText("不用联网找素材");
   const [source] = await Promise.all([
     page.waitForEvent("download"),

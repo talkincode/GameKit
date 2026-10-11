@@ -1,18 +1,19 @@
 import { expect, test, type Page } from "@playwright/test";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel } from "./nav";
 
 // 我的项目：a panel of its own. Search, open, rename, duplicate, export, delete —
 // all through the studio's actions, and a delete always asks first.
 
 async function openProjects(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await expect(page.getByTestId("projects-panel")).toBeVisible();
 }
 
 /** 新建/复制/删除 change the open project, and that closes the panel. */
 async function reopen(page: Page) {
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await expect(page.getByTestId("projects-panel")).toBeVisible();
 }
 

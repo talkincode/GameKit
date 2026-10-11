@@ -2,6 +2,7 @@ import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { ASSISTANT_SAY } from "../../shared/assistant-error";
 import { text } from "../../src/ui/text";
+import { openLogs } from "./nav";
 
 const ALLOWED = "kid@example.com";
 const MODEL = "http://127.0.0.1:4199";
@@ -28,7 +29,7 @@ test("anonymous: the log panel opens without an identity request", async ({ page
   });
   await page.goto("/");
   await expect(page.getByTestId("stage")).toBeVisible();
-  await page.getByTestId("logs-open").click();
+  await openLogs(page);
   await expect(page.getByTestId("logs-panel")).toBeVisible();
   await expect(page.getByTestId("logs-empty")).toHaveText(text.logs.empty);
   expect(api).toEqual([]);
@@ -67,7 +68,7 @@ test("an upstream rate limit shows a detail link, a request id, and a local log 
   expect(copied).toContain("rate_limit");
   expect(copied).not.toContain("e2e-key");
 
-  await page.getByTestId("logs-open").click();
+  await openLogs(page);
   const row = page.locator(`[data-testid="log-row"][data-request-id="${requestId}"]`);
   await expect(row).toBeVisible();
   await expect(row).toContainText(ASSISTANT_SAY.rate_limit);
@@ -86,7 +87,7 @@ test("an upstream rate limit shows a detail link, a request id, and a local log 
 
   await page.getByRole("button", { name: text.logs.close }).click();
   await page.reload();
-  await page.getByTestId("logs-open").click();
+  await openLogs(page);
   await expect(page.locator(`[data-testid="log-row"][data-request-id="${requestId}"]`)).toBeVisible();
 
   await page.getByTestId("logs-clear").click();

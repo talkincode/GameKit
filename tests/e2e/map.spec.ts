@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { unzipSync } from "fflate";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel } from "./nav";
 
 // 瓦片地图：不登录。画关、碰撞、出生点和物件保存后能重新打开；
 // 地图包导入后和原来一致；源码包里是 JSON + CSV + PNG；舞台上的 pygame 打出同一组碰撞和出生点。
@@ -202,7 +203,7 @@ test("anonymous: a painted map is saved, reopened, exported, and played by pygam
   await expect(page.locator(".console")).toContainText("MAP-TILE 56 183 100 255");
   await expect(page.locator(".console")).toContainText("MAP-OBJECTS 1");
 
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   const [source] = await Promise.all([
     page.waitForEvent("download"),
     page.getByTestId("projects-panel").getByRole("button", { name: text.project.exportSource, exact: true }).first().click(),
@@ -221,7 +222,7 @@ test("anonymous: a painted map is saved, reopened, exported, and played by pygam
   expect(loader).not.toContain("import gamekit");
   await page.keyboard.press("Escape");
 
-  await page.getByRole("button", { name: text.header.undoShort, exact: true }).click();
+  await page.getByTestId("undo").click();
   await expect.poll(async () => (await fileOf(page, "main.py"))?.text ?? "").not.toContain("MAP-OK");
   await expect.poll(async () => fileOf(page, "map_loader.py")).toBeNull();
   expect((await fileOf(page, DOC))?.text).toContain('"tileX": 2');

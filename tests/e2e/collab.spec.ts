@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { text } from "../../src/ui/text";
+import { openSettings } from "./nav";
 
 const ALLOWED = "kid@example.com";
 
@@ -15,7 +16,7 @@ test("anonymous user cannot start MCP collaboration", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("stage")).toBeVisible();
 
-  await page.getByTestId("settings-open").click();
+  await openSettings(page);
   const panel = page.getByTestId("settings-panel");
   await expect(panel).toBeVisible();
 
@@ -30,7 +31,7 @@ test("anonymous user cannot start MCP collaboration", async ({ page }) => {
 test("signed-in user can start collaboration, see active badge, and stop", async ({ page }) => {
   await signIn(page, ALLOWED);
 
-  await page.getByTestId("settings-open").click();
+  await openSettings(page);
   const panel = page.getByTestId("settings-panel");
   await expect(panel).toBeVisible();
 
@@ -97,7 +98,7 @@ test("external MCP proposal appears as candidate, can be adopted and undone", as
   });
 
   await signIn(page, ALLOWED);
-  await page.getByTestId("settings-open").click();
+  await openSettings(page);
   await page.getByTestId("collab-toggle").click();
   await page.getByTestId("settings-close").click();
 
@@ -162,7 +163,7 @@ test("external MCP proposal can be discarded without changing files", async ({ p
   });
 
   await signIn(page, ALLOWED);
-  await page.getByTestId("settings-open").click();
+  await openSettings(page);
   await page.getByTestId("collab-toggle").click();
   await page.getByTestId("settings-close").click();
 

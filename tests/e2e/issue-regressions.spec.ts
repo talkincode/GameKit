@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { text } from "../../src/ui/text";
+import { openProjectsPanel } from "./nav";
 
 async function openCode(page: Page) {
   await page.goto("/");
@@ -8,7 +9,7 @@ async function openCode(page: Page) {
 }
 
 async function createSecondProject(page: Page, name: string) {
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   page.once("dialog", (dialog) => void dialog.accept(name));
   await page.getByTestId("projects-panel").getByRole("button", { name: new RegExp(text.project.newProject) }).click();
 }
@@ -28,7 +29,7 @@ test("undo history is cleared when opening a different project", async ({ page }
 test("switching projects flushes the pending text save", async ({ page }) => {
   await openCode(page);
   await createSecondProject(page, "second-project");
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await page.getByTestId("projects-panel").locator(".project-card", { hasText: "my-cool-game" }).locator(".project-open").click();
   await page.getByRole("tab", { name: text.header.code }).click();
   const projectId = await page.evaluate(() => localStorage.getItem("gamekit.active"));
@@ -47,7 +48,7 @@ test("switching projects flushes the pending text save", async ({ page }) => {
   await page.keyboard.type("# flush-on-project-switch");
   await expect(editor).toContainText("flush-on-project-switch");
   await page.waitForTimeout(50);
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await page.getByTestId("projects-panel").locator(".project-card", { hasText: "second-project" }).locator(".project-open").click();
 
   const saved = await page.evaluate(async (id) => {
@@ -118,7 +119,7 @@ test("switching projects cancels a pending preview startup", async ({ page }) =>
   await createSecondProject(page, "second-project");
   await page.getByRole("button", { name: text.stage.play }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { __serviceWorkerStarted?: boolean }).__serviceWorkerStarted)).toBe(true);
-  await page.getByRole("button", { name: text.header.project, exact: true }).click();
+  await openProjectsPanel(page);
   await page.getByTestId("projects-panel").locator(".project-card", { hasText: "my-cool-game" }).locator(".project-open").click();
   await page.evaluate(() => (window as unknown as { __releaseServiceWorker: () => void }).__releaseServiceWorker());
   await expect(page.locator("iframe")).toHaveAttribute("src", "about:blank");
