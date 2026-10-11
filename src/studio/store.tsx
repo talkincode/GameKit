@@ -65,6 +65,9 @@ import { parseHex } from "../lib/pixel/buffer";
 import { canEditPixels, checkSize, imagePath } from "../lib/pixel/rules";
 import { animationSidecarPath } from "../lib/pixel/anim";
 import { planAnimExample, planPixelSave, type AnimExampleInput, type AnimExampleResult, type PixelSaveFailure, type PixelSaveInput } from "../lib/pixel/save";
+import { collisionCsvPath, layerCsvPath, mapDocumentPath, slugFromDocumentPath, tilesetPath, type MapFileBlob } from "../lib/map/document";
+import { cleanMapName, createMap, isMapSlug } from "../lib/map/model";
+import { planMapExample, planMapSave, type MapExampleInput, type MapExampleResult, type MapSaveFailure, type MapSaveInput } from "../lib/map/save";
 import { discardPlay, downloadBytes, ensurePlayerServiceWorker, publishPlay } from "../lib/session";
 import { budgetFor, loadSettings, saveSettings, type Settings } from "../lib/settings";
 import { renderMusic, renderSfx } from "../lib/audio/render";
@@ -126,6 +129,22 @@ export type PixelSession = PixelOpen & { id: number; projectId: string };
 export type PixelNewInput = { path: string; width: unknown; height: unknown; background: string | null };
 
 export type PixelSaveResult = { ok: true; path: string } | { ok: false; reason: PixelSaveFailure };
+
+export type MapNewInput = {
+  slug: string;
+  name: string;
+  columns: number;
+  rows: number;
+  tileWidth: number;
+  tileHeight: number;
+};
+
+export type MapOpen = ({ source: "new" } & MapNewInput) | { source: "file"; path: string; files: MapFileBlob[] };
+
+/** An open map editor, pinned to the project it was opened for. */
+export type MapSession = MapOpen & { id: number; projectId: string };
+
+export type MapSaveResult = { ok: true; path: string } | { ok: false; reason: MapSaveFailure };
 
 /**
  * One round in the conversation pane. It is a record of what happened, not a
@@ -241,6 +260,21 @@ type StudioValue = {
   savePixelImage: (input: PixelSaveInput) => Promise<PixelSaveResult>;
   /** Puts the pygame helper in the project. Replaces main.py only when `mainText` is set. */
   saveAnimExample: (input: AnimExampleInput) => Promise<AnimExampleResult>;
+  mapNewOpen: boolean;
+  setMapNewOpen: (open: boolean) => void;
+  mapSession: MapSession | null;
+  /** Opens a blank map. False when the name is taken or the size is not allowed. */
+  startMapNew: (input: MapNewInput) => boolean;
+  /** Opens a saved `.map.json`. False when the path is not a map document. */
+  editMapFile: (path: string) => boolean;
+  closeMapEditor: () => void;
+  /**
+   * The only way the map editor writes. Files land on disk before memory
+   * changes, so a failed write leaves the project and the canvas as they were.
+   */
+  saveMap: (input: MapSaveInput) => Promise<MapSaveResult>;
+  /** Puts map_loader.py in the project. Replaces main.py only when `mainText` is set. */
+  saveMapExample: (input: MapExampleInput) => Promise<MapExampleResult>;
   soundKind: SoundKind;
   setSoundKind: (kind: SoundKind) => void;
   aiBusy: boolean;
@@ -367,6 +401,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [pixelNewOpen, setPixelNewOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [pixelSession, setPixelSession] = useState<PixelSession | null>(null);
+  const [mapNewOpen, setMapNewOpen] = useState(false);
+  const [mapSession, setMapSession] = useState<MapSession | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [bottomTab, setBottomTab] = useState<"console" | "problems" | "debug">("console");
@@ -399,10 +435,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const saveChain = useRef<Promise<void>>(Promise.resolve());
   const pixelSessionRef = useRef(pixelSession);
   pixelSessionRef.current = pixelSession;
+  const mapSessionRef = useRef(mapSession);
+  mapSessionRef.current = mapSession;
   // Read at the moment of closing, not at the render the click came from: 保存并关闭 consumes the draft first.
   const assetDraftRef = useRef(assetDraft);
   assetDraftRef.current = assetDraft;
   const pixelCount = useRef(0);
+  const mapCount = useRef(0);
+
+  useEffect(() => {
+    if (mapSession && mapSession.projectId !== project?.id) setMapSession(null);
+  }, [project?.id, mapSession]);
 
   useEffect(() => {
     let cancel = false;
@@ -622,6 +665,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     if (!current) return;
     pixelCount.current += 1;
     setPixelNewOpen(false);
+    setMapNewOpen(false);
+    setMapSession(null);
     setPixelSession({ ...open, id: pixelCount.current, projectId: current.id });
   }, []);
 
@@ -740,6 +785,103 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           return next;
         }),
       );
+      if (plan.main) setPath("main.py");
+      return { ok: true, changed: true, module: plan.module, main: plan.main };
+    },
+    [flushSave],
+  );
+
+  const openMapEditor = useCallback((open: MapOpen) => {
+    const current = projectRef.current;
+    if (!current) return;
+    mapCount.current += 1;
+    setMapNewOpen(false);
+    setPixelNewOpen(false);
+    setPixelSession(null);
+    setMapSession({ ...open, id: mapCount.current, projectId: current.id });
+  }, []);
+
+  const startMapNew = useCallback(
+    (input: MapNewInput) => {
+      const current = projectRef.current;
+      if (!current || !isMapSlug(input.slug) || !cleanMapName(input.name) || !createMap(input)) return false;
+      const paths = [mapDocumentPath(input.slug), tilesetPath(input.slug), collisionCsvPath(input.slug), layerCsvPath(input.slug, "ground")];
+      if (paths.some((path) => !path || current.files.some((file) => file.path === path))) return false;
+      openMapEditor({ source: "new", ...input });
+      return true;
+    },
+    [openMapEditor],
+  );
+
+  const editMapFile = useCallback(
+    (filePath: string) => {
+      const current = projectRef.current;
+      const slug = slugFromDocumentPath(filePath);
+      if (!current || !slug) return false;
+      const prefix = `maps/${slug}.`;
+      const files = current.files
+        .filter((file) => file.path === filePath || file.path.startsWith(prefix))
+        .map((file) => ({ path: file.path, text: file.text, bytes: file.bytes ? new Uint8Array(file.bytes) : undefined }));
+      if (!files.some((file) => file.path === filePath && typeof file.text === "string")) return false;
+      openMapEditor({ source: "file", path: filePath, files });
+      return true;
+    },
+    [openMapEditor],
+  );
+
+  const closeMapEditor = useCallback(() => {
+    setMapSession(null);
+  }, []);
+
+  const saveMap = useCallback(
+    async (input: MapSaveInput): Promise<MapSaveResult> => {
+      const session = mapSessionRef.current;
+      const base = projectRef.current;
+      const plan = planMapSave(base, session?.projectId ?? null, input);
+      if (!base || !plan.ok) return plan.ok ? { ok: false, reason: "no-project" } : plan;
+      flushSave();
+      const written = saveChain.current.then(() => saveProject(plan.next));
+      saveChain.current = written.then(
+        () => undefined,
+        () => undefined,
+      );
+      try {
+        await written;
+      } catch (error) {
+        console.warn("Saving the map failed:", error);
+        return { ok: false, reason: "write-failed" };
+      }
+      setUndoStack((stack) => [...stack, { projectId: base.id, files: base.files, design: base.design, trash: base.trash }].slice(-20));
+      if (projectRef.current?.id === plan.next.id) projectRef.current = plan.next;
+      setProjects((current) => current.map((item) => (item.id === plan.next.id ? plan.next : item)));
+      setPath(plan.documentPath);
+      return { ok: true, path: plan.documentPath };
+    },
+    [flushSave],
+  );
+
+  const saveMapExample = useCallback(
+    async (input: MapExampleInput): Promise<MapExampleResult> => {
+      const session = mapSessionRef.current;
+      const base = projectRef.current;
+      const plan = planMapExample(base, session?.projectId ?? null, input);
+      if (!base || !plan.ok) return plan.ok ? { ok: false, reason: "no-project" } : plan;
+      if (!plan.changed) return { ok: true, changed: false, module: plan.module, main: plan.main };
+      flushSave();
+      const written = saveChain.current.then(() => saveProject(plan.next));
+      saveChain.current = written.then(
+        () => undefined,
+        () => undefined,
+      );
+      try {
+        await written;
+      } catch (error) {
+        console.warn("Saving the map example failed:", error);
+        return { ok: false, reason: "write-failed" };
+      }
+      setUndoStack((stack) => [...stack, { projectId: base.id, files: base.files, design: base.design, trash: base.trash }].slice(-20));
+      if (projectRef.current?.id === plan.next.id) projectRef.current = plan.next;
+      setProjects((current) => current.map((item) => (item.id === plan.next.id ? plan.next : item)));
       if (plan.main) setPath("main.py");
       return { ok: true, changed: true, module: plan.module, main: plan.main };
     },
@@ -1641,6 +1783,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       closePixelEditor,
       savePixelImage,
       saveAnimExample,
+      mapNewOpen,
+      setMapNewOpen,
+      mapSession,
+      startMapNew,
+      editMapFile,
+      closeMapEditor,
+      saveMap,
+      saveMapExample,
     };
   }, [
     ready,
@@ -1699,6 +1849,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     closePixelEditor,
     savePixelImage,
     saveAnimExample,
+    mapNewOpen,
+    mapSession,
+    startMapNew,
+    editMapFile,
+    closeMapEditor,
+    saveMap,
+    saveMapExample,
     aiBusy,
     notice,
     bottomTab,

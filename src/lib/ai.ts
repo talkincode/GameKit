@@ -1,6 +1,7 @@
 import { designFromRecord, designText, type DesignCard } from "./design";
 import type { Problem } from "./diagnostics";
 import { PINS_PATH } from "./assets/copy";
+import { isMapDataPath } from "./map/document";
 import { normalizePath, type Project, type ProjectFile } from "./project";
 
 export type ChatMessage = { role: "system" | "user"; content: string | ChatPart[] };
@@ -45,6 +46,7 @@ Code rules:
 - Never write to assets/ in a reply: images, sounds and fonts are binary files the child owns.
 - The built-in asset library is read-only for you. You cannot copy a library file into the project, and you cannot rewrite assets/library.json. The child adds those files. You may load a picture that is already in the project with pygame.image.load.
 - Sprite animation notes (*.anim.json) belong to the child. Do not rewrite them. Play a saved sheet with ordinary pygame: load the PNG, read the JSON, and blit frames by durationMs.
+- Tile maps (*.map.json, maps/*.csv, and *.tileset.png) belong to the child. Do not rewrite them. Load a saved map with ordinary pygame: read the JSON, the collision CSV, and the tileset PNG.
 - Write code a kid can read: meaningful names, short functions, a few short comments in simple Simplified Chinese. Avoid advanced features the project does not already use.
 Talking to the child:
 - Write "say" in Simplified Chinese, at the level of a teenager who is new to programming: everyday words, short sentences, no jargon (say 帧循环 not "game loop 架构"), no English terms unless pygame itself uses them, never blaming.
@@ -108,10 +110,12 @@ export function readCandidateFiles(raw: string, project: Project, fallbackPath: 
     if (!item || typeof item !== "object") continue;
     const entry = item as { path?: unknown; content?: unknown };
     const path = normalizePath(typeof entry.path === "string" ? entry.path : fallbackPath);
-    const allowed = !!path && [".py", ".txt", ".toml", ".json", ".md"].some((ext) => path.endsWith(ext));
-    if (!path || !allowed) throw new Error(`Rejected a file outside the text-edit scope: ${String(entry.path)}`);
+    if (!path) throw new Error(`Rejected a file outside the text-edit scope: ${String(entry.path)}`);
     if (path === PINS_PATH) throw new Error("AI cannot rewrite the asset library record.");
     if (path.endsWith(".anim.json")) throw new Error("AI cannot rewrite a sprite animation note.");
+    if (isMapDataPath(path)) throw new Error("AI cannot rewrite a tile map.");
+    const allowed = [".py", ".txt", ".toml", ".json", ".md"].some((ext) => path.endsWith(ext));
+    if (!allowed) throw new Error(`Rejected a file outside the text-edit scope: ${String(entry.path)}`);
     if (project.files.some((file) => file.path === path && file.bytes)) {
       throw new Error(`AI cannot replace the binary asset ${path}.`);
     }
@@ -163,7 +167,7 @@ export function buildMessages(input: { request: string; design: DesignCard; base
         `${designBlock(input.design)}\n` +
         `现在项目里的文件：\n${filesForPrompt(input.base.files, MESSAGE_BUDGET - 4_000) || "（空项目）"}\n` +
         `把这张设计卡做成能玩的游戏，写出完整的文件（不是片段）。必须包含 main.py。\n` +
-        `沿用项目里已经在用的结构和命名；可以新增 .py 文件；不要改动 assets/ 里的二进制素材，也不要改 assets/library.json 或 *.anim.json。素材库里的图要孩子自己复制进项目。动画帧也要孩子自己在像素编辑器里改。\n` +
+        `沿用项目里已经在用的结构和命名；可以新增 .py 文件；不要改动 assets/ 里的二进制素材，也不要改 assets/library.json、*.anim.json 或地图文件（*.map.json、maps/*.csv、*.tileset.png）。素材库里的图要孩子自己复制进项目。动画帧和地图也要孩子自己在编辑器里改。\n` +
         `返回 {"say":"给孩子的一句话","files":[{"path":"main.py","content":"整个文件"}]}，最多 6 个文件。`,
     },
   ];

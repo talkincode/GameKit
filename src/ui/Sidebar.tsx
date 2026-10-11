@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { canEditPixels } from "../lib/pixel/rules";
+import { isMapDocument } from "../lib/map/document";
 import { assetFilter, fileTree, mediaType, normalizePath, type TrashedFile, type TreeNode } from "../lib/project";
 import { useStudio } from "../studio/store";
 import { text } from "./text";
@@ -98,6 +99,10 @@ export function Sidebar() {
               <IconPixel />
               {text.pixel.newImage}
             </button>
+            <button type="button" data-testid="map-new" title={text.map.newMapHint} onClick={() => studio.setMapNewOpen(true)}>
+              <IconMap />
+              {text.map.newMap}
+            </button>
           </div>
 
           {editing?.kind === "new" ? (
@@ -127,6 +132,7 @@ export function Sidebar() {
                 confirming={confirming}
                 onOpen={studio.setPath}
                 onEditPixels={studio.editPixelFile}
+                onEditMap={studio.editMapFile}
                 onStartRename={startRename}
                 onChangeDraft={setDraft}
                 onSubmitRename={submit}
@@ -198,6 +204,10 @@ export function Sidebar() {
             <button type="button" data-testid="pixel-new" title={text.pixel.newImageHint} onClick={() => studio.setPixelNewOpen(true)}>
               <IconPixel />
               {text.pixel.newImage}
+            </button>
+            <button type="button" data-testid="map-new" title={text.map.newMapHint} onClick={() => studio.setMapNewOpen(true)}>
+              <IconMap />
+              {text.map.newMap}
             </button>
             <button type="button" title={text.code.generateHint} onClick={() => studio.setAssetOpen(true)}>
               <IconSparkle />
@@ -309,6 +319,7 @@ function Node({
   confirming,
   onOpen,
   onEditPixels,
+  onEditMap,
   onStartRename,
   onChangeDraft,
   onSubmitRename,
@@ -326,6 +337,7 @@ function Node({
   confirming: string | null;
   onOpen: (path: string) => void;
   onEditPixels: (path: string) => void;
+  onEditMap: (path: string) => void;
   onStartRename: (path: string) => void;
   onChangeDraft: (value: string) => void;
   onSubmitRename: () => void;
@@ -352,6 +364,7 @@ function Node({
             confirming={confirming}
             onOpen={onOpen}
             onEditPixels={onEditPixels}
+            onEditMap={onEditMap}
             onStartRename={onStartRename}
             onChangeDraft={onChangeDraft}
             onSubmitRename={onSubmitRename}
@@ -413,6 +426,17 @@ function Node({
             onClick={() => onEditPixels(node.path)}
           >
             <IconPixel />
+          </button>
+        ) : null}
+        {isMapDocument(node.path) ? (
+          <button
+            type="button"
+            data-testid="map-edit"
+            aria-label={text.map.editFile(node.path)}
+            title={text.map.edit}
+            onClick={() => onEditMap(node.path)}
+          >
+            <IconMap />
           </button>
         ) : null}
         <button type="button" aria-label={`${text.code.rename} ${node.name}`} onClick={() => onStartRename(node.path)}>
@@ -485,6 +509,13 @@ function IconPixel() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true">
       <path d="M3 3h4v4H3zM9 9h4v4H9zM9 3h4v2.5H9zM3 9h4v4H3z" />
+    </svg>
+  );
+}
+function IconMap() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M2.5 3.5h11v9h-11zM6 3.5v9M10 3.5v9M2.5 7h11M2.5 10.5h11" />
     </svg>
   );
 }

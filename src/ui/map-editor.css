@@ -1,0 +1,97 @@
+/* 地图编辑器。弹层和按钮沿用 styles.css，这里只排这一块。 */
+
+.modal.map-new { width: min(480px, 100%); }
+.modal.map-editor {
+  position: relative;
+  width: min(1080px, 100%);
+  height: min(760px, 92vh);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  outline: none;
+}
+.map-head, .map-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.map-head h2 { flex: 1; margin: 0; font-size: 16px; }
+.map-dirty { color: var(--brass); font-size: 12px; }
+.map-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 200px;
+  gap: 12px;
+  min-height: 0;
+}
+.map-tools, .map-side { display: grid; gap: 8px; align-content: start; overflow: auto; }
+.map-tool-row, .map-mode, .map-zoom, .map-bg { display: flex; flex-wrap: wrap; gap: 4px; }
+.map-tool-row > button, .map-mode > button { flex: 1 1 40%; }
+.modal .map-tool.on, .modal .map-mode button.on, .modal .map-tile.on, .modal .map-layer.on, .modal .map-bg button.on {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--paper-2), 0 0 0 3px var(--ink);
+}
+.map-palette, .map-layers { display: grid; gap: 4px; }
+.map-palette { grid-template-columns: repeat(4, 1fr); }
+.modal .map-tile, .modal .map-layer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  text-align: left;
+}
+.modal .map-tile canvas { width: 28px; height: 28px; image-rendering: pixelated; border-radius: 4px; }
+.map-layer-row { display: flex; gap: 4px; align-items: center; }
+.map-layer-row > button:first-child { flex: 1; }
+.map-stage { min-width: 0; min-height: 0; overflow: auto; display: grid; align-content: start; justify-items: start; }
+.map-board {
+  position: relative;
+  touch-action: none;
+  cursor: crosshair;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.map-board canvas { display: block; image-rendering: pixelated; }
+.map-readout { margin: 0; font-size: 13px; }
+.map-snippet {
+  margin: 0;
+  max-height: 96px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+.map-field { display: grid; gap: 6px; font-size: 13px; }
+.map-field > span:first-child { color: var(--muted); font-size: 12px; }
+.map-field input:not([type="checkbox"]) {
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fffdf8;
+  padding: 0 10px;
+}
+.map-field small { color: var(--muted); font-size: 11px; }
+.map-link {
+  border: 0 !important;
+  background: none !important;
+  padding: 0 !important;
+  color: var(--pine);
+  text-decoration: underline;
+  min-height: 0 !important;
+}
+.modal .map-problem { color: var(--danger); font-size: 13px; margin: 0; }
+.map-ask {
+  position: absolute;
+  inset: 0;
+  background: rgba(28, 30, 26, 0.28);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.map-ask > div {
+  width: min(420px, 100%);
+  background: var(--paper-2);
+  border-radius: 12px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 860px) {
+  .map-body { grid-template-columns: 1fr; }
+  .modal.map-editor { height: min(920px, 100%); }
+}

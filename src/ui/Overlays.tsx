@@ -5,6 +5,8 @@ import { useStudio } from "../studio/store";
 import { LibraryDialog } from "./LibraryDialog";
 import { PixelEditor } from "./PixelEditor";
 import { PixelNewDialog } from "./PixelNewDialog";
+import { MapEditor } from "./MapEditor";
+import { MapNewDialog } from "./MapNewDialog";
 import { text } from "./text";
 
 export function Overlays() {
@@ -14,8 +16,10 @@ export function Overlays() {
       {studio.assetOpen ? <AssetDialog /> : null}
       {studio.soundOpen ? <SoundDialog /> : null}
       {studio.pixelNewOpen ? <PixelNewDialog /> : null}
+      {studio.mapNewOpen ? <MapNewDialog /> : null}
       <LibraryDialog />
       <PixelEditor />
+      <MapEditor />
     </>
   );
 }
