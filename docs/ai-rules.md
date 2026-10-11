@@ -67,6 +67,7 @@
 - 【已实现】内置素材库对小助手和 WebMCP 是只读的：不能把库里的文件写进项目，也不能改 `assets/library.json` 这份版本记录。
   孩子在素材库里点「复制到项目」才复制文件，走工作室的同一套写入和撤销。模型可以 `pygame.image.load` 项目里已经有的图。
 - 【已实现】精灵动画说明（`*.anim.json`）也是孩子的：小助手和 WebMCP 不能改写。播放用普通 pygame 读 PNG 和这份 JSON。
+- 【已实现】瓦片地图（`*.map.json`、`maps/*.csv`、`*.tileset.png`）也是孩子的：小助手和 WebMCP 不能改写。加载用普通 pygame 读 JSON、碰撞 CSV 和瓦片 PNG。
 - 【已实现】生成的图片先预览，接受后才存入 `assets/`。
 - 【已实现】声音也是这样：模型只挑参数（`op: "sound"`），采样在浏览器里合成（`src/lib/audio/render.ts`），
   预听的 WAV 就是最后存进 `assets/` 的那一份。参数一律夹紧到安全范围（音高 20–8000 Hz、增益 ≤ 0.6、时长 ≤ 4 秒）。

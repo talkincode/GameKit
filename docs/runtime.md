@@ -39,6 +39,10 @@ await asyncio.sleep(0)
 
 精灵动画是项目里的两份普通文件：一张 PNG 精灵表，和旁边的 `.anim.json`。说明里的 `animation` 字段和素材库清单相同（帧宽高、帧序号、毫秒、动作）。预览和导出把它们和其他 `assets/` 文件一起打包。播放用普通 pygame（`image.load`、`subsurface`、`json`），可以是孩子复制的片段，或项目里可见的 `sprite_anim.py`。模板没有为动画改过。
 
+## 瓦片地图
+
+瓦片地图是项目里的普通文件：`maps/<名字>.map.json`、每一层一个 CSV、一份碰撞 CSV、一张瓦片 PNG。说明里的路径必须就是这些文件，不能指到项目里的其他路径。预览和导出把它们和其他项目文件一起打包。加载用普通 pygame（`json`、`csv`、`image.load`），可以是孩子照着编辑器里的片段写的，或项目里可见的 `map_loader.py`。模板没有为地图改过。
+
 ## 模板改动
 
 `runtime/player.tmpl` 来自 pygbag 0.9.3 的 `default.tmpl`（MIT，见 `runtime/LICENSE-pygbag.txt`），只改了四件事：

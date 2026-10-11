@@ -6,6 +6,7 @@ import "monaco-editor/languages/definitions/html/register.js";
 import "monaco-editor/languages/definitions/css/register.js";
 import { useEffect, useState } from "react";
 import { canEditPixels } from "../lib/pixel/rules";
+import { isMapDocument } from "../lib/map/document";
 import { assetFilter, editorLanguage, mediaType } from "../lib/project";
 import { useStudio } from "../studio/store";
 import { text } from "./text";
@@ -29,6 +30,11 @@ export function CodePane() {
       <div className="tabs">
         <span>{studio.path || text.code.files}</span>
         <div className="inline-ai">
+          {file && isMapDocument(file.path) ? (
+            <button type="button" data-testid="map-edit-code" onClick={() => studio.editMapFile(file.path)}>
+              {text.map.edit}
+            </button>
+          ) : null}
           <button
             type="button"
             data-testid="explain"

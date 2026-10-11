@@ -84,6 +84,9 @@ export function createGameKitMcpServer(env: GameKitEnv, email: string): McpServe
         if (file.path.endsWith(".anim.json")) {
           return { content: [{ type: "text", text: "动画说明要孩子自己在像素编辑器里改，助手不能改写。" }], isError: true };
         }
+        if (file.path.endsWith(".map.json") || file.path.endsWith(".tileset.png") || (file.path.startsWith("maps/") && file.path.endsWith(".csv"))) {
+          return { content: [{ type: "text", text: "地图要孩子自己在地图编辑器里改，助手不能改写。" }], isError: true };
+        }
         if (![".py", ".txt", ".json", ".toml", ".md"].some((ext) => file.path.endsWith(ext))) {
           return { content: [{ type: "text", text: `只能改文本文件，${file.path} 不行。` }], isError: true };
         }

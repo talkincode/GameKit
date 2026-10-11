@@ -373,6 +373,29 @@ describe("OAuth 2.1 full authorization & MCP collaboration loop", () => {
     expect(animText).toContain("动画说明");
     expect(animText).not.toContain("已交给孩子确认");
 
+    const mapReq = new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: bearer,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 43,
+        method: "tools/call",
+        params: {
+          name: "propose_files",
+          arguments: { say: "改掉地图", files: [{ path: "maps/level-1.map.json", text: "{}" }] },
+        },
+      }),
+    });
+    const mapRes = await worker.fetch(mapReq as never, env, {} as never);
+    expect(mapRes.status).toBe(200);
+    const mapText = await mapRes.text();
+    expect(mapText).toContain("地图要孩子自己");
+    expect(mapText).not.toContain("已交给孩子确认");
+
     // 11. Child's studio polls /api/collab/sync and receives the candidate
     const syncReq = new Request("http://localhost/api/collab/sync", {
       method: "POST",
