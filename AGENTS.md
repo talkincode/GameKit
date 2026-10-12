@@ -60,7 +60,7 @@ GameKit 是给孩子用的 AI 辅助 pygame 游戏工作室：像 MakeCode Arcad
 
 Worker 没有需要 Cloudflare 登录的远程绑定：文本和图片都走服务端持有的密钥，本地、预览和线上跑的是同一套代码。
 
-上线步骤：`scripts/setup-access.sh`（创建 Access 应用并写入 `ACCESS_AUD`）→ `scripts/put-secrets.sh`（把 `.env` 里的 secret 写入 Worker）→ 推送 `main`。
+上线步骤：`scripts/setup-access.sh`（创建 Access 应用并写入 `ACCESS_AUD`）→ `scripts/put-secrets.sh`（把 `.env` 里的 secret 写入 Worker）→ 在 GitHub Actions 中从 `main` 分支手动运行 `CI` workflow（`workflow_dispatch`）。
 
 ## 常用命令
 

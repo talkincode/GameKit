@@ -57,7 +57,9 @@ pnpm preview
 
 ## 部署
 
-推送到 `main` 后，GitHub Actions 会跑单元测试、类型检查、构建和 E2E，全部通过后执行 `wrangler deploy`。
+PR 上的 GitHub Actions 只运行快速状态标记，不会跑测试、类型检查、构建或 E2E；绿色状态不代表这些检查已在 GitHub 上执行。提交前请本地运行 `pnpm test`、`pnpm typecheck`、`pnpm build` 和 `pnpm test:e2e`。
+
+生产发布改为手动触发：在 GitHub Actions 中从 `main` 分支运行 `CI` workflow（`workflow_dispatch`），部署任务会构建并执行 `wrangler deploy`。
 
 使用仓库已有的 Cloudflare 凭据，不把密钥写入源码：
 
