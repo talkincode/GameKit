@@ -121,10 +121,11 @@ Cloudflare Worker（gamekit.talkincode.net）
 
 听懂想法 → 设计（设计卡）→ 制作（候选版本文件）→ 静态检查 → 自动试运行 → 最多修两次 → 等孩子试玩。
 一轮最多 4 次模型调用；只有代码证据（静态问题、traceback）触发修复，预览没起来就算「没能自动验证」。
-候选在内存里，刷新就没了，从不碰作品；采用才写入并记快照。
+候选不写进作品。它和对话卡片一起留在这台电脑上，刷新后还在，可以接着改；采用才写入并记快照。
 孩子可以中途停下；换项目、新建、导入时正在跑的一轮立即作废。
 会话（对话历史、token 用量、压缩）由 Google ADK 承担：每个项目一份 session 存在本机，打开项目接着聊，
 超过记忆上限就把最早的对话压成摘要；上限在「设置」里可选，默认跟随模型能装多少。
+下一句默认接着同一局：屏幕上没采用的那一版就是要改的游戏，提示词里带着之前几轮的原话。
 入口 `src/lib/agent.ts`（步骤逻辑，可注入依赖）、`src/lib/adk/`（模型适配、会话、runner）、
 `src/studio/store.tsx`（接运行与状态）、`src/ui/SettingsPanel.tsx`。
 
@@ -281,8 +282,8 @@ Worker 对每个 `/api/*` 请求校验 Access JWT（签名、aud、iss、过期�
 
 推送 `main` 后 CI 单元测试、类型检查、构建、E2E，全部通过后 `wrangler deploy`（`.github/workflows/ci.yml`）。
 
-尚不存在：云同步、PWA 清单与离线外壳、AI 按人配额、
-对话历史持久化（一轮的对话刷新后就没了，设计卡和作品在）。教程与配方、素材检索已在阶段 E 交付。
+尚不存在：云同步、PWA 清单与离线外壳、AI 按人配额。教程与配方、素材检索已在阶段 E 交付。
+对话卡片刷新后还在（IndexedDB `transcripts`），作品仍然要采用才写入。
 
 ## L0 分阶段（Issue #14）
 
@@ -442,7 +443,7 @@ PNG/OGG/数据文件，代码用标准 pygame 读取。不依赖 AI，未登录�
 | 浏览器内运行 | 已有 | 中 | ✅（候选版本在舞台上跑起来，循环能拿到「在跑」证据） | ❌ 缺口（出错行定位） | 不适用 | 不适用（不改持久状态） | `tests/e2e/agent.spec.ts` 的每一条都要经过运行阶段；`src/lib/export.test.ts`（打包与模板）；`tests/e2e/issue-regressions.spec.ts`（停止/换项目取消启动中的预览、预览在独立来源的 iframe 里）、`src/lib/session.test.ts`（多标签页不清掉彼此的预览缓存）。画面本身与真实帧率仍需人工看 |
 | 诊断与报错 | 已有 | 中 | ✅（小助手靠静态检查发现 time.sleep 并修好） | ✅ 单元 | 不适用 | 不适用（只读） | `src/lib/diagnostics.test.ts`（含没有 Traceback 抬头的语法错误）；`tests/e2e/agent.spec.ts`：`a candidate the checks reject is repaired before the child sees it`；`tests/e2e/issue-regressions.spec.ts`：`export build errors are reported in the Problems panel` |
 | 本机日志与小助手错误详情 | 已有 | 中（看不懂失败、密钥进日志） | ✅（匿名打开「日志」，没有 `/api/` 请求；授权用户一轮结束后日志里有这一条） | ✅（上游 429：孩子看到「太忙」，点「查看详情」能看到 `requestId` 和状态码；页面和复制内容不含密钥） | ✅ 匿名可看日志 / 授权用户才会打到小助手 | ✅（清空前再问一次；失败不改作品，坏答案仍不写入） | `tests/e2e/logs.spec.ts`；`worker/index.test.ts`：`classifies a rate limit…`、`gives a refused sign-in a request id…`；`src/lib/log/journal.test.ts`；`src/lib/agent.test.ts`：`fails loudly when the model answer is unusable` |
-| AI 游戏设计器（Agent 循环） | 已有 | 高（改动作品、消耗额度） | ✅（想法 → 候选 → 采用 → 撤销；第二轮在已采用的基础上继续改；图片输入） | ✅（坏答案不写入；静态问题先修；修复超限停下；中途取消；换项目不串写；越界路径、二进制素材、超大文件；图片类型/张数/大小） | ✅ 匿名 / 授权 / 已登录未授权 | ✅（采用后撤销；取消、失败、登录丢失后作品不变） | `tests/e2e/agent.spec.ts`（7 条）、`tests/e2e/attachments.spec.ts`（3 条）、`tests/e2e/ask.spec.ts`（3 条）、`tests/e2e/account.spec.ts`（6 条）、`src/lib/agent.test.ts`（15 条）、`src/lib/ai.test.ts`（12 条）；`worker/index.test.ts`：`ai gateway` |
+| AI 游戏设计器（Agent 循环） | 已有 | 高（改动作品、消耗额度） | ✅（想法 → 候选 → 采用 → 撤销；第二轮在已采用或还没采用的这一版上继续改；刷新后对话还在；图片输入） | ✅（坏答案不写入；静态问题先修；修复超限停下；中途取消；换项目不串写；越界路径、二进制素材、超大文件；图片类型/张数/大小） | ✅ 匿名 / 授权 / 已登录未授权 | ✅（采用后撤销；取消、失败、登录丢失后作品不变） | `tests/e2e/agent.spec.ts`（7 条）、`tests/e2e/settings.spec.ts`（刷新后对话还在，下一句请求带上一句）、`tests/e2e/attachments.spec.ts`（3 条）、`tests/e2e/ask.spec.ts`（3 条）、`tests/e2e/account.spec.ts`（6 条）、`src/lib/agent.test.ts`（18 条）、`src/lib/ai.test.ts`（15 条）、`src/lib/conversation.test.ts`（6 条）；`worker/index.test.ts`：`ai gateway` |
 | AI 讲解（只读） | 已有 | 低 | ✅（讲讲这段 → 对话面板里出现回答，项目不变） | ✅ 单元（模型没答好时显示「没想好」） | ✅ 匿名时不可用 / 授权可用 | 不适用（不写入） | `tests/e2e/account.spec.ts`：`allowed account: 讲讲这段 reads code and never rewrites the project`；`src/lib/ai.test.ts`：`asks for an explanation without allowing new files` |
 | 声音生成 | 已有 | 中（消耗额度、噪音扰人） | ✅（音效与音乐生成 → 试听 → 保存到项目 → 撤销） | ✅ 单元（参数越界全部夹紧、非 JSON 拒绝、确定性渲染、循环长度与首尾无爆音、WAV 头） | ✅ 匿名不可用 / 授权可用 | ✅（接受前不写入，保存后可撤销） | `tests/e2e/sounds.spec.ts`（3 条）、`src/lib/audio/render.test.ts`（10 条） |
 | AI 素材生成 | 已有 | 高（消耗额度、儿童内容） | ✅（生成 → 预览 → 放进项目 → 撤销） | ✅ 单元（未配置拒绝、上游失败不回显密钥、无图 502；去背景/裁剪/缩放像素级断言） | ✅ 匿名不可用 / 授权可用 | ✅（接受前不写入，接受后可撤销） | `tests/e2e/assets.spec.ts`（3 条）、`worker/index.test.ts`：`draws with Gemini…`、`tells the model what a sprite must not contain…`、`refuses to draw when the Gemini key is not configured`；`src/lib/sprite.test.ts` |

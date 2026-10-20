@@ -113,6 +113,23 @@ describe("a round of the agent loop", () => {
     expect(h.candidates).toHaveLength(1);
   });
 
+  it("asks the model to continue the earlier conversation", async () => {
+    const h = harness({ answers: [DESIGN, filesAnswer(GOOD_MAIN)] });
+    await runAgentTurn(
+      {
+        id: "t2",
+        request: "加一个分数",
+        earlier: [{ request: "做一个躲陨石的游戏", say: "好，先做躲陨石。", title: "太空小方块" }],
+      },
+      base,
+      h.fx,
+    );
+    expect(h.prompts[0]).toContain("做一个躲陨石的游戏");
+    expect(h.prompts[0]).toContain("同一局游戏");
+    expect(h.prompts[1]).toContain("加一个分数");
+    expect(h.prompts[1]).toContain("接着这一局改");
+  });
+
   it("never touches the child's project", async () => {
     const h = harness({ answers: [DESIGN, filesAnswer(GOOD_MAIN)] });
     await turn(h);

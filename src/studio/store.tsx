@@ -40,6 +40,7 @@ import { loadLibrary } from "../lib/assets/catalog";
 import { materializeAsset, resolveCatalogCopy } from "../lib/assets/propose";
 import { hitsFromPacks } from "../lib/assets/search";
 import { explainMessages, readSay, type ChatImage, type ChatMessage } from "../lib/ai";
+import { earlierRounds, packConversation, projectForNextRound, restoreConversation } from "../lib/conversation";
 import { lessonFor } from "../lib/recipes/check";
 import { createRecipeProject, recipeIdOf } from "../lib/recipes/catalog";
 import { buildWebBundle } from "../lib/build";
@@ -86,7 +87,7 @@ import { createBlankProject, createStarterProject } from "../lib/starter";
 import { applyLibraryCopy, type LibraryCopyRequest, type LibraryCopyResult } from "../lib/assets/copy";
 import { librarySpriteNote } from "../lib/assets/sprite-note";
 import { aiCallSummary, appendLog, hydrateLogs, logFailure, requestIdFrom } from "../lib/log/journal";
-import { deleteStoredProject, loadProjects, saveProject } from "../lib/storage";
+import { deleteStoredProject, loadProjects, loadTranscript, saveProject, saveTranscript } from "../lib/storage";
 import { text } from "../ui/text";
 
 export type RunState = "idle" | "starting" | "running" | "stopped" | "error";
@@ -451,6 +452,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<ViewId>("design");
   const [panels, setPanels] = useState<PanelState>(() => readPanels());
   const [turns, setTurns] = useState<Turn[]>([]);
+  /** False until this project's saved dialogue has been read, so a save cannot wipe it. */
+  const [turnsReady, setTurnsReady] = useState(false);
   const [turnBusy, setTurnBusy] = useState(false);
   const [assetDraft, setAssetDraft] = useState<AssetDraft | null>(null);
   const [assetKind, setAssetKind] = useState<AssetKind>("sprite");
@@ -491,6 +494,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const project = projects.find((item) => item.id === activeId) ?? null;
   const projectRef = useRef(project);
   projectRef.current = project;
+  const turnsRef = useRef(turns);
+  turnsRef.current = turns;
+  /** Project id whose dialogue is loaded. A save for any other id is ignored. */
+  const conversationFor = useRef("");
   /** Which view is on screen, for messages that belong to the other one. */
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -697,6 +704,43 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!project) {
+      conversationFor.current = "";
+      setTurnsReady(false);
+      return;
+    }
+    const id = project.id;
+    let cancel = false;
+    conversationFor.current = "";
+    setTurnsReady(false);
+    setTurns([]);
+    void loadTranscript(id)
+      .then((stored) => {
+        if (cancel) return;
+        conversationFor.current = id;
+        setTurns(restoreConversation(stored));
+        setTurnsReady(true);
+      })
+      .catch(() => {
+        if (cancel) return;
+        conversationFor.current = id;
+        setTurns([]);
+        setTurnsReady(true);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [project?.id]);
+
+  useEffect(() => {
+    const id = project?.id;
+    if (!id || conversationFor.current !== id) return;
+    void saveTranscript(id, packConversation(turns)).catch((error: unknown) => {
+      console.warn("Conversation was not saved:", error);
+    });
+  }, [turns, project?.id]);
+
+  useEffect(() => {
+    if (!project) {
       setRemembers(false);
       return;
     }
@@ -731,15 +775,26 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     };
   }, [project, ready, flushSave]);
 
-  /** Closing the tab or switching away must not drop the last keystrokes. */
+  /** Closing the tab or switching away must not drop the last keystrokes or the last sentence. */
   useEffect(() => {
-    const onHidden = () => {
-      if (document.visibilityState === "hidden") flushSave();
+    const flushConversation = () => {
+      const id = conversationFor.current;
+      if (!id) return;
+      void saveTranscript(id, packConversation(turnsRef.current)).catch((error: unknown) => {
+        console.warn("Conversation was not saved:", error);
+      });
     };
-    window.addEventListener("pagehide", flushSave);
+    const onLeave = () => {
+      flushSave();
+      flushConversation();
+    };
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") onLeave();
+    };
+    window.addEventListener("pagehide", onLeave);
     document.addEventListener("visibilitychange", onHidden);
     return () => {
-      window.removeEventListener("pagehide", flushSave);
+      window.removeEventListener("pagehide", onLeave);
       document.removeEventListener("visibilitychange", onHidden);
     };
   }, [flushSave]);
@@ -1198,8 +1253,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const startTurn = useCallback(
     async (request: string, images?: ChatImage[]) => {
-      const base = projectRef.current;
-      if (!base) return;
+      const saved = projectRef.current;
+      if (!saved || conversationFor.current !== saved.id) return;
       if (account.kind !== "signed-in") {
         setNotice(text.ai.needsSignIn);
         return;
@@ -1215,8 +1270,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         adopted: false,
         discarded: false,
       };
+      // Read the previous rounds before this sentence is appended. After the
+      // await below, the ref already includes `fresh`, which has no candidate
+      // yet and would otherwise look like "start from the saved project".
+      const prior = turnsRef.current;
+      const base = projectForNextRound(saved, prior);
+      const earlier = earlierRounds(prior);
       setTurns((list) => [...list, fresh]);
-      turnRef.current = { id: turnId, projectId: base.id, cancelled: false };
+      turnRef.current = { id: turnId, projectId: saved.id, cancelled: false };
       setTurnBusy(true);
       setNotice("");
       const patch = (change: (turn: Turn) => Turn) =>
@@ -1229,27 +1290,31 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       }
       let outcome: AgentTurnOutcome;
       try {
-        outcome = await runAgentTurn({ id: turnId, request: fresh.request, images, catalog }, base, {
-          model: callModel,
-          diagnose: diagnoseProject,
-          run: runCandidate,
-          cancelled: () =>
-            turnRef.current?.id !== turnId || turnRef.current.cancelled || projectRef.current?.id !== base.id,
-          emit: (event) => patch((item) => applyEvent(item, event)),
-          attachAssets: async (project, assets) => {
-            let next = project;
-            for (const asset of assets) {
-              const copy = await resolveCatalogCopy(asset.packId, asset.assetId);
-              if (!copy) throw new Error("Unknown library asset.");
-              const applied = await materializeAsset(next, copy);
-              if (!applied.ok && applied.reason !== "identical") {
-                throw new Error("Refusing to overwrite a library file the child already has.");
+        outcome = await runAgentTurn(
+          { id: turnId, request: fresh.request, images, catalog, earlier },
+          base,
+          {
+            model: callModel,
+            diagnose: diagnoseProject,
+            run: runCandidate,
+            cancelled: () =>
+              turnRef.current?.id !== turnId || turnRef.current.cancelled || projectRef.current?.id !== saved.id,
+            emit: (event) => patch((item) => applyEvent(item, event)),
+            attachAssets: async (project, assets) => {
+              let next = project;
+              for (const asset of assets) {
+                const copy = await resolveCatalogCopy(asset.packId, asset.assetId);
+                if (!copy) throw new Error("Unknown library asset.");
+                const applied = await materializeAsset(next, copy);
+                if (!applied.ok && applied.reason !== "identical") {
+                  throw new Error("Refusing to overwrite a library file the child already has.");
+                }
+                if (applied.ok) next = applied.project;
               }
-              if (applied.ok) next = applied.project;
-            }
-            return next;
+              return next;
+            },
           },
-        });
+        );
       } catch (error) {
         const failure = failureFromUnknown(error);
         outcome = { kind: "failed", message: failure.message, failure };
@@ -1299,7 +1364,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   /** The step the loop is on right now, for the live status in the UI. */
   const activeStep = activeTurn?.steps.filter((step) => step.status === "active").at(-1);
   const candidate = activeTurn && !activeTurn.adopted && !activeTurn.discarded ? activeTurn.candidate ?? null : null;
-  const canTurn = account.kind === "signed-in" && !!project && !turnBusy;
+  const canTurn = account.kind === "signed-in" && !!project && !turnBusy && turnsReady;
 
   const adoptCandidate = useCallback(() => {
     const turn = turns.at(-1);
@@ -1338,7 +1403,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const explainSelection = useCallback(async () => {
     const current = projectRef.current;
-    if (!current) return;
+    if (!current || conversationFor.current !== current.id) return;
     if (account.kind !== "signed-in") {
       setNotice(text.ai.needsSignIn);
       return;

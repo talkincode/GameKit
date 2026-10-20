@@ -18,6 +18,7 @@ import {
   type AssetIntent,
   type ChatImage,
   type ChatMessage,
+  type EarlierRound,
   type TextChange,
 } from "./ai";
 import type { DesignCard } from "./design";
@@ -72,7 +73,14 @@ export type AgentEvent =
   | { kind: "design"; design: DesignCard; say: string }
   | { kind: "candidate"; candidate: CandidateResult };
 
-export type AgentTurnInput = { id: string; request: string; images?: ChatImage[]; catalog?: CatalogHit[] };
+export type AgentTurnInput = {
+  id: string;
+  request: string;
+  images?: ChatImage[];
+  catalog?: CatalogHit[];
+  /** Earlier rounds of this same game, so this step is not a new conversation. */
+  earlier?: EarlierRound[];
+};
 
 export type AgentEffects = {
   /** One model call. Throws when the call or the answer is unusable. */
@@ -162,7 +170,9 @@ export async function runAgentTurn(
   let design: DesignCard;
   let say = "";
   try {
-    const answer = readDesign(await ask(designMessages({ request: input.request, base, images: input.images })));
+    const answer = readDesign(
+      await ask(designMessages({ request: input.request, base, images: input.images, earlier: input.earlier })),
+    );
     design = answer.card;
     say = answer.say;
   } catch (error) {
@@ -188,7 +198,7 @@ export async function runAgentTurn(
   let candidate: Project;
   try {
     const built = await takeFiles(
-      await ask(buildMessages({ request: input.request, design, base, catalog: input.catalog })),
+      await ask(buildMessages({ request: input.request, design, base, catalog: input.catalog, earlier: input.earlier })),
       base,
     );
     candidate = built.project;

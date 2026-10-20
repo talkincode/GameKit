@@ -26,7 +26,9 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: "pnpm exec vite preview --port 4173 --strictPort",
+      // Build copies .dev.vars into dist/, and preview then ignores process.env.
+      // Rewrite that file from the env below or local secrets hide the stand-in login.
+      command: "node tests/e2e/preview-vars.mjs && exec pnpm exec vite preview --port 4173 --strictPort",
       url: "http://localhost:4173",
       reuseExistingServer: false,
       env: {

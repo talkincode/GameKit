@@ -40,6 +40,9 @@ export function projectRunner(input: { system: string; sessionId: string; budget
     name: "gamekit_designer",
     model: llm,
     instruction: input.system,
+    // Leave this explicit. Some ADK paths treat an omitted value as "none" and
+    // then each step is a new conversation with no earlier turns.
+    includeContents: "default",
     contextCompactors: [
       new TokenBasedContextCompactor({
         tokenThreshold: input.budgetTokens,

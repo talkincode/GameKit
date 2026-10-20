@@ -60,15 +60,39 @@ test("a project's conversation is loaded back when it is opened again", async ({
   await page.getByLabel(text.pane.placeholder).fill("做一个太空小方块");
   await page.getByRole("button", { name: text.pane.send }).click();
   await expect(page.getByTestId("candidate")).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(async () => {
+      return page.evaluate(async () => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open("gamekit");
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        if (!db.objectStoreNames.contains("transcripts")) {
+          db.close();
+          return "";
+        }
+        const rows = await new Promise<{ turns?: { request?: string }[] }[]>((resolve, reject) => {
+          const request = db.transaction("transcripts").objectStore("transcripts").getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        db.close();
+        return rows.flatMap((row) => row.turns ?? []).map((turn) => turn.request ?? "").join("\n");
+      });
+    })
+    .toContain("做一个太空小方块");
 
-  // Reload: a fresh page, the same project. The next round must carry the first
-  // one in its conversation, which only works if the session came back from disk.
+  // Reload: a fresh page, the same project. The dialogue card and the next model
+  // request both have to carry the first sentence.
   await page.reload();
-  await expect(page.getByTestId("pane")).toContainText(text.pane.remembers);
+  await expect(page.getByTestId("design-turn")).toContainText("做一个太空小方块");
+  const before = seen.length;
   await page.getByLabel(text.pane.placeholder).fill("再改一句");
-  await page.locator(".pane-actions .run").click();
-  await expect.poll(() => seen.length, { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
+  await page.getByRole("button", { name: text.pane.sendNext }).click();
+  await expect.poll(() => seen.length, { timeout: 30_000 }).toBeGreaterThan(before);
 
-  const last = seen.at(-1) ?? [];
-  expect(last.some((content) => content.includes("做一个太空小方块"))).toBe(true);
+  const followUp = seen.slice(before).flat();
+  expect(followUp.some((content) => content.includes("再改一句"))).toBe(true);
+  expect(followUp.some((content) => content.includes("做一个太空小方块"))).toBe(true);
 });

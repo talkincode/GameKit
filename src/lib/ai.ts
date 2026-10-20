@@ -1,5 +1,5 @@
 import { catalogLines, findHit, type CatalogHit } from "../../shared/catalog";
-import { designFromRecord, designText, type DesignCard } from "./design";
+import { designFromRecord, designText, hasDesign, type DesignCard } from "./design";
 import type { Problem } from "./diagnostics";
 import { isAudioPath } from "./audio/format";
 import { PINS_PATH } from "./assets/copy";
@@ -45,6 +45,7 @@ const SYSTEM = `You are the game designer inside GameKit, a browser studio where
 You work in rounds: read the child's idea, write the design card, build the game files, and fix what the checks find. The child plays the result and decides whether to keep it.
 Code rules:
 - The child owns the project. Change only the requested scope and keep the project's existing structure and names.
+- A later sentence continues this same game. Keep the current design and code except what the child just asked to change. Start a different game only when they clearly ask for a new one.
 - Write ordinary pygame. Never invent a GameKit game API. If you are unsure a pygame function exists, say so instead of guessing.
 - The browser runtime is pygame-ce via pygbag. A frame loop must include await asyncio.sleep(0), usually right after pygame.display.flip(). That form also runs on desktop Python.
 - Do not use time.sleep, pygame.time.wait, or pygame.time.delay.
@@ -158,6 +159,20 @@ function designBlock(card: DesignCard | undefined): string {
   return card ? `现在的设计卡：\n${designText(card)}\n` : "还没有设计卡。\n";
 }
 
+/** One earlier round, short enough to sit inside the next request. */
+export type EarlierRound = { request: string; say: string; title?: string };
+
+/** The same game, told again so the latest request is not a brand-new conversation. */
+function historyBlock(earlier: EarlierRound[] | undefined): string {
+  if (!earlier?.length) return "";
+  const lines = earlier.slice(-8).map((round, index) => {
+    const title = round.title?.trim() ? `，游戏叫「${clip(round.title.trim(), 40)}」` : "";
+    const say = round.say.trim() ? `\n   小助手：${clip(round.say.trim(), 180)}` : "";
+    return `${index + 1}. 孩子：${clip(round.request.trim(), 240)}${title}${say}`;
+  });
+  return clip(`之前的对话（这是同一局游戏，接着改；只有孩子明确要换一个新游戏时才重做）：\n${lines.join("\n")}\n\n`, 1_600);
+}
+
 function problemsBlock(problems: Problem[], consoleTail: string): string {
   const lines = problems.map((item) => `${item.path ?? "main.py"}${item.line ? `:${item.line}` : ""} — ${item.message}`);
   const console = consoleTail.trim() ? `\n运行输出（最后几行）：\n${clip(consoleTail.trim(), CONSOLE_TAIL)}\n` : "";
@@ -165,11 +180,22 @@ function problemsBlock(problems: Problem[], consoleTail: string): string {
 }
 
 /** Turns the child's words (and any pictures they attached) into a design card. */
-export function designMessages(input: { request: string; base: Project; images?: ChatImage[] }): ChatMessage[] {
+export function designMessages(input: {
+  request: string;
+  base: Project;
+  images?: ChatImage[];
+  earlier?: EarlierRound[];
+}): ChatMessage[] {
+  const continuing = hasDesign(input.base.design) || (input.earlier?.length ?? 0) > 0;
+  const fileBudget = continuing ? 8_000 : 3_000;
   const text =
+    historyBlock(input.earlier) +
     `孩子说的话：${clip(input.request.trim(), 1_500)}\n\n` +
-    `现在项目里的文件：\n${clip(filesForPrompt(input.base.files, 3_000), 3_000)}\n` +
-    `把这句话整理成这张游戏的设计卡。孩子没想到的地方你替他拿主意，用孩子看得懂的说法。\n` +
+    (hasDesign(input.base.design) ? `${designBlock(input.base.design)}\n` : "") +
+    `现在项目里的文件：\n${clip(filesForPrompt(input.base.files, fileBudget), fileBudget)}\n` +
+    (continuing
+      ? `这是同一局游戏。按孩子这次说的话改设计卡，没提到的地方保持原样。只有孩子明确说要换一个新游戏时才重做。\n`
+      : `把这句话整理成这张游戏的设计卡。孩子没想到的地方你替他拿主意，用孩子看得懂的说法。\n`) +
     (input.images?.length
       ? `孩子还发了 ${input.images.length} 张图片，先看懂它们（可能是想做的样子，也可能是游戏出错的截图），再写设计卡。\n`
       : "") +
@@ -183,7 +209,13 @@ export function designMessages(input: { request: string; base: Project; images?:
 }
 
 /** Builds the candidate version of the whole game. */
-export function buildMessages(input: { request: string; design: DesignCard; base: Project; catalog?: CatalogHit[] }): ChatMessage[] {
+export function buildMessages(input: {
+  request: string;
+  design: DesignCard;
+  base: Project;
+  catalog?: CatalogHit[];
+  earlier?: EarlierRound[];
+}): ChatMessage[] {
   const catalog = input.catalog?.length
     ? `素材目录（只读，最多点名 2 个，不要写字节）：\n${catalogLines(input.catalog)}\n` +
       `要用的话，在 JSON 里加 "assets":[{"packId":"...","assetId":"..."}]。这只会产生候选，不会直接改作品。\n`
@@ -193,11 +225,14 @@ export function buildMessages(input: { request: string; design: DesignCard; base
     {
       role: "user",
       content:
+        historyBlock(input.earlier) +
         `孩子说的话：${clip(input.request.trim(), 1_000)}\n\n` +
         `${designBlock(input.design)}\n` +
         `现在项目里的文件：\n${filesForPrompt(input.base.files, MESSAGE_BUDGET - 4_000) || "（空项目）"}\n` +
         catalog +
-        `把这张设计卡做成能玩的游戏，写出完整的文件（不是片段）。必须包含 main.py。\n` +
+        (input.earlier?.length
+          ? `接着这一局改：按新的设计卡改现在的文件，没让改的部分留着，不要换成另一个游戏。写出完整的文件（不是片段）。必须包含 main.py。\n`
+          : `把这张设计卡做成能玩的游戏，写出完整的文件（不是片段）。必须包含 main.py。\n`) +
         `沿用项目里已经在用的结构和命名；可以新增 .py 文件；不要改动 assets/ 里的二进制素材，也不要改 assets/library.json、*.anim.json、音频文件（*.wav、*.ogg、*.mp3、*.aiff）或地图文件（*.map.json、maps/*.csv、*.tileset.png）。点名素材库只放在 assets 数组里。动画帧、地图和声音文件也要孩子自己在编辑器里改。\n` +
         `返回 {"say":"给孩子的一句话","files":[{"path":"main.py","content":"整个文件"}]}，最多 6 个文件。`,
     },

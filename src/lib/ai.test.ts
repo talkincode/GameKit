@@ -37,6 +37,20 @@ describe("requests to the model", () => {
     expect(system.content).toContain("*.map.json");
     expect(system.content).toContain("*.wav");
     expect(user.content).toContain("一个在太空里躲陨石的游戏");
+    expect(user.content).not.toContain("同一局游戏");
+  });
+
+  it("continues the same game when the child has already been talking", () => {
+    const [, user] = designMessages({
+      request: "加一个分数",
+      base: { ...project, design: card },
+      earlier: [{ request: "做一个躲陨石的游戏", say: "好，先做躲陨石。", title: "太空小方块" }],
+    });
+    expect(user.content).toContain("加一个分数");
+    expect(user.content).toContain("做一个躲陨石的游戏");
+    expect(user.content).toContain("太空小方块");
+    expect(user.content).toContain("同一局游戏");
+    expect(user.content).toContain("现在的设计卡");
   });
 
   it("carries the child's project into a build request", () => {

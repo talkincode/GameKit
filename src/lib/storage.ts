@@ -8,6 +8,8 @@ const SESSION_STORE = "sessions";
 const SOUND_STORE = "sounds";
 /** One ring of local diagnostic rows (src/lib/log/journal.ts). */
 const LOG_STORE = "logs";
+/** The visible assistant dialogue for one project (src/lib/conversation.ts). */
+const TRANSCRIPT_STORE = "transcripts";
 const JOURNAL_ID = "journal";
 
 /**
@@ -18,8 +20,9 @@ const JOURNAL_ID = "journal";
  * Version 2 added the `sessions` store for agent conversations.
  * Version 3 added the `sounds` store for editor sounds kept on this computer.
  * Version 4 added the `logs` store for the on-device diagnostic journal.
+ * Version 5 added the `transcripts` store so a project's conversation survives refresh.
  */
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export type StoredKeptSound = {
   id: string;
@@ -37,6 +40,7 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(SESSION_STORE)) db.createObjectStore(SESSION_STORE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(SOUND_STORE)) db.createObjectStore(SOUND_STORE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(LOG_STORE)) db.createObjectStore(LOG_STORE, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(TRANSCRIPT_STORE)) db.createObjectStore(TRANSCRIPT_STORE, { keyPath: "id" });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -84,7 +88,32 @@ export async function deleteStoredProject(id: string): Promise<void> {
   const db = await openDb();
   await requestToPromise(db.transaction(STORE, "readwrite").objectStore(STORE).delete(id));
   await requestToPromise(db.transaction(SESSION_STORE, "readwrite").objectStore(SESSION_STORE).delete(id));
+  await requestToPromise(db.transaction(TRANSCRIPT_STORE, "readwrite").objectStore(TRANSCRIPT_STORE).delete(id));
   db.close();
+}
+
+/** The dialogue cards for one project. Missing row means this project has not been talked about. */
+export async function loadTranscript(projectId: string): Promise<unknown[] | null> {
+  const db = await openDb();
+  const row = await requestToPromise(
+    db.transaction(TRANSCRIPT_STORE).objectStore(TRANSCRIPT_STORE).get(projectId) as IDBRequest<{ id: string; turns?: unknown } | undefined>,
+  );
+  db.close();
+  return Array.isArray(row?.turns) ? row.turns : null;
+}
+
+export async function saveTranscript(projectId: string, turns: unknown[]): Promise<void> {
+  const db = await openDb();
+  const transaction = db.transaction(TRANSCRIPT_STORE, "readwrite");
+  const committed = transactionToPromise(transaction);
+  try {
+    await Promise.all([
+      requestToPromise(transaction.objectStore(TRANSCRIPT_STORE).put({ id: projectId, turns })),
+      committed,
+    ]);
+  } finally {
+    db.close();
+  }
 }
 
 /**
